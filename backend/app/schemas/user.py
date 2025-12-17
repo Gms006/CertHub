@@ -1,0 +1,23 @@
+import uuid
+from datetime import datetime
+
+from pydantic import BaseModel, ConfigDict
+
+
+class UserBase(BaseModel):
+    ad_username: str
+    email: str | None = None
+    nome: str | None = None
+    is_active: bool = True
+
+
+class UserCreate(UserBase):
+    pass
+
+
+class UserRead(UserBase):
+    id: uuid.UUID
+    org_id: int
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
