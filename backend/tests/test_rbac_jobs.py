@@ -1,98 +1,34 @@
-import os
-import sys
 import uuid
-from datetime import datetime
+
+import importlib.util
 from pathlib import Path
 
-import pytest
-from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.pool import StaticPool
-from sqlalchemy.orm import Session, sessionmaker
+helpers_path = Path(__file__).resolve().parent / "helpers.py"
+helpers_spec = importlib.util.spec_from_file_location("tests.helpers", helpers_path)
+helpers = importlib.util.module_from_spec(helpers_spec)
+assert helpers_spec and helpers_spec.loader
+helpers_spec.loader.exec_module(helpers)
 
-os.environ.setdefault("DATABASE_URL", "sqlite+pysqlite:///:memory:")
-sys.path.append(str(Path(__file__).resolve().parents[1]))
+from app import models
+from app.models import AuditLog
 
-from app import models  # noqa: E402
-from app.core.security import ALLOWED_ROLES  # noqa: E402
-from app.db.base import Base  # noqa: E402
-from app.db.session import get_db  # noqa: E402
-from app.main import app  # noqa: E402
-
-
-@pytest.fixture()
-def test_client_and_session():
-    engine = create_engine(
-        os.environ["DATABASE_URL"], connect_args={"check_same_thread": False}, poolclass=StaticPool
-    )
-    Base.metadata.drop_all(engine)
-    Base.metadata.create_all(engine)
-    TestingSessionLocal = sessionmaker(
-        bind=engine, autocommit=False, autoflush=False, class_=Session, expire_on_commit=False
-    )
-
-    def override_get_db():
-        db = TestingSessionLocal()
-        try:
-            yield db
-        finally:
-            db.close()
-
-    app.dependency_overrides[get_db] = override_get_db
-
-    with TestClient(app) as client:
-        yield client, TestingSessionLocal
-
-    app.dependency_overrides.clear()
-    Base.metadata.drop_all(engine)
-    engine.dispose()
-
-
-def _create_user(db: Session, role: str = "VIEW", auto_approve: bool = False) -> models.User:
-    assert role in ALLOWED_ROLES
-    user = models.User(
-        org_id=1,
-        ad_username=f"user_{role.lower()}_{uuid.uuid4().hex[:6]}",
-        role_global=role,
-        auto_approve_install_jobs=auto_approve,
-    )
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-    return user
-
-
-def _create_device(db: Session) -> models.Device:
-    device = models.Device(org_id=1, hostname=f"device-{uuid.uuid4().hex[:6]}")
-    db.add(device)
-    db.commit()
-    db.refresh(device)
-    return device
-
-
-def _create_certificate(db: Session) -> models.Certificate:
-    cert = models.Certificate(org_id=1, name=f"Cert {uuid.uuid4().hex[:4]}")
-    db.add(cert)
-    db.commit()
-    db.refresh(cert)
-    return cert
-
-
-def _headers(user: models.User) -> dict[str, str]:
-    return {"X-User-Id": str(user.id), "X-Org-Id": str(user.org_id)}
+create_certificate = helpers.create_certificate
+create_device = helpers.create_device
+create_user = helpers.create_user
+headers = helpers.headers
 
 
 def test_view_without_auto_approve_creates_requested(test_client_and_session):
     client, SessionLocal = test_client_and_session
     with SessionLocal() as db:
-        viewer = _create_user(db, role="VIEW", auto_approve=False)
-        cert = _create_certificate(db)
-        device = _create_device(db)
+        viewer = create_user(db, role="VIEW", auto_approve=False)
+        cert = create_certificate(db)
+        device = create_device(db)
 
     response = client.post(
         f"/api/v1/certificados/{cert.id}/install",
         json={"device_id": str(device.id)},
-        headers=_headers(viewer),
+        headers=headers(viewer),
     )
     assert response.status_code == 201
     payload = response.json()
@@ -103,54 +39,106 @@ def test_view_without_auto_approve_creates_requested(test_client_and_session):
 def test_view_with_auto_approve_creates_pending(test_client_and_session):
     client, SessionLocal = test_client_and_session
     with SessionLocal() as db:
-        viewer = _create_user(db, role="VIEW", auto_approve=True)
-        cert = _create_certificate(db)
-        device = _create_device(db)
+        viewer = create_user(db, role="VIEW", auto_approve=True)
+        cert = create_certificate(db)
+        device = create_device(db)
 
     response = client.post(
         f"/api/v1/certificados/{cert.id}/install",
         json={"device_id": str(device.id)},
-        headers=_headers(viewer),
+        headers=headers(viewer),
     )
     assert response.status_code == 201
     assert response.json()["status"] == models.JOB_STATUS_PENDING
+
+
+def test_auto_approve_flag_sets_approved_and_audit(test_client_and_session):
+    client, SessionLocal = test_client_and_session
+    with SessionLocal() as db:
+        viewer = create_user(db, role="VIEW", auto_approve=True)
+        cert = create_certificate(db)
+        device = create_device(db)
+
+    response = client.post(
+        f"/api/v1/certificados/{cert.id}/install",
+        json={"device_id": str(device.id)},
+        headers=headers(viewer),
+    )
+    assert response.status_code == 201
+    payload = response.json()
+    assert payload["status"] == models.JOB_STATUS_PENDING
+    assert payload["approved_by_user_id"] == str(viewer.id)
+    assert payload["approved_at"] is not None
+
+    with SessionLocal() as db:
+        audits = db.query(AuditLog).order_by(AuditLog.timestamp).all()
+        assert [audit.action for audit in audits] == ["INSTALL_REQUESTED", "INSTALL_APPROVED"]
+        assert audits[-1].meta_json == {
+            "auto": True,
+            "via": "flag",
+            "job_id": payload["id"],
+        }
 
 
 def test_admin_creates_pending_job(test_client_and_session):
     client, SessionLocal = test_client_and_session
     with SessionLocal() as db:
-        admin = _create_user(db, role="ADMIN")
-        cert = _create_certificate(db)
-        device = _create_device(db)
+        admin = create_user(db, role="ADMIN")
+        cert = create_certificate(db)
+        device = create_device(db)
 
     response = client.post(
         f"/api/v1/certificados/{cert.id}/install",
         json={"device_id": str(device.id)},
-        headers=_headers(admin),
+        headers=headers(admin),
     )
     assert response.status_code == 201
     assert response.json()["status"] == models.JOB_STATUS_PENDING
 
 
+def test_admin_auto_approval_sets_fields_and_audit(test_client_and_session):
+    client, SessionLocal = test_client_and_session
+    with SessionLocal() as db:
+        admin = create_user(db, role="ADMIN")
+        cert = create_certificate(db)
+        device = create_device(db)
+
+    response = client.post(
+        f"/api/v1/certificados/{cert.id}/install",
+        json={"device_id": str(device.id)},
+        headers=headers(admin),
+    )
+    assert response.status_code == 201
+    payload = response.json()
+    assert payload["status"] == models.JOB_STATUS_PENDING
+    assert payload["approved_by_user_id"] == str(admin.id)
+    assert payload["approved_at"] is not None
+
+    with SessionLocal() as db:
+        audits = db.query(AuditLog).order_by(AuditLog.timestamp).all()
+        assert [audit.action for audit in audits] == ["INSTALL_REQUESTED", "INSTALL_APPROVED"]
+        assert audits[-1].meta_json["via"] == "role"
+
+
 def test_admin_approves_requested_job(test_client_and_session):
     client, SessionLocal = test_client_and_session
     with SessionLocal() as db:
-        admin = _create_user(db, role="ADMIN")
-        viewer = _create_user(db, role="VIEW")
-        cert = _create_certificate(db)
-        device = _create_device(db)
+        admin = create_user(db, role="ADMIN")
+        viewer = create_user(db, role="VIEW")
+        cert = create_certificate(db)
+        device = create_device(db)
 
     create_resp = client.post(
         f"/api/v1/certificados/{cert.id}/install",
         json={"device_id": str(device.id)},
-        headers=_headers(viewer),
+        headers=headers(viewer),
     )
     job_id = create_resp.json()["id"]
 
     approve_resp = client.post(
         f"/api/v1/install-jobs/{job_id}/approve",
         json={},
-        headers=_headers(admin),
+        headers=headers(admin),
     )
     assert approve_resp.status_code == 200
     payload = approve_resp.json()
@@ -162,43 +150,67 @@ def test_admin_approves_requested_job(test_client_and_session):
 def test_view_cannot_approve_job(test_client_and_session):
     client, SessionLocal = test_client_and_session
     with SessionLocal() as db:
-        viewer = _create_user(db, role="VIEW")
-        cert = _create_certificate(db)
-        device = _create_device(db)
+        viewer = create_user(db, role="VIEW")
+        cert = create_certificate(db)
+        device = create_device(db)
 
     create_resp = client.post(
         f"/api/v1/certificados/{cert.id}/install",
         json={"device_id": str(device.id)},
-        headers=_headers(viewer),
+        headers=headers(viewer),
     )
     job_id = create_resp.json()["id"]
 
     deny_resp = client.post(
         f"/api/v1/install-jobs/{job_id}/approve",
         json={},
-        headers=_headers(viewer),
+        headers=headers(viewer),
     )
     assert deny_resp.status_code == 403
+
+
+def test_view_without_flag_does_not_auto_approve(test_client_and_session):
+    client, SessionLocal = test_client_and_session
+    with SessionLocal() as db:
+        viewer = create_user(db, role="VIEW", auto_approve=False)
+        cert = create_certificate(db)
+        device = create_device(db)
+
+    response = client.post(
+        f"/api/v1/certificados/{cert.id}/install",
+        json={"device_id": str(device.id)},
+        headers=headers(viewer),
+    )
+    assert response.status_code == 201
+    payload = response.json()
+    assert payload["status"] == models.JOB_STATUS_REQUESTED
+    assert payload["approved_by_user_id"] is None
+    assert payload["approved_at"] is None
+
+    with SessionLocal() as db:
+        audits = db.query(AuditLog).order_by(AuditLog.timestamp).all()
+        assert len(audits) == 1
+        assert audits[0].action == "INSTALL_REQUESTED"
 
 
 def test_view_listing_permissions(test_client_and_session):
     client, SessionLocal = test_client_and_session
     with SessionLocal() as db:
-        viewer = _create_user(db, role="VIEW")
-        cert = _create_certificate(db)
-        device = _create_device(db)
+        viewer = create_user(db, role="VIEW")
+        cert = create_certificate(db)
+        device = create_device(db)
 
     create_resp = client.post(
         f"/api/v1/certificados/{cert.id}/install",
         json={"device_id": str(device.id)},
-        headers=_headers(viewer),
+        headers=headers(viewer),
     )
     assert create_resp.status_code == 201
 
-    general_list = client.get("/api/v1/install-jobs", headers=_headers(viewer))
+    general_list = client.get("/api/v1/install-jobs", headers=headers(viewer))
     assert general_list.status_code == 403
 
-    mine_list = client.get("/api/v1/install-jobs?mine=true", headers=_headers(viewer))
+    mine_list = client.get("/api/v1/install-jobs?mine=true", headers=headers(viewer))
     assert mine_list.status_code == 200
     mine_payload = mine_list.json()
     assert len(mine_payload) == 1

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
@@ -75,10 +76,16 @@ async def create_install_job(
     if device is None or device.org_id != current_user.org_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="device not found")
 
+    auto_approved = False
+    auto_reason = None
     if current_user.role_global in {"DEV", "ADMIN"}:
         initial_status = JOB_STATUS_PENDING
+        auto_approved = True
+        auto_reason = "role"
     elif current_user.auto_approve_install_jobs:
         initial_status = JOB_STATUS_PENDING
+        auto_approved = True
+        auto_reason = "flag"
     else:
         initial_status = JOB_STATUS_REQUESTED
 
@@ -89,7 +96,11 @@ async def create_install_job(
         requested_by_user_id=current_user.id,
         status=initial_status,
     )
+    if auto_approved:
+        job.approved_by_user_id = current_user.id
+        job.approved_at = datetime.now(timezone.utc)
     db.add(job)
+    db.flush()
     log_audit(
         db=db,
         org_id=current_user.org_id,
@@ -104,6 +115,16 @@ async def create_install_job(
             "requested_by_user_id": str(current_user.id),
         },
     )
+    if auto_approved:
+        log_audit(
+            db=db,
+            org_id=current_user.org_id,
+            action="INSTALL_APPROVED",
+            entity_type="cert_install_job",
+            entity_id=job.id,
+            actor_user_id=current_user.id,
+            meta={"auto": True, "via": auto_reason, "job_id": str(job.id)},
+        )
     db.commit()
     db.refresh(job)
     return job
