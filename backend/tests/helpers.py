@@ -6,10 +6,12 @@ from app import models
 from app.core.security import ALLOWED_ROLES
 
 
-def create_user(db: Session, role: str = "VIEW", auto_approve: bool = False) -> models.User:
+def create_user(
+    db: Session, role: str = "VIEW", auto_approve: bool = False, org_id: int = 1
+) -> models.User:
     assert role in ALLOWED_ROLES
     user = models.User(
-        org_id=1,
+        org_id=org_id,
         ad_username=f"user_{role.lower()}_{uuid.uuid4().hex[:6]}",
         role_global=role,
         auto_approve_install_jobs=auto_approve,

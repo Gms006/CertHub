@@ -89,6 +89,19 @@ curl -X POST "http://localhost:8000/api/v1/admin/certificates/ingest-from-fs" \
 * payload de instalação entregue somente ao Agent (evolui no S6: token one-time + expiração + device binding)
 * auditoria: INSTALL_REQUESTED / CLAIM / DONE / FAILED / REMOVED_18H
 
+### Exemplo: habilitar auto-approve para um usuário VIEW
+
+Endpoint ADMIN para atualizar um usuário existente (mesmo `org_id`) e permitir auto-approve em jobs de instalação:
+
+```bash
+curl -X PATCH "http://localhost:8000/api/v1/admin/users/<ID_DO_USUARIO>" \
+  -H "Content-Type: application/json" \
+  -H "X-User-Id: <UUID_DEV_OU_ADMIN>" -H "X-Org-Id: 1" \
+  -d '{"auto_approve_install_jobs": true}'
+```
+
+Campos opcionais no corpo: `auto_approve_install_jobs`, `role_global`, `is_active`, `ad_username`, `email`, `nome`.
+
 ## Stages
 
 * S1: Base de dados + auditoria (tabelas users/devices/jobs/audit + seeds/rotas admin + middleware de auditoria)

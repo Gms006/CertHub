@@ -8,17 +8,20 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.audit import log_audit
-from app.core.security import require_dev
+from app.core.security import require_admin_or_dev, require_dev
 from app.db.session import get_db
 from app.models import Device, User, UserDevice, UserEmpresaPermission
 from app.schemas.cert_ingest import CertIngestRequest, CertIngestResponse
 from app.schemas.device import DeviceCreate, DeviceRead
 from app.schemas.permission import UserEmpresaPermissionCreate, UserEmpresaPermissionRead
-from app.schemas.user import UserCreate, UserRead
+from app.schemas.user import UserCreate, UserRead, UserUpdate
 from app.schemas.user_device import UserDeviceCreate, UserDeviceRead
 from app.services.certificate_ingest import ingest_certificates_from_fs
 
-router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(require_dev)])
+router = APIRouter(prefix="/admin", tags=["admin"])
+
+
+# User management
 
 
 @router.post("/users", response_model=UserRead, status_code=status.HTTP_201_CREATED)
@@ -58,6 +61,59 @@ def list_users(
         .order_by(User.created_at)
     )
     return db.execute(statement).scalars().all()
+
+
+@router.patch("/users/{user_id}", response_model=UserRead)
+def update_user(
+    user_id: uuid.UUID,
+    user_in: UserUpdate,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_admin_or_dev),
+) -> User:
+    user = db.get(User, user_id)
+    if user is None or user.org_id != current_user.org_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="user not found")
+
+    changes: dict[str, list] = {}
+
+    def apply_change(field: str, value) -> None:
+        if value is None:
+            return
+        old_value = getattr(user, field)
+        if old_value != value:
+            setattr(user, field, value)
+            changes[field] = [old_value, value]
+
+    if user_in.role_global is not None or user_in.is_active is not None:
+        if current_user.role_global != "DEV":
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
+
+    apply_change("auto_approve_install_jobs", user_in.auto_approve_install_jobs)
+    apply_change("role_global", user_in.role_global)
+    apply_change("is_active", user_in.is_active)
+    apply_change("ad_username", user_in.ad_username)
+    apply_change("email", user_in.email)
+    apply_change("nome", user_in.nome)
+
+    if not changes:
+        return user
+
+    log_audit(
+        db=db,
+        org_id=current_user.org_id,
+        action="USER_UPDATED",
+        entity_type="user",
+        entity_id=user.id,
+        actor_user_id=current_user.id,
+        meta={"changes": changes},
+    )
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc.orig))
+    db.refresh(user)
+    return user
 
 
 @router.post("/devices", response_model=DeviceRead, status_code=status.HTTP_201_CREATED)
