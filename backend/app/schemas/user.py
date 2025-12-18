@@ -9,10 +9,13 @@ class UserBase(BaseModel):
     email: str | None = None
     nome: str | None = None
     is_active: bool = True
+    role_global: str = "VIEW"
+    auto_approve_install_jobs: bool = False
 
 
 class UserCreate(UserBase):
-    pass
+    role_global: str = "VIEW"
+    auto_approve_install_jobs: bool = False
 
 
 class UserRead(UserBase):
