@@ -136,6 +136,9 @@ O Agent **nunca** deve remover certificados que:
 1. `users`
 
 - `id`, `org_id`, `ad_username`, `email`, `nome`, `is_active`, `created_at`
+- NOVO:
+  - `role_global` (DEV | ADMIN | VIEW)
+  - `auto_approve_install_jobs` (bool, default false)
 
 2. `devices`
 
@@ -154,9 +157,12 @@ O Agent **nunca** deve remover certificados que:
 
 - `id` (uuid), `org_id`, `certificado_id`, `empresa_id` (opcional), `requested_by_user_id`
 - `target_user_id` (quem vai receber), `target_device_id`
-- `status` (PENDING, IN\_PROGRESS, DONE, FAILED, EXPIRED, CANCELED)
+- `status` (REQUESTED, PENDING, IN\_PROGRESS, DONE, FAILED, EXPIRED, CANCELED)
 - `expires_at`, `created_at`, `started_at`, `finished_at`
 - `error_code`, `error_message`
+- NOVO:
+  - `approved_by_user_id` (nullable)
+  - `approved_at` (nullable)
 
 6. `audit_log`
 
@@ -302,6 +308,13 @@ O Agent **nunca** deve remover certificados que:
 
 - JWT interno.
 - RBAC: usuário só enxerga certificados das empresas permitidas.
+- Perfis (globais):
+  - DEV (você): acesso total (todas as abas e ações).
+  - ADMIN (4 usuários): acesso às abas Certificados, Jobs e Dispositivos.
+  - VIEW (demais): acesso apenas à aba Certificados (pode solicitar instalação).
+- Auto-aprovar: configuração habilitável por usuário (por exemplo: `auto_approve_install_jobs=true/false`).
+  - DEV e ADMIN: sempre podem aprovar / executar fluxo completo.
+  - VIEW: por padrão NÃO auto-aprova; quando habilitado, pode auto-aprovar seus próprios pedidos.
 - **Front (protótipo em dev)**
   - Subir o layout base do protótipo (Shell + Tabs + KPI strip) com dados mock.
   - Definir o contrato dos hooks: `useAuth()`, `useCertificados()`, `useDevices()`, `useJobs()`, `useAudit()`.
@@ -317,21 +330,31 @@ O Agent **nunca** deve remover certificados que:
 
 **Objetivo**: portal cria job e acompanha status, usando as telas do protótipo.
 
-**Entregáveis (Backend)**
-
-- `POST /certificados/{id}/install` cria job para device alvo.
-- `GET /install-jobs` lista status.
-- Auditoria: INSTALL_REQUESTED.
+ **Entregáveis (Backend)**
+ 
+ - `POST /certificados/{id}/install` cria job para device alvo.
+ - `GET /install-jobs` lista status.
+ - Auditoria: INSTALL_REQUESTED.
+- Aprovação:
+  - Se `auto_approve_install_jobs=true` (ou perfil ADMIN/DEV), job nasce em `PENDING` (pronto pro agent).
+  - Se `auto_approve_install_jobs=false` (VIEW padrão), job nasce em `REQUESTED` e precisa de aprovação.
+  - Endpoints novos (ADMIN/DEV):
+    - `POST /install-jobs/{job_id}/approve` -> muda `REQUESTED` -> `PENDING`
+    - `POST /install-jobs/{job_id}/deny` -> muda `REQUESTED` -> `CANCELED` (ou `DENIED`)
+  - Auditoria adicional: INSTALL_APPROVED / INSTALL_DENIED.
 
 **Entregáveis (Front — protótipo)**
 
-- Aba **Certificados**
-  - Botão “Instalar” abre o modal.
-  - Modal lista devices autorizados (e marca bloqueados).
-  - CTA “Criar job” chama `POST /certificados/{id}/install`.
-  - Toast de sucesso/erro (job criado / device bloqueado).
-- Aba **Jobs**
-  - Carrega `GET /install-jobs?mine=true` e exibe tabela com status.
+ - Aba **Certificados**
+   - Botão “Instalar” abre o modal.
+   - Modal lista devices autorizados (e marca bloqueados).
+   - CTA “Criar job” chama `POST /certificados/{id}/install`.
+   - Toast de sucesso/erro (job criado / device bloqueado).
+- VIEW não precisa ver a aba Jobs:
+  - Se job ficou `REQUESTED`, mostrar mensagem "Pedido enviado para aprovação".
+  - Opcional: mostrar "Últimos pedidos" dentro do modal/tela de Certificados.
+ - Aba **Jobs**
+   - Carrega `GET /install-jobs?mine=true` e exibe tabela com status.
   - Polling leve (ex.: 5–10s) só enquanto existir `PENDING/IN_PROGRESS`.
 
 **Aceite**
@@ -456,7 +479,7 @@ O Agent **nunca** deve remover certificados que:
 - [ ] Senha **não** armazenada em texto puro (secret store / criptografia).
 - [ ] Jobs: token one-time + expiração curta + rate limit.
 - [ ] Device binding: device registrado e is_allowed.
-- [ ] Auditoria: INSTALL_REQUESTED / CLAIM / DONE / FAILED / REMOVED_18H.
+- [ ] Auditoria: INSTALL_REQUESTED / INSTALL_APPROVED / INSTALL_DENIED / CLAIM / DONE / FAILED / REMOVED_18H.
 - [ ] Limpeza 18h garantida (Scheduled Task + fallback no startup).
 - [ ] TLS interno (mesmo self-signed) com certificado confiável nas máquinas.
 - [ ] Backup do DB + logs + diretório de certificados.

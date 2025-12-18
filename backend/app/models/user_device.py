@@ -1,7 +1,7 @@
 from datetime import datetime
 import uuid
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, UniqueConstraint, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, UniqueConstraint, func, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -18,7 +18,7 @@ class UserDevice(Base):
     device_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("devices.id", ondelete="CASCADE"), primary_key=True
     )
-    is_allowed: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=func.true())
+    is_allowed: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
