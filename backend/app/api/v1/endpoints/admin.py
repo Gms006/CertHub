@@ -11,10 +11,12 @@ from app.core.audit import log_audit
 from app.core.security import require_dev
 from app.db.session import get_db
 from app.models import Device, User, UserDevice, UserEmpresaPermission
+from app.schemas.cert_ingest import CertIngestRequest, CertIngestResponse
 from app.schemas.device import DeviceCreate, DeviceRead
 from app.schemas.permission import UserEmpresaPermissionCreate, UserEmpresaPermissionRead
 from app.schemas.user import UserCreate, UserRead
 from app.schemas.user_device import UserDeviceCreate, UserDeviceRead
+from app.services.certificate_ingest import ingest_certificates_from_fs
 
 router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(require_dev)])
 
@@ -154,3 +156,44 @@ def create_permission(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc.orig))
     db.refresh(permission)
     return permission
+
+
+@router.post(
+    "/certificates/ingest-from-fs",
+    response_model=CertIngestResponse,
+    status_code=status.HTTP_200_OK,
+)
+def ingest_certificates_from_filesystem(
+    payload: CertIngestRequest = CertIngestRequest(),
+    db: Session = Depends(get_db),
+    current_user=Depends(require_dev),
+) -> CertIngestResponse:
+    try:
+        result = ingest_certificates_from_fs(
+            db,
+            org_id=current_user.org_id,
+            dry_run=payload.dry_run,
+            limit=payload.limit,
+        )
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+    if not payload.dry_run:
+        log_audit(
+            db=db,
+            org_id=current_user.org_id,
+            action="CERT_INGEST_FROM_FS",
+            entity_type="certificate",
+            entity_id=None,
+            actor_user_id=current_user.id,
+            meta={
+                "inserted": result["inserted"],
+                "updated": result["updated"],
+                "failed": result["failed"],
+                "total": result["total"],
+                "limit": payload.limit,
+            },
+        )
+        db.commit()
+
+    return CertIngestResponse(**result)

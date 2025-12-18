@@ -65,6 +65,25 @@ npm run dev
 
 Veja `.env.example`.
 
+- `CERTS_ROOT_PATH`: caminho do diretório raiz com os `.pfx/.p12` (somente os arquivos diretos, subpastas são ignoradas).
+- `OPENSSL_PATH`: binário do OpenSSL (ex.: `openssl` no Linux/macOS ou `C:\\Program Files\\OpenSSL-Win64\\bin\\openssl.exe` no Windows).
+
+## Ingestão de certificados a partir do filesystem (DEV)
+
+Endpoint DEV-only para ingestão rápida dos `.pfx/.p12` da pasta configurada em `CERTS_ROOT_PATH`:
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/admin/certificates/ingest-from-fs" \
+  -H "Content-Type: application/json" \
+  -H "X-User-Id: <UUID_DO_DEV>" -H "X-Org-Id: 1" \
+  -d '{"dry_run": true, "limit": 5}'
+```
+
+* Campos opcionais: `dry_run` (true/false) e `limit` (0 = sem limite).
+* A senha é deduzida do nome do arquivo (padrão "Senha ..."), caso contrário tenta vazia.
+* Metadados extraídos via OpenSSL (`subject`, `issuer`, `serial`, `notBefore`, `notAfter`, `sha1`).
+* Deduplicação por `sha1` (preferencial) ou `serial` por `org_id`; falhas de parse são registradas em `parse_error`.
+
 ## Segurança (MVP)
 
 * payload de instalação entregue somente ao Agent (evolui no S6: token one-time + expiração + device binding)
