@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 import subprocess
+import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -15,7 +16,7 @@ from app.models import Certificate
 
 DATE_FORMAT = "%b %d %H:%M:%S %Y %Z"
 CERT_EXTENSIONS = {".pfx", ".p12"}
-MAX_ERRORS = 10
+MAX_ERRORS = 50
 
 
 class CertificateParserError(Exception):
@@ -160,7 +161,7 @@ def _candidate_passwords(path: Path) -> list[str]:
 
 def ingest_certificates_from_fs(
     db: Session, *, org_id: int, dry_run: bool = False, limit: int = 0
-) -> dict[str, int | list[str]]:
+) -> dict[str, int | list[dict[str, str | None]]]:
     root_path = settings.certs_root_path.expanduser()
     if not root_path.exists() or not root_path.is_dir():
         raise FileNotFoundError(f"CERTS_ROOT_PATH not found: {root_path}")
@@ -173,39 +174,72 @@ def ingest_certificates_from_fs(
     if limit and limit > 0:
         files = files[:limit]
 
-    inserted = updated = failed = 0
-    errors: list[str] = []
+    results: list[dict[str, str | uuid.UUID | None]] = []
 
     for path in files:
         parsed, success = _extract_metadata(path, _candidate_passwords(path))
-        if not success:
-            failed += 1
-            if len(errors) < MAX_ERRORS:
-                errors.append(f"{path.name}: {parsed.parse_error}")
-
         existing = _find_existing_certificate(
             db, org_id=org_id, sha1=parsed.sha1_fingerprint, serial=parsed.serial_number, name=parsed.name
         )
 
         if dry_run:
-            if existing:
-                updated += 1
-            else:
-                inserted += 1
+            results.append(
+                {
+                    "action": "updated" if existing else "inserted",
+                    "cert_id": existing.id if existing else None,
+                    "file": path.name,
+                    "error": parsed.parse_error if not success else None,
+                }
+            )
+            if not success:
+                results[-1]["action"] = "failed"
             continue
 
-        if existing:
-            _update_certificate(existing, parsed)
-            updated += 1
+        if success:
+            if existing:
+                _update_certificate(existing, parsed)
+                action = "updated"
+                cert_id = existing.id
+            else:
+                certificate = _build_certificate(org_id, parsed)
+                db.add(certificate)
+                action = "inserted"
+                cert_id = certificate.id
         else:
-            db.add(_build_certificate(org_id, parsed))
-            inserted += 1
+            action = "failed"
+            cert_id = existing.id if existing else None
+            if existing:
+                _mark_parse_failure(existing, parsed)
+
+        results.append(
+            {
+                "action": action,
+                "cert_id": cert_id,
+                "file": path.name,
+                "error": parsed.parse_error if not success else None,
+            }
+        )
 
     if not dry_run:
         db.commit()
 
     total = len(files)
-    return {"inserted": inserted, "updated": updated, "failed": failed, "total": total, "errors": errors}
+    inserted = sum(1 for item in results if item["action"] == "inserted")
+    updated = sum(1 for item in results if item["action"] == "updated")
+    failed = sum(1 for item in results if item["action"] == "failed")
+    errors = [
+        {"filename": item["file"], "reason": item["error"], "exception": None}
+        for item in results
+        if item["action"] == "failed" and item.get("error")
+    ][:MAX_ERRORS]
+
+    return {
+        "inserted": inserted,
+        "updated": updated,
+        "failed": failed,
+        "total": total,
+        "errors": errors,
+    }
 
 
 def _find_existing_certificate(
@@ -239,8 +273,11 @@ def _update_certificate(target: Certificate, parsed: ParsedCertificate) -> None:
     target.not_before = parsed.not_before
     target.not_after = parsed.not_after
     target.sha1_fingerprint = parsed.sha1_fingerprint
-    target.parse_error = parsed.parse_error
+    target.parse_ok = True
+    target.parse_error = None
     target.source_path = str(parsed.path)
+    target.last_ingested_at = datetime.now(timezone.utc)
+    target.last_error_at = None
 
 
 def _build_certificate(org_id: int, parsed: ParsedCertificate) -> Certificate:
@@ -253,6 +290,19 @@ def _build_certificate(org_id: int, parsed: ParsedCertificate) -> Certificate:
         not_before=parsed.not_before,
         not_after=parsed.not_after,
         sha1_fingerprint=parsed.sha1_fingerprint,
-        parse_error=parsed.parse_error,
+        parse_ok=True,
+        parse_error=None,
         source_path=str(parsed.path),
+        last_ingested_at=datetime.now(timezone.utc),
+        last_error_at=None,
     )
+
+
+def _mark_parse_failure(target: Certificate, parsed: ParsedCertificate) -> None:
+    now = datetime.now(timezone.utc)
+    target.parse_ok = False
+    target.parse_error = parsed.parse_error
+    target.last_ingested_at = now
+    target.last_error_at = now
+    if target.source_path is None:
+        target.source_path = str(parsed.path)
