@@ -136,9 +136,14 @@ O Agent **nunca** deve remover certificados que:
 1. `users`
 
 - `id`, `org_id`, `ad_username`, `email`, `nome`, `is_active`, `created_at`
-- NOVO:
+- RBAC:
   - `role_global` (DEV | ADMIN | VIEW)
   - `auto_approve_install_jobs` (bool, default false)
+- **Autenticação (S2)**:
+  - `password_hash` (nullable, vazio até primeira configuração)
+  - `password_set_at` (nullable, timestamp da primeira senha)
+  - `failed_login_attempts` (int, default 0)
+  - `locked_until` (nullable, timestamp de desbloqueio por lockout)
 
 2. `devices`
 
@@ -164,6 +169,18 @@ O Agent **nunca** deve remover certificados que:
 
 - `id`, `org_id`, `actor_user_id` (ou `actor_device_id`), `action`, `entity_type`, `entity_id`, `timestamp`, `ip`, `meta_json`
 
+6. `auth_tokens` (novo em S2)
+
+- `id` (uuid), `user_id`, `token_hash` (SHA256), `purpose` (SET_PASSWORD | RESET_PASSWORD | REFRESH)
+- `expires_at`, `created_at`, `used_at` (nullable)
+- índice: (token_hash, purpose, expires_at)
+
+7. `user_sessions` (opcional, recomendado em S2)
+
+- `id` (uuid), `user_id`, `refresh_token_hash` (SHA256), `ip`, `user_agent`
+- `created_at`, `expires_at`, `revoked_at` (nullable)
+- índice: (refresh_token_hash, user_id)
+
 ### Ajustes na tabela `certificados`
 
 - Ideal: **não** persistir `senha` em texto puro.
@@ -175,10 +192,25 @@ O Agent **nunca** deve remover certificados que:
 
 ## Endpoints (contrato sugerido)
 
-### Auth
+### Auth (S1: Windows Auth / S2: email+senha)
 
-- `GET /auth/whoami` → (via Windows Auth) retorna `ad_username`, `email` (se disponível)
-- `POST /auth/jwt` → troca “whoami” por JWT interno
+**First-time password setup:**
+- `POST /auth/password/set/init` → recebe `email`, retorna link 1x (token em URL, TTL 1h)
+- `POST /auth/password/set/confirm` → recebe `token` + `new_password`, seta `password_hash` + `password_set_at`
+
+**Login normal:**
+- `POST /auth/login` → recebe `email` + `password`, valida lockout, gera JWT + refresh token
+  - Resposta: `{ "access_token": "...", "refresh_token": "...", "user": {...} }`
+  - Status 429 (Too Many Requests) se `failed_login_attempts >= 5` antes de `locked_until`
+- `POST /auth/refresh` → recebe `refresh_token`, emite novo JWT (sem renovar refresh se ainda válido)
+- `POST /auth/logout` → revoga refresh token (marca `revoked_at` em user_sessions)
+
+**Password reset:**
+- `POST /auth/password/reset/init` → recebe `email`, envia link 1x (token em URL, TTL 30min)
+- `POST /auth/password/reset/confirm` → recebe `token` + `new_password`, seta nova `password_hash`
+
+**Info:**
+- `GET /auth/me` → retorna dados do user autenticado (requer JWT válido)
 
 ### Portal
 
@@ -332,33 +364,417 @@ O Agent **nunca** deve remover certificados que:
 
 **Objetivo**: login no portal e RBAC global, já com a UI do protótipo rodando.
 
-**Caminho A (intranet/ideal)**
+**Padrão S2: Email+Senha (usuários pré-criados)**
 
-- Gateway IIS com Windows Auth → emite JWT.
+Não há auto-cadastro. Admin cria usuários no banco (is_active=true) e distribui link 1x para definir senha no primeiro acesso.
 
-**Caminho B (rápido)**
+**Fluxos de autenticação:**
 
-- Magic link por e-mail.
+- **Novo usuário (primeiro acesso)**
+  - Admin via POST `/api/v1/admin/users` (requer role DEV/ADMIN) cria user com `is_active=true`, `password_hash=NULL`
+  - API retorna `setup_token` (1x, TTL 10 min) no response
+  - Admin envia link: `http://portal.netocms.local/auth/set-password?token=<SETUP_TOKEN>` (válido por **10 min**)
+  - User acessa link e faz POST `/auth/password/set/confirm` com `token` + `new_password`
+  - Após isso: `password_hash` é preenchido (bcrypt), `password_set_at` marcado
+  
+- **Login normal** (sempre que voltar)
+  - POST `/auth/login` com `email` + `password`
+  - Retorna: `{ "access_token": "...", "refresh_token": "...", "user": {...} }`
+  - Access JWT: TTL **30 min** (curto)
+  - Refresh token: HttpOnly cookie, TTL **14 dias**, rotacionável
+  
+- **Esqueci senha**
+  - POST `/auth/password/reset/init` com `email`
+  - Link: `http://portal.netocms.local/auth/reset-password?token=<TOKEN>` (válido por **30 min**)
+  - POST `/auth/password/reset/confirm` com `token` + `new_password`
+  
+- **Segurança de lockout**
+  - Após 5 tentativas de login falhadas → `locked_until` marcado (bloqueia por **15 min**)
+  - Retorna HTTP 429 (Too Many Requests) durante lockout
+  - Admin pode resetar manualmente: `UPDATE users SET failed_login_attempts=0, locked_until=NULL WHERE email='...'`
 
-**Entregáveis**
+**Modo futuro (Windows Auth via IIS)**
 
-- JWT interno.
-- RBAC: usuário enxerga todos os certificados do `org_id` (sem carteiras).
-- Perfis (globais):
-  - DEV (você): acesso total (todas as abas e ações).
-  - ADMIN (4 usuários): acesso às abas Certificados, Jobs e Dispositivos.
-  - VIEW (demais): acesso apenas à aba Certificados (pode solicitar instalação).
-- Auto-aprovar: configuração habilitável por usuário (por exemplo: `auto_approve_install_jobs=true/false`).
-  - DEV e ADMIN: sempre podem aprovar / executar fluxo completo.
-  - VIEW: por padrão NÃO auto-aprova; quando habilitado, pode auto-aprovar seus próprios pedidos.
-- **Front (protótipo em dev)**
-  - Subir o layout base do protótipo (Shell + Tabs + KPI strip) com dados mock.
-  - Definir o contrato dos hooks: `useAuth()`, `useCertificados()`, `useDevices()`, `useJobs()`, `useAudit()`.
+- Caminho A (intranet/ideal, implementar após S2)
+- IIS/Reverse Proxy com **Windows Authentication** (Kerberos/NTLM) ativado
+- Endpoint `/auth/whoami` retorna usuário AD normalizado (strip `DOMINIO\`, lowercase, busca case-insensitive no DB)
+- Gateway emite JWT interno (sem exigir password_hash)
+- Benefício: login transparente dentro da rede corporativa
 
-**Aceite**
+**Entregáveis (Backend)**
 
-- Usuário loga e vê todos os certificados do org (sem carteira).
-- UI do protótipo abre e renderiza “Certificados/Jobs/Dispositivos/Auditoria” (ainda que com mocks).
+- Migração Alembic: adicionar colunas a `users` + tabelas `auth_tokens` + `user_sessions`.
+- Endpoints de Auth (a criar em S2: `backend/app/api/v1/endpoints/auth.py`):
+  - `POST /auth/password/set/init` (envia link 1x, TTL 10 min)
+  - `POST /auth/password/set/confirm` (recebe token + password, valida hash do token no DB)
+  - `POST /auth/login` (valida email + password, checa lockout, gera JWT + refresh)
+  - `POST /auth/refresh` (revalida refresh token, emite novo access JWT)
+  - `POST /auth/logout` (marca refresh token como revoked)
+  - `POST /auth/password/reset/init` (envia link 1x, TTL 30 min)
+  - `POST /auth/password/reset/confirm` (recebe token + password)
+  - `GET /auth/me` (retorna user autenticado, requer access JWT válido)
+- **Segurança de senha** (usar `passlib[bcrypt]`):
+  - Hash: bcrypt (min. custo 12)
+  - Senhas nunca em logs, tokens ou responses
+- **Tokens 1x** (para setup/reset):
+  - Armazenados como `token_hash` (SHA256) no DB
+  - Validação: calcular hash do token recebido e comparar
+  - Campos: `expires_at`, `created_at`, `used_at` (marca quando consumido)
+  - Expiração: 10 min (setup), 30 min (reset)
+- **JWT interno** (HS256):
+  - Access JWT: TTL **30 min** (curto)
+  - Refresh token: HttpOnly cookie, TTL **14 dias**, rotacionável
+  - Payload mínimo: `sub` (user_id), `email`, `role_global`, `iat`, `exp`
+- **Validação de lockout** em middleware:
+  - Bloqueia login se `locked_until > now()` → HTTP 429
+  - Incrementa `failed_login_attempts` a cada falha
+  - Reset após 15 min ou manual por admin
+- **Auditoria** (audit_log com ator=user_id):
+  - `LOGIN_ATTEMPT_SUCCESS` (com ip)
+  - `LOGIN_ATTEMPT_FAILED` (com ip, motivo: invalid_password | user_not_found | locked)
+  - `LOGIN_LOCKED` (depois de 5 falhas)
+  - `PASSWORD_SET` (primeiro acesso)
+  - `PASSWORD_RESET` (esqueci senha)
+  - `LOGOUT` (revogação de refresh)
+
+**RBAC global (sem carteiras por empresa)**
+
+- **Visibilidade**: todos enxergam todos os certificados do `org_id` (sem segregação por empresa).
+- **Perfis**:
+  - **DEV** (você): acesso total (todas as abas: Certificados, Jobs, Dispositivos, Auditoria).
+    - Pode gerenciar usuários e flags (`auto_approve_install_jobs`)
+    - Pode aprovar/executar jobs
+    - Pode authorizar/bloquear devices
+  - **ADMIN** (ex.: Maria, 4 usuários): acesso às abas Certificados, Jobs e Dispositivos.
+    - Pode aprovar/executar jobs
+    - Pode gerenciar devices (autorizar/bloquear)
+    - Sem acesso à aba Auditoria
+    - Sem gerenciar usuários
+  - **VIEW** (demais usuários): acesso apenas à aba Certificados.
+    - Pode ver todos certificados do org
+    - Pode solicitar jobs (cria em REQUESTED ou PENDING, vide regra abaixo)
+    - Sem acesso às abas Jobs, Dispositivos, Auditoria
+    - Sem gerenciar nada
+
+- **Auto-aprovação** (`auto_approve_install_jobs` flag por usuário):
+  - DEV/ADMIN: sempre aprovam (job nasce em PENDING)
+  - VIEW com `auto_approve_install_jobs=false` (padrão): job nasce em REQUESTED, precisa de ADMIN/DEV aprovar
+  - VIEW com `auto_approve_install_jobs=true`: job nasce em PENDING (auto-aprovado)
+
+- **Exemplos HTTP (200 vs 403)**:
+  ```bash
+  # VIEW tentando listar jobs (sem acesso) → 403
+  curl -H "Authorization: Bearer $JWT_VIEW" \
+    "http://localhost:8000/api/v1/install-jobs"
+  # Resposta: {"detail": "Forbidden"}
+  
+  # ADMIN listando jobs (com acesso) → 200
+  curl -H "Authorization: Bearer $JWT_ADMIN" \
+    "http://localhost:8000/api/v1/install-jobs"
+  # Resposta: [{"id": "...", "status": "PENDING", ...}]
+  
+  # VIEW tentando gerenciar usuários → 403
+  curl -X POST -H "Authorization: Bearer $JWT_VIEW" \
+    -H "Content-Type: application/json" \
+    -d '{"email": "new@netocontabilidade.com.br", "role": "ADMIN"}' \
+    "http://localhost:8000/api/v1/admin/users"
+  # Resposta: {"detail": "Forbidden"}
+  
+  # DEV gerenciando usuários (com acesso) → 201
+  curl -X POST -H "Authorization: Bearer $JWT_DEV" \
+    -H "Content-Type: application/json" \
+    -d '{"email": "new@netocontabilidade.com.br", "role": "ADMIN"}' \
+    "http://localhost:8000/api/v1/admin/users"
+  # Resposta: {"id": "...", "email": "...", "role_global": "ADMIN"}
+  ```
+
+**Front (protótipo em dev)**
+
+- Tela de login: email + senha (com loader de submissão).
+- Tela de "Primeira vez": modal para definir senha (a partir do link enviado por admin).
+- Layout base (Shell + Tabs + KPI strip) com dados mock.
+- Hooks: `useAuth()`, `useCertificados()`, `useDevices()`, `useJobs()`, `useAudit()`.
+
+**Variáveis de ambiente (S2)**
+
+Adicionar em `.env` (backend root):
+
+```env
+# Auth JWT
+JWT_SECRET=<GERADO_VIA_SECRETS>
+ACCESS_TOKEN_TTL_MIN=30
+REFRESH_TTL_DAYS=14
+SET_PASSWORD_TOKEN_TTL_MIN=10
+RESET_PASSWORD_TOKEN_TTL_MIN=30
+
+# Segurança de Senha
+BCRYPT_COST=12
+LOCKOUT_MAX_ATTEMPTS=5
+LOCKOUT_MINUTES=15
+
+# Cookies (refresh token)
+COOKIE_SECURE=true
+COOKIE_SAMESITE=Strict
+COOKIE_HTTPONLY=true
+```
+
+Gerar JWT_SECRET seguro:
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(32))"
+```
+
+**Validações (S2)**
+
+**1) Verificar Alembic e colunas:**
+```bash
+cd backend && alembic upgrade head
+
+psql "$DATABASE_URL" -c \
+  "SELECT column_name, data_type FROM information_schema.columns \
+   WHERE table_name='users' AND column_name IN \
+   ('password_hash', 'password_set_at', 'failed_login_attempts', 'locked_until') \
+   ORDER BY column_name;"
+
+psql "$DATABASE_URL" -c \
+  "SELECT tablename FROM pg_tables \
+   WHERE schemaname='public' AND tablename IN ('auth_tokens', 'user_sessions');"
+```
+
+**2) Criar primeiro user (bootstrap):**
+
+Via SQL (comando psql):
+```bash
+psql "$DATABASE_URL" -c \
+  "INSERT INTO users (id, org_id, email, nome, ad_username, role_global, is_active, password_hash, failed_login_attempts, created_at) \
+   VALUES (gen_random_uuid(), 1, 'maria@netocontabilidade.com.br', 'Maria', 'maria.clara', 'ADMIN', true, NULL, 0, NOW());"
+```
+
+Ou via POST /api/v1/admin/users (requer user DEV/ADMIN já no DB):
+```bash
+curl -X POST "http://localhost:8000/api/v1/admin/users" \
+  -H "Authorization: Bearer <JWT_ADMIN>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "maria@netocontabilidade.com.br",
+    "nome": "Maria Clara",
+    "role_global": "ADMIN"
+  }'
+
+# Resposta: {"id": "<USER_ID>", "email": "maria@...", "setup_token": "<TOKEN_1X>"}
+```
+
+**3) Setup de senha (link 1x, TTL 10 min):**
+```bash
+SETUP_TOKEN="<TOKEN_RETORNADO_ACIMA>"
+
+curl -X POST "http://localhost:8000/auth/password/set/confirm" \
+  -H "Content-Type: application/json" \
+  -d "{\"token\": \"${SETUP_TOKEN}\", \"password\": \"SenhaForte123!\"}"
+
+# Resposta esperada: 200 {"message": "Senha configurada com sucesso"}
+```
+
+Verificar auditoria:
+```bash
+psql "$DATABASE_URL" -c \
+  "SELECT action, actor_user_id, timestamp FROM audit_log \
+   WHERE action='PASSWORD_SET' ORDER BY timestamp DESC LIMIT 1;"
+```
+
+**4) Login (email + password):**
+```bash
+LOGIN_RESPONSE=$(curl -s -X POST "http://localhost:8000/auth/login" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "maria@netocontabilidade.com.br",
+    "password": "SenhaForte123!"
+  }')
+
+ACCESS_JWT=$(echo "$LOGIN_RESPONSE" | jq -r '.access_token')
+REFRESH_TOKEN=$(echo "$LOGIN_RESPONSE" | jq -r '.refresh_token')
+
+echo "Access JWT: $ACCESS_JWT"
+echo "Refresh Token: $REFRESH_TOKEN"
+
+# Verificar payload do JWT
+echo "$ACCESS_JWT" | jq -R 'split(".")[[1]] | @base64d | fromjson'
+# Deve conter: sub, email, role_global, iat, exp
+```
+
+Verificar auditoria:
+```bash
+psql "$DATABASE_URL" -c \
+  "SELECT action, meta_json, timestamp FROM audit_log \
+   WHERE action='LOGIN_ATTEMPT_SUCCESS' ORDER BY timestamp DESC LIMIT 1;"
+```
+
+**5) GET /auth/me (autenticado):**
+```bash
+curl -H "Authorization: Bearer ${ACCESS_JWT}" \
+  "http://localhost:8000/auth/me"
+
+# Esperado: 200 + user data
+# Sem JWT: 401
+
+curl "http://localhost:8000/auth/me"
+# Esperado: 401 Unauthorized
+```
+
+**6) Refresh token:**
+```bash
+curl -s -X POST "http://localhost:8000/auth/refresh" \
+  -H "Content-Type: application/json" \
+  -d "{\"refresh_token\": \"${REFRESH_TOKEN}\"}" | jq '.access_token'
+
+# Esperado: novo access_token (diferente do anterior)
+```
+
+**7) Logout (revoga refresh):**
+```bash
+curl -X POST "http://localhost:8000/auth/logout" \
+  -H "Authorization: Bearer ${ACCESS_JWT}"
+
+# Esperado: 200 {"message": "Logout realizado"}
+
+# Tentar usar refresh revogado:
+curl -X POST "http://localhost:8000/auth/refresh" \
+  -H "Content-Type: application/json" \
+  -d "{\"refresh_token\": \"${REFRESH_TOKEN}\"}"
+
+# Esperado: 401 {"detail": "Refresh token revoked"}
+```
+
+**8) Lockout (5 tentativas + 15 min bloqueio):**
+```bash
+for i in {1..5}; do
+  curl -X POST "http://localhost:8000/auth/login" \
+    -H "Content-Type: application/json" \
+    -d '{"email": "maria@netocontabilidade.com.br", "password": "ERRADA"}' \
+    2>/dev/null | jq '.detail // "falha"'
+  sleep 1
+done
+
+# 6ª tentativa:
+curl -X POST "http://localhost:8000/auth/login" \
+  -H "Content-Type: application/json" \
+  -d '{"email": "maria@netocontabilidade.com.br", "password": "ERRADA"}'
+
+# Esperado: HTTP 429 {"detail": "Too many login attempts. Try again in 15 minutes."}
+
+# Verificar lockout no DB:
+psql "$DATABASE_URL" -c \
+  "SELECT email, failed_login_attempts, locked_until, EXTRACT(EPOCH FROM (locked_until - NOW())) as segundos_restantes \
+   FROM users WHERE email='maria@netocontabilidade.com.br';"
+
+# Deve mostrar: failed_login_attempts >= 5, locked_until = NOW() + 15 min
+
+# Auditoria:
+psql "$DATABASE_URL" -c \
+  "SELECT action, COUNT(*) FROM audit_log \
+   WHERE action IN ('LOGIN_ATTEMPT_FAILED', 'LOGIN_LOCKED') \
+   AND timestamp > NOW() - interval '5 minutes' \
+   GROUP BY action;"
+
+# Desbloqueio manual (admin):
+psql "$DATABASE_URL" -c \
+  "UPDATE users SET failed_login_attempts=0, locked_until=NULL \
+   WHERE email='maria@netocontabilidade.com.br';"
+
+# Login funciona novamente:
+curl -X POST "http://localhost:8000/auth/login" \
+  -H "Content-Type: application/json" \
+  -d '{"email": "maria@netocontabilidade.com.br", "password": "SenhaForte123!"}' | jq '.access_token'
+```
+
+**9) Reset de senha (TTL 30 min):**
+```bash
+curl -X POST "http://localhost:8000/auth/password/reset/init" \
+  -H "Content-Type: application/json" \
+  -d '{"email": "maria@netocontabilidade.com.br"}'
+
+# Resposta: 200 {"message": "Link enviado para o e-mail"}
+# (Em dev, você recebe o token no response ou logs)
+
+RESET_TOKEN="<TOKEN_RESET>"
+
+curl -X POST "http://localhost:8000/auth/password/reset/confirm" \
+  -H "Content-Type: application/json" \
+  -d "{\"token\": \"${RESET_TOKEN}\", \"password\": \"NovaSenha456!\"}"
+
+# Esperado: 200 {"message": "Senha atualizada"}
+
+# Auditoria:
+psql "$DATABASE_URL" -c \
+  "SELECT action FROM audit_log WHERE action='PASSWORD_RESET' ORDER BY timestamp DESC LIMIT 1;"
+```
+
+**10) RBAC (200 vs 403):**
+
+Criar segundo user VIEW:
+```bash
+psql "$DATABASE_URL" -c \
+  "INSERT INTO users (id, org_id, email, nome, ad_username, role_global, is_active, password_hash, failed_login_attempts, created_at) \
+   VALUES (gen_random_uuid(), 1, 'view@netocontabilidade.com.br', 'View User', 'view.user', 'VIEW', true, NULL, 0, NOW());"
+
+# Setup senha dele (repita fluxo acima)
+```
+
+VIEW tentando listar jobs (sem permissão) → 403:
+```bash
+curl -H "Authorization: Bearer ${JWT_VIEW}" \
+  "http://localhost:8000/api/v1/install-jobs"
+
+# Esperado: 403 {"detail": "Forbidden"}
+```
+
+ADMIN listando jobs (com permissão) → 200:
+```bash
+curl -H "Authorization: Bearer ${JWT_ADMIN}" \
+  "http://localhost:8000/api/v1/install-jobs"
+
+# Esperado: 200 [{"id": "...", "status": "PENDING", ...}]
+```
+
+**Rollback (S2)**
+
+Para desfazer S2 em ambiente dev:
+
+```bash
+# 1) Identificar commit de S2
+cd backend
+git log --oneline --all | head -20
+
+# 2) Reverter commit (cria novo commit de reversão, preserva histórico)
+git revert <COMMIT_S2_SHA>
+# Ou reverter múltiplos commits:
+git revert <OLDEST_S2>..<NEWEST_S2>
+
+# 3) Desfazer migrations
+alembic downgrade -1
+
+# 4) Limpar sessions/tokens para invalidar JWTs
+psql "$DATABASE_URL" -c "TRUNCATE TABLE user_sessions, auth_tokens CASCADE;"
+
+# 5) (Opcional) Remover users de teste
+psql "$DATABASE_URL" -c "DELETE FROM users WHERE email IN ('maria@netocontabilidade.com.br', 'view@netocontabilidade.com.br');"
+```
+
+**Checklist de Aceite (S2)**
+
+- [ ] Migração Alembic aplicada: colunas em `users` + tabelas `auth_tokens` + `user_sessions`.
+- [ ] Variáveis de ambiente (.env) configuradas com JWT_SECRET gerado.
+- [ ] User criado via SQL ou POST /api/v1/admin/users.
+- [ ] Setup de senha: curl com SETUP_TOKEN funciona, password_hash preenchido no DB.
+- [ ] Login: email + password retorna access_token + refresh_token.
+- [ ] GET /auth/me com JWT válido retorna dados corretos.
+- [ ] Refresh token renova JWT com sucesso.
+- [ ] Logout revoga refresh_token (próximo refresh falha com 401).
+- [ ] Lockout funciona: 5 tentativas → HTTP 429, locked_until marcado.
+- [ ] Reset de senha: link 1x (30 min) funciona, nova password_hash preenchida.
+- [ ] RBAC 200/403: VIEW → 403 em /api/v1/admin/users, ADMIN → 200.
+- [ ] Auditoria registra: PASSWORD_SET, LOGIN_ATTEMPT_SUCCESS, LOGIN_LOCKED, PASSWORD_RESET.
+- [ ] UI: telas de login, setup, reset renderizam e submetem requisições corretamente.
+- [ ] Rollback: git revert + alembic downgrade -1 restauram estado pré-S2.
 
 ---
 
