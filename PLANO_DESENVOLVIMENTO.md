@@ -187,22 +187,22 @@ O Agent **nunca** deve remover certificados que:
 ### Auth (S1: Windows Auth / S2: email+senha)
 
 **First-time password setup:**
-- `POST /auth/password/set/init` → recebe `email`, retorna link 1x (token em URL, TTL 1h)
-- `POST /auth/password/set/confirm` → recebe `token` + `new_password`, seta `password_hash` + `password_set_at`
+- `POST /api/v1/auth/password/set/init` → recebe `email`, retorna link 1x (token em URL, TTL 1h)
+- `POST /api/v1/auth/password/set/confirm` → recebe `token` + `new_password`, seta `password_hash` + `password_set_at`
 
 **Login normal:**
-- `POST /auth/login` → recebe `email` + `password`, valida lockout, gera JWT + refresh token
-  - Resposta: `{ "access_token": "...", "refresh_token": "...", "user": {...} }`
+- `POST /api/v1/auth/login` → recebe `email` + `password`, valida lockout, gera JWT + refresh token
+  - Resposta: `{ "access_token": "...", "user": {...} }` (+ cookie HttpOnly)
   - Status 429 (Too Many Requests) se `failed_login_attempts >= 5` antes de `locked_until`
-- `POST /auth/refresh` → recebe `refresh_token`, emite novo JWT (sem renovar refresh se ainda válido)
-- `POST /auth/logout` → revoga refresh token (marca `revoked_at` em user_sessions)
+- `POST /api/v1/auth/refresh` → usa cookie HttpOnly (ou body em dev), emite novo JWT (sem renovar refresh se ainda válido)
+- `POST /api/v1/auth/logout` → revoga refresh token (marca `revoked_at` em user_sessions)
 
 **Password reset:**
-- `POST /auth/password/reset/init` → recebe `email`, envia link 1x (token em URL, TTL 30min)
-- `POST /auth/password/reset/confirm` → recebe `token` + `new_password`, seta nova `password_hash`
+- `POST /api/v1/auth/password/reset/init` → recebe `email`, envia link 1x (token em URL, TTL 30min)
+- `POST /api/v1/auth/password/reset/confirm` → recebe `token` + `new_password`, seta nova `password_hash`
 
 **Info:**
-- `GET /auth/me` → retorna dados do user autenticado (requer JWT válido)
+- `GET /api/v1/auth/me` → retorna dados do user autenticado (requer JWT válido)
 
 ### Portal
 
@@ -359,13 +359,13 @@ O Agent **nunca** deve remover certificados que:
 
 **Objetivo**: login no portal e RBAC global, já com a UI do protótipo rodando.
 
-**Status**: 🟡 Em andamento
+**Status**: ✅ **Concluído**
 
-**Evidências (S2 em andamento)**
+**Evidências (S2)**
 
-- Migração criada para `auth_tokens/user_sessions` e colunas de auth em `users` (alembic 0007).
-- Endpoints `/auth/*` implementados com JWT + refresh cookie e lockout.
-- Skeleton do front com páginas `Login`, `SetPassword`, `ResetPassword` e hook `useAuth`.
+- Endpoints `/api/v1/auth/*` alinhados (tokens 1x, lockout, refresh via cookie HttpOnly).
+- RBAC global aplicado (VIEW 403 em `/api/v1/admin/users`, 200 em `/api/v1/certificados`).
+- Auditoria registrada: `PASSWORD_SET`, `PASSWORD_RESET`, `LOGIN_SUCCESS`, `LOGIN_FAILED`, `LOGIN_LOCKED`, `LOGOUT`.
 
 **Padrão S2: Email+Senha (usuários pré-criados)**
 
@@ -376,23 +376,25 @@ Não há auto-cadastro. Admin cria usuários no banco (is_active=true) e distrib
 - **Novo usuário (primeiro acesso)**
   - Admin via POST `/api/v1/admin/users` (requer role DEV/ADMIN) cria user com `is_active=true`, `password_hash=NULL`
   - API retorna `setup_token` (1x, TTL 10 min) no response
+  - Em DEV, `/api/v1/auth/password/set/init` retorna `token` no JSON; em PROD retorna apenas `{ ok: true }`
   - Admin envia link: `http://portal.netocms.local/auth/set-password?token=<SETUP_TOKEN>` (válido por **10 min**)
-  - User acessa link e faz POST `/auth/password/set/confirm` com `token` + `new_password`
+  - User acessa link e faz POST `/api/v1/auth/password/set/confirm` com `token` + `new_password`
   - Após isso: `password_hash` é preenchido (bcrypt), `password_set_at` marcado
   
 - **Login normal** (sempre que voltar)
-  - POST `/auth/login` com `email` + `password`
-  - Retorna: `{ "access_token": "...", "refresh_token": "...", "user": {...} }`
+  - POST `/api/v1/auth/login` com `email` + `password`
+  - Retorna: `{ "access_token": "...", "user": {...} }`
   - Access JWT: TTL **30 min** (curto)
-  - Refresh token: HttpOnly cookie, TTL **14 dias**, rotacionável
+  - Refresh token: **cookie HttpOnly**, TTL **14 dias**, rotacionável
   
 - **Esqueci senha**
-  - POST `/auth/password/reset/init` com `email`
+  - POST `/api/v1/auth/password/reset/init` com `email`
+  - Em DEV, retorna `token` no JSON; em PROD retorna apenas `{ ok: true }`
   - Link: `http://portal.netocms.local/auth/reset-password?token=<TOKEN>` (válido por **30 min**)
-  - POST `/auth/password/reset/confirm` com `token` + `new_password`
+  - POST `/api/v1/auth/password/reset/confirm` com `token` + `new_password`
   
 - **Segurança de lockout**
-  - Após 5 tentativas de login falhadas → `locked_until` marcado (bloqueia por **15 min**)
+  - 5ª tentativa inválida já retorna **HTTP 429** e marca `locked_until` (bloqueia por **15 min**)
   - Retorna HTTP 429 (Too Many Requests) durante lockout
   - Admin pode resetar manualmente: `UPDATE users SET failed_login_attempts=0, locked_until=NULL WHERE email='...'`
 
@@ -408,14 +410,14 @@ Não há auto-cadastro. Admin cria usuários no banco (is_active=true) e distrib
 
 - Migração Alembic: adicionar colunas a `users` + tabelas `auth_tokens` + `user_sessions`.
 - Endpoints de Auth (a criar em S2: `backend/app/api/v1/endpoints/auth.py`):
-  - `POST /auth/password/set/init` (envia link 1x, TTL 10 min)
-  - `POST /auth/password/set/confirm` (recebe token + password, valida hash do token no DB)
-  - `POST /auth/login` (valida email + password, checa lockout, gera JWT + refresh)
-  - `POST /auth/refresh` (revalida refresh token, emite novo access JWT)
-  - `POST /auth/logout` (marca refresh token como revoked)
-  - `POST /auth/password/reset/init` (envia link 1x, TTL 30 min)
-  - `POST /auth/password/reset/confirm` (recebe token + password)
-  - `GET /auth/me` (retorna user autenticado, requer access JWT válido)
+  - `POST /api/v1/auth/password/set/init` (envia link 1x, TTL 10 min)
+  - `POST /api/v1/auth/password/set/confirm` (recebe token + new_password, valida hash do token no DB)
+  - `POST /api/v1/auth/login` (valida email + password, checa lockout, gera JWT + refresh)
+  - `POST /api/v1/auth/refresh` (revalida refresh token, emite novo access JWT)
+  - `POST /api/v1/auth/logout` (marca refresh token como revoked)
+  - `POST /api/v1/auth/password/reset/init` (envia link 1x, TTL 30 min)
+  - `POST /api/v1/auth/password/reset/confirm` (recebe token + new_password)
+  - `GET /api/v1/auth/me` (retorna user autenticado, requer access JWT válido)
 - **Segurança de senha** (usar `passlib[bcrypt]`):
   - Hash: bcrypt (min. custo 12)
   - Senhas nunca em logs, tokens ou responses
@@ -426,16 +428,16 @@ Não há auto-cadastro. Admin cria usuários no banco (is_active=true) e distrib
   - Expiração: 10 min (setup), 30 min (reset)
 - **JWT interno** (HS256):
   - Access JWT: TTL **30 min** (curto)
-  - Refresh token: HttpOnly cookie, TTL **14 dias**, rotacionável
+  - Refresh token: HttpOnly cookie, TTL **14 dias**, rotacionável (não exposto no body)
   - Payload mínimo: `sub` (user_id), `email`, `role_global`, `iat`, `exp`
 - **Validação de lockout** em middleware:
   - Bloqueia login se `locked_until > now()` → HTTP 429
   - Incrementa `failed_login_attempts` a cada falha
   - Reset após 15 min ou manual por admin
 - **Auditoria** (audit_log com ator=user_id):
-  - `LOGIN_ATTEMPT_SUCCESS` (com ip)
-  - `LOGIN_ATTEMPT_FAILED` (com ip, motivo: invalid_password | user_not_found | locked)
-  - `LOGIN_LOCKED` (depois de 5 falhas)
+  - `LOGIN_SUCCESS` (com ip)
+  - `LOGIN_FAILED` (com ip, motivo: invalid_password | user_not_found | inactive)
+  - `LOGIN_LOCKED` (após 5 falhas ou durante bloqueio)
   - `PASSWORD_SET` (primeiro acesso)
   - `PASSWORD_RESET` (esqueci senha)
   - `LOGOUT` (revogação de refresh)
@@ -570,9 +572,9 @@ curl -X POST "http://localhost:8000/api/v1/admin/users" \
 ```bash
 SETUP_TOKEN="<TOKEN_RETORNADO_ACIMA>"
 
-curl -X POST "http://localhost:8000/auth/password/set/confirm" \
+curl -X POST "http://localhost:8000/api/v1/auth/password/set/confirm" \
   -H "Content-Type: application/json" \
-  -d "{\"token\": \"${SETUP_TOKEN}\", \"password\": \"SenhaForte123!\"}"
+  -d "{\"token\": \"${SETUP_TOKEN}\", \"new_password\": \"SenhaForte123!\"}"
 
 # Resposta esperada: 200 {"message": "Senha configurada com sucesso"}
 ```
@@ -586,7 +588,7 @@ psql "$DATABASE_URL" -c \
 
 **4) Login (email + password):**
 ```bash
-LOGIN_RESPONSE=$(curl -s -X POST "http://localhost:8000/auth/login" \
+LOGIN_RESPONSE=$(curl -s -c cookies.txt -X POST "http://localhost:8000/api/v1/auth/login" \
   -H "Content-Type: application/json" \
   -d '{
     "email": "maria@netocontabilidade.com.br",
@@ -594,10 +596,8 @@ LOGIN_RESPONSE=$(curl -s -X POST "http://localhost:8000/auth/login" \
   }')
 
 ACCESS_JWT=$(echo "$LOGIN_RESPONSE" | jq -r '.access_token')
-REFRESH_TOKEN=$(echo "$LOGIN_RESPONSE" | jq -r '.refresh_token')
 
 echo "Access JWT: $ACCESS_JWT"
-echo "Refresh Token: $REFRESH_TOKEN"
 
 # Verificar payload do JWT
 echo "$ACCESS_JWT" | jq -R 'split(".")[[1]] | @base64d | fromjson'
@@ -608,41 +608,39 @@ Verificar auditoria:
 ```bash
 psql "$DATABASE_URL" -c \
   "SELECT action, meta_json, timestamp FROM audit_log \
-   WHERE action='LOGIN_ATTEMPT_SUCCESS' ORDER BY timestamp DESC LIMIT 1;"
+   WHERE action='LOGIN_SUCCESS' ORDER BY timestamp DESC LIMIT 1;"
 ```
 
-**5) GET /auth/me (autenticado):**
+**5) GET /api/v1/auth/me (autenticado):**
 ```bash
 curl -H "Authorization: Bearer ${ACCESS_JWT}" \
-  "http://localhost:8000/auth/me"
+  "http://localhost:8000/api/v1/auth/me"
 
 # Esperado: 200 + user data
 # Sem JWT: 401
 
-curl "http://localhost:8000/auth/me"
+curl "http://localhost:8000/api/v1/auth/me"
 # Esperado: 401 Unauthorized
 ```
 
 **6) Refresh token:**
 ```bash
-curl -s -X POST "http://localhost:8000/auth/refresh" \
-  -H "Content-Type: application/json" \
-  -d "{\"refresh_token\": \"${REFRESH_TOKEN}\"}" | jq '.access_token'
+curl -s -X POST "http://localhost:8000/api/v1/auth/refresh" \
+  -b cookies.txt | jq '.access_token'
 
 # Esperado: novo access_token (diferente do anterior)
 ```
 
 **7) Logout (revoga refresh):**
 ```bash
-curl -X POST "http://localhost:8000/auth/logout" \
+curl -X POST "http://localhost:8000/api/v1/auth/logout" \
   -H "Authorization: Bearer ${ACCESS_JWT}"
 
 # Esperado: 200 {"message": "Logout realizado"}
 
 # Tentar usar refresh revogado:
-curl -X POST "http://localhost:8000/auth/refresh" \
-  -H "Content-Type: application/json" \
-  -d "{\"refresh_token\": \"${REFRESH_TOKEN}\"}"
+curl -X POST "http://localhost:8000/api/v1/auth/refresh" \
+  -b cookies.txt
 
 # Esperado: 401 {"detail": "Refresh token revoked"}
 ```
@@ -650,7 +648,7 @@ curl -X POST "http://localhost:8000/auth/refresh" \
 **8) Lockout (5 tentativas + 15 min bloqueio):**
 ```bash
 for i in {1..5}; do
-  curl -X POST "http://localhost:8000/auth/login" \
+  curl -X POST "http://localhost:8000/api/v1/auth/login" \
     -H "Content-Type: application/json" \
     -d '{"email": "maria@netocontabilidade.com.br", "password": "ERRADA"}' \
     2>/dev/null | jq '.detail // "falha"'
@@ -658,7 +656,7 @@ for i in {1..5}; do
 done
 
 # 6ª tentativa:
-curl -X POST "http://localhost:8000/auth/login" \
+curl -X POST "http://localhost:8000/api/v1/auth/login" \
   -H "Content-Type: application/json" \
   -d '{"email": "maria@netocontabilidade.com.br", "password": "ERRADA"}'
 
@@ -674,7 +672,7 @@ psql "$DATABASE_URL" -c \
 # Auditoria:
 psql "$DATABASE_URL" -c \
   "SELECT action, COUNT(*) FROM audit_log \
-   WHERE action IN ('LOGIN_ATTEMPT_FAILED', 'LOGIN_LOCKED') \
+   WHERE action IN ('LOGIN_FAILED', 'LOGIN_LOCKED') \
    AND timestamp > NOW() - interval '5 minutes' \
    GROUP BY action;"
 
@@ -684,14 +682,14 @@ psql "$DATABASE_URL" -c \
    WHERE email='maria@netocontabilidade.com.br';"
 
 # Login funciona novamente:
-curl -X POST "http://localhost:8000/auth/login" \
+curl -X POST "http://localhost:8000/api/v1/auth/login" \
   -H "Content-Type: application/json" \
   -d '{"email": "maria@netocontabilidade.com.br", "password": "SenhaForte123!"}' | jq '.access_token'
 ```
 
 **9) Reset de senha (TTL 30 min):**
 ```bash
-curl -X POST "http://localhost:8000/auth/password/reset/init" \
+curl -X POST "http://localhost:8000/api/v1/auth/password/reset/init" \
   -H "Content-Type: application/json" \
   -d '{"email": "maria@netocontabilidade.com.br"}'
 
@@ -700,9 +698,9 @@ curl -X POST "http://localhost:8000/auth/password/reset/init" \
 
 RESET_TOKEN="<TOKEN_RESET>"
 
-curl -X POST "http://localhost:8000/auth/password/reset/confirm" \
+curl -X POST "http://localhost:8000/api/v1/auth/password/reset/confirm" \
   -H "Content-Type: application/json" \
-  -d "{\"token\": \"${RESET_TOKEN}\", \"password\": \"NovaSenha456!\"}"
+  -d "{\"token\": \"${RESET_TOKEN}\", \"new_password\": \"NovaSenha456!\"}"
 
 # Esperado: 200 {"message": "Senha atualizada"}
 
@@ -768,14 +766,14 @@ psql "$DATABASE_URL" -c "DELETE FROM users WHERE email IN ('maria@netocontabilid
 - [ ] Variáveis de ambiente (.env) configuradas com JWT_SECRET gerado.
 - [ ] User criado via SQL ou POST /api/v1/admin/users.
 - [ ] Setup de senha: curl com SETUP_TOKEN funciona, password_hash preenchido no DB.
-- [ ] Login: email + password retorna access_token + refresh_token.
-- [ ] GET /auth/me com JWT válido retorna dados corretos.
+- [ ] Login: email + password retorna access_token (refresh via cookie HttpOnly).
+- [ ] GET /api/v1/auth/me com JWT válido retorna dados corretos.
 - [ ] Refresh token renova JWT com sucesso.
 - [ ] Logout revoga refresh_token (próximo refresh falha com 401).
 - [ ] Lockout funciona: 5 tentativas → HTTP 429, locked_until marcado.
 - [ ] Reset de senha: link 1x (30 min) funciona, nova password_hash preenchida.
 - [ ] RBAC 200/403: VIEW → 403 em /api/v1/admin/users, ADMIN → 200.
-- [ ] Auditoria registra: PASSWORD_SET, LOGIN_ATTEMPT_SUCCESS, LOGIN_LOCKED, PASSWORD_RESET.
+- [ ] Auditoria registra: PASSWORD_SET, LOGIN_SUCCESS, LOGIN_FAILED, LOGIN_LOCKED, PASSWORD_RESET.
 - [ ] UI: telas de login, setup, reset renderizam e submetem requisições corretamente.
 - [ ] Rollback: git revert + alembic downgrade -1 restauram estado pré-S2.
 

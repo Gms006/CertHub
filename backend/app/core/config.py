@@ -25,8 +25,8 @@ class Settings(BaseSettings):
     bcrypt_cost: int = Field(12, alias="BCRYPT_COST")
     lockout_max_attempts: int = Field(5, alias="LOCKOUT_MAX_ATTEMPTS")
     lockout_minutes: int = Field(15, alias="LOCKOUT_MINUTES")
-    cookie_secure: bool = Field(False, alias="COOKIE_SECURE")
-    cookie_samesite: str = Field("lax", alias="COOKIE_SAMESITE")
+    cookie_secure: bool = Field(True, alias="COOKIE_SECURE")
+    cookie_samesite: str = Field("strict", alias="COOKIE_SAMESITE")
     cookie_httponly: bool = Field(True, alias="COOKIE_HTTPONLY")
     allow_legacy_headers: bool = Field(False, alias="ALLOW_LEGACY_HEADERS")
 
