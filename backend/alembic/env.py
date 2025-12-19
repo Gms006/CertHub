@@ -3,27 +3,42 @@ from __future__ import with_statement
 import os
 import sys
 from logging.config import fileConfig
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+# Resolve paths: backend/alembic/env.py
+BACKEND_DIR = Path(__file__).resolve().parents[1]   # .../backend
+REPO_DIR = BACKEND_DIR.parent                       # .../CertHub
+
+# Load .env files (backend first, then repo root)
+load_dotenv(BACKEND_DIR / ".env")   # se existir
+load_dotenv(REPO_DIR / ".env")      # raiz (principal)
+
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    raise RuntimeError("DATABASE_URL não encontrado. Crie .env na raiz ou exporte a variável.")
 
 from alembic import context
-from sqlalchemy import engine_from_config, pool
+from sqlalchemy import create_engine, pool
 
 # Add application directory to path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+sys.path.append(str(BACKEND_DIR))
 
-from app.core.config import settings  # noqa: E402
 from app.db.base import Base  # noqa: E402
 from app import models  # noqa: F401, E402
 
 config = context.config
-fileConfig(config.config_file_name)
-config.set_main_option("sqlalchemy.url", settings.database_url)
+if config.config_file_name is not None:
+    fileConfig(config.config_file_name)
+config.set_main_option("sqlalchemy.url", DATABASE_URL)
 
 target_metadata = Base.metadata
 
+
 def run_migrations_offline() -> None:
-    url = config.get_main_option("sqlalchemy.url")
     context.configure(
-        url=url,
+        url=DATABASE_URL,
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
@@ -34,11 +49,8 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    )
+    assert DATABASE_URL is not None, "DATABASE_URL must be set"
+    connectable = create_engine(DATABASE_URL, poolclass=pool.NullPool, pool_pre_ping=True)
 
     with connectable.connect() as connection:
         context.configure(connection=connection, target_metadata=target_metadata)

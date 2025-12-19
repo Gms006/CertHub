@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: certhub-postgres
+    environment:
+      POSTGRES_USER: certhub
+      POSTGRES_PASSWORD: 619038
+      POSTGRES_DB: certhub
+    ports:
+      - "5433:5432"
+
+    volumes:
+      - certhub_pgdata:/var/lib/postgresql/data
+
+volumes:
+  certhub_pgdata:
