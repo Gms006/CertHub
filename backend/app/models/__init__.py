@@ -13,7 +13,6 @@ from app.models.cert_install_job import (
 from app.models.device import Device
 from app.models.user import User
 from app.models.user_device import UserDevice
-from app.models.user_empresa_permission import UserEmpresaPermission
 
 __all__ = [
     "User",
@@ -28,6 +27,5 @@ __all__ = [
     "JOB_STATUS_CANCELED",
     "Device",
     "UserDevice",
-    "UserEmpresaPermission",
     "AuditLog",
 ]
