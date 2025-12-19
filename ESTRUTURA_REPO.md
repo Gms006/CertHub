@@ -51,6 +51,7 @@ certhub/
 │  │  └─ versions/
 │  │     ├─ 0007_auth_tokens_sessions.py
 │  ├─ tests/
+│  ├─ requirements.txt
 │  ├─ alembic.ini
 │  └─ Dockerfile
 │
