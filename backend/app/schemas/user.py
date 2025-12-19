@@ -34,3 +34,7 @@ class UserRead(UserBase):
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class UserCreateResponse(UserRead):
+    setup_token: str | None = None

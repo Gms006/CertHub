@@ -11,7 +11,8 @@ certhub/
 │  │  │     │  ├─ certificados.py
 │  │  │     │  ├─ agent.py
 │  │  │     │  ├─ install_jobs.py
-│  │  │     │  └─ admin.py
+│  │  │     │  ├─ admin.py
+│  │  │     │  └─ auth.py
 │  │  ├─ core/
 │  │  │  ├─ config.py
 │  │  │  ├─ security.py
@@ -23,6 +24,8 @@ certhub/
 │  │  ├─ models/
 │  │  │  ├─ base.py
 │  │  │  ├─ user.py
+│  │  │  ├─ auth_token.py
+│  │  │  ├─ user_session.py
 │  │  │  ├─ device.py
 │  │  │  ├─ user_device.py
 │  │  │  ├─ certificate.py
@@ -30,6 +33,7 @@ certhub/
 │  │  │  └─ audit_log.py
 │  │  ├─ schemas/
 │  │  │  ├─ user.py
+│  │  │  ├─ auth.py
 │  │  │  ├─ device.py
 │  │  │  ├─ install_job.py
 │  │  │  └─ audit.py
@@ -45,20 +49,28 @@ certhub/
 │  │  ├─ env.py
 │  │  ├─ script.py.mako
 │  │  └─ versions/
+│  │     ├─ 0007_auth_tokens_sessions.py
 │  ├─ tests/
+│  ├─ requirements.txt
 │  ├─ alembic.ini
 │  └─ Dockerfile
 │
 ├─ frontend/
 │  ├─ src/
-│  │  ├─ app/
-│  │  ├─ components/
+│  │  ├─ App.tsx
 │  │  ├─ pages/
+│  │  │  ├─ Login.tsx
+│  │  │  ├─ ResetPassword.tsx
+│  │  │  └─ SetPassword.tsx
 │  │  ├─ hooks/
+│  │  │  └─ useAuth.ts
 │  │  ├─ lib/
+│  │  │  └─ api.ts
 │  │  └─ main.tsx
 │  ├─ index.html
 │  ├─ package.json
+│  ├─ tsconfig.json
+│  ├─ tsconfig.node.json
 │  ├─ vite.config.ts
 │  └─ README.md
 │

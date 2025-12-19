@@ -1,4 +1,5 @@
 from app.models.audit_log import AuditLog
+from app.models.auth_token import AuthToken
 from app.models.certificate import Certificate
 from app.models.cert_install_job import (
     CertInstallJob,
@@ -13,9 +14,12 @@ from app.models.cert_install_job import (
 from app.models.device import Device
 from app.models.user import User
 from app.models.user_device import UserDevice
+from app.models.user_session import UserSession
 
 __all__ = [
     "User",
+    "AuthToken",
+    "UserSession",
     "Certificate",
     "CertInstallJob",
     "JOB_STATUS_REQUESTED",
