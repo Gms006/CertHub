@@ -2,7 +2,7 @@
 
 Objetivo: substituir o diretório público de `.pfx` por um fluxo controlado via **Portal (React) + API + Agent Windows**, com:
 - instalação no **CurrentUser** sem o usuário ter acesso ao arquivo nem à senha
-- controle de permissões (usuário ↔ empresas)
+- controle de acesso via **RBAC global** + flags por usuário
 - **auditoria** completa
 - remoção automática às **18:00** dos certificados temporários instalados pelo Agent
 
@@ -88,6 +88,7 @@ curl -X POST "http://localhost:8000/api/v1/admin/certificates/ingest-from-fs" \
 
 * payload de instalação entregue somente ao Agent (evolui no S6: token one-time + expiração + device binding)
 * auditoria: INSTALL_REQUESTED / CLAIM / DONE / FAILED / REMOVED_18H
+* visibilidade de certificados é global por `org_id` (sem carteiras/permissões por certificado)
 
 ### Exemplo: habilitar auto-approve para um usuário VIEW
 
@@ -108,4 +109,3 @@ Campos opcionais no corpo: `auto_approve_install_jobs`, `role_global`, `is_activ
 * S2: Auth piloto + RBAC + skeleton do front (protótipo)
 * S3+: Jobs + Agent MVP + limpeza às 18h + hardening
 > As partes de S1/S2/S3/S4/S5/S6 estão todas descritas no plano (incluindo tabelas/endpoints e a política das 18h).
-

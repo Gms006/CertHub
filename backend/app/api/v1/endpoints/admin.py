@@ -10,10 +10,9 @@ from sqlalchemy.orm import Session
 from app.core.audit import log_audit
 from app.core.security import require_admin_or_dev, require_dev
 from app.db.session import get_db
-from app.models import Device, User, UserDevice, UserEmpresaPermission
+from app.models import Device, User, UserDevice
 from app.schemas.cert_ingest import CertIngestRequest, CertIngestResponse
 from app.schemas.device import DeviceCreate, DeviceRead
-from app.schemas.permission import UserEmpresaPermissionCreate, UserEmpresaPermissionRead
 from app.schemas.user import UserCreate, UserRead, UserUpdate
 from app.schemas.user_device import UserDeviceCreate, UserDeviceRead
 from app.services.certificate_ingest import ingest_certificates_from_fs
@@ -182,36 +181,6 @@ def link_user_device(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc.orig))
     db.refresh(link)
     return link
-
-
-@router.post(
-    "/permissions",
-    response_model=UserEmpresaPermissionRead,
-    status_code=status.HTTP_201_CREATED,
-)
-def create_permission(
-    payload: UserEmpresaPermissionCreate,
-    db: Session = Depends(get_db),
-    current_user=Depends(require_dev),
-) -> UserEmpresaPermission:
-    permission = UserEmpresaPermission(org_id=current_user.org_id, **payload.model_dump())
-    db.add(permission)
-    log_audit(
-        db=db,
-        org_id=current_user.org_id,
-        action="PERMISSION_CREATED",
-        entity_type="user_empresa_permission",
-        entity_id=permission.id,
-        actor_user_id=current_user.id,
-        meta={"role": permission.role, "empresa_id": str(permission.empresa_id)},
-    )
-    try:
-        db.commit()
-    except IntegrityError as exc:
-        db.rollback()
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc.orig))
-    db.refresh(permission)
-    return permission
 
 
 @router.post(
