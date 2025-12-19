@@ -359,6 +359,14 @@ O Agent **nunca** deve remover certificados que:
 
 **Objetivo**: login no portal e RBAC global, já com a UI do protótipo rodando.
 
+**Status**: 🟡 Em andamento
+
+**Evidências (S2 em andamento)**
+
+- Migração criada para `auth_tokens/user_sessions` e colunas de auth em `users` (alembic 0007).
+- Endpoints `/auth/*` implementados com JWT + refresh cookie e lockout.
+- Skeleton do front com páginas `Login`, `SetPassword`, `ResetPassword` e hook `useAuth`.
+
 **Padrão S2: Email+Senha (usuários pré-criados)**
 
 Não há auto-cadastro. Admin cria usuários no banco (is_active=true) e distribui link 1x para definir senha no primeiro acesso.
@@ -939,4 +947,3 @@ Padrão atual: `nome_CPF/CNPJ Senha [senha].pfx`
 
 - O ingest continua deduzindo senha do nome.
 - No médio prazo, recomendação: parar de usar senha no nome e migrar para “secret store” (sem quebrar o portal).
-

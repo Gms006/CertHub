@@ -67,6 +67,73 @@ Veja `.env.example`.
 
 - `CERTS_ROOT_PATH`: caminho do diretório raiz com os `.pfx/.p12` (somente os arquivos diretos, subpastas são ignoradas).
 - `OPENSSL_PATH`: binário do OpenSSL (ex.: `openssl` no Linux/macOS ou `C:\\Program Files\\OpenSSL-Win64\\bin\\openssl.exe` no Windows).
+- `JWT_SECRET`, `ACCESS_TOKEN_TTL_MIN`, `REFRESH_TTL_DAYS`: chaves e TTLs para autenticação S2.
+- `ALLOW_LEGACY_HEADERS`: habilita headers `X-User-Id/X-Org-Id` **apenas em dev** para compatibilidade temporária.
+
+## S2 — Auth + RBAC (validação local)
+
+### 1) Aplicar migration
+```bash
+cd backend
+alembic upgrade head
+```
+
+### 2) Verificar colunas/tabelas
+```bash
+psql "$DATABASE_URL" -c \
+  "SELECT column_name FROM information_schema.columns \
+   WHERE table_name='users' AND column_name IN \
+   ('password_hash', 'password_set_at', 'failed_login_attempts', 'locked_until');"
+
+psql "$DATABASE_URL" -c \
+  "SELECT tablename FROM pg_tables \
+   WHERE schemaname='public' AND tablename IN ('auth_tokens', 'user_sessions');"
+```
+
+### 3) Criar usuário (DEV) e gerar token 1x
+```bash
+curl -X POST "http://localhost:8000/api/v1/admin/users" \
+  -H "Authorization: Bearer <JWT_DEV>" \
+  -H "Content-Type: application/json" \
+  -d '{"email": "maria@netocontabilidade.com.br", "nome": "Maria", "role_global": "ADMIN"}'
+```
+
+### 4) Definir senha (token 1x)
+```bash
+curl -X POST "http://localhost:8000/api/v1/auth/password/set/confirm" \
+  -H "Content-Type: application/json" \
+  -d '{"token": "<TOKEN_1X>", "new_password": "SenhaForte123!"}'
+```
+
+### 5) Login e /auth/me
+```bash
+curl -X POST "http://localhost:8000/api/v1/auth/login" \
+  -H "Content-Type: application/json" \
+  -d '{"email": "maria@netocontabilidade.com.br", "password": "SenhaForte123!"}'
+
+curl -H "Authorization: Bearer <JWT_ADMIN>" \
+  "http://localhost:8000/api/v1/auth/me"
+```
+
+### 6) Lockout (5 falhas)
+```bash
+for i in {1..5}; do
+  curl -X POST "http://localhost:8000/api/v1/auth/login" \
+    -H "Content-Type: application/json" \
+    -d '{"email": "maria@netocontabilidade.com.br", "password": "ERRADA"}'
+done
+```
+
+### 7) RBAC (200 vs 403)
+```bash
+# VIEW não lista jobs
+curl -H "Authorization: Bearer <JWT_VIEW>" \
+  "http://localhost:8000/api/v1/install-jobs"
+
+# ADMIN lista jobs
+curl -H "Authorization: Bearer <JWT_ADMIN>" \
+  "http://localhost:8000/api/v1/install-jobs"
+```
 
 ## Ingestão de certificados a partir do filesystem (DEV)
 
