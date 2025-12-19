@@ -230,6 +230,8 @@ def ingest_certificates_from_filesystem(
             org_id=current_user.org_id,
             dry_run=payload.dry_run,
             limit=payload.limit,
+            prune_missing=payload.prune_missing,
+            dedupe=payload.dedupe,
         )
     except FileNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
@@ -247,6 +249,8 @@ def ingest_certificates_from_filesystem(
                 "updated": result["updated"],
                 "failed": result["failed"],
                 "total": result["total"],
+                "pruned": result["pruned"],
+                "deduped": result["deduped"],
                 "limit": payload.limit,
             },
         )

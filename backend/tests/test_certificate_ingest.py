@@ -104,6 +104,8 @@ def test_ingest_counts_and_preserves_valid_data(monkeypatch, tmp_path, test_clie
         "updated": 1,
         "failed": 1,
         "total": 3,
+        "pruned": 0,
+        "deduped": 0,
         "errors": [
             {"filename": "existing-fail.pfx", "reason": "failed to parse", "exception": None}
         ],
@@ -128,3 +130,15 @@ def test_ingest_counts_and_preserves_valid_data(monkeypatch, tmp_path, test_clie
         assert new_cert.subject == "New Subject"
         assert new_cert.parse_ok is True
         assert new_cert.last_ingested_at is not None
+
+
+def test_guess_password_variations():
+    cases = [
+        ("cert senha 123.pfx", "123"),
+        ("cert-senha:abc.pfx", "abc"),
+        ("cert_senha-ABC123.pfx", "ABC123"),
+        ("cert senha_789.pfx", "789"),
+        ("cert-senha \"quoted\".pfx", "\"quoted\""),
+    ]
+    for filename, expected in cases:
+        assert certificate_ingest._guess_password(Path(filename)) == expected
