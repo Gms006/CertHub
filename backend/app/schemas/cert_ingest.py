@@ -6,6 +6,8 @@ from pydantic import BaseModel, Field
 class CertIngestRequest(BaseModel):
     dry_run: bool = False
     limit: int = Field(0, ge=0)
+    prune_missing: bool = False
+    dedupe: bool = False
 
 
 class CertIngestError(BaseModel):
@@ -19,4 +21,6 @@ class CertIngestResponse(BaseModel):
     updated: int
     failed: int
     total: int
+    pruned: int = 0
+    deduped: int = 0
     errors: list[CertIngestError]

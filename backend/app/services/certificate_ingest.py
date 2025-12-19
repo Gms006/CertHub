@@ -13,6 +13,8 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.models import Certificate
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.serialization.pkcs12 import load_key_and_certificates
 
 DATE_FORMAT = "%b %d %H:%M:%S %Y %Z"
 CERT_EXTENSIONS = {".pfx", ".p12"}
@@ -39,17 +41,18 @@ class ParsedCertificate:
 
 def _guess_password(path: Path) -> str | None:
     stem = path.stem
-    match = re.search(r"senha[:\s_-]+(.+)", stem, flags=re.IGNORECASE)
+    match = re.search(r"senha(?:\s*[:_-]?\s+|\s*[:_-]\s*)(\S+)$", stem, flags=re.IGNORECASE)
     if match:
         return match.group(1).strip()
     return None
 
 
 def _parse_datetime(raw_value: str) -> datetime:
-    return datetime.strptime(raw_value, DATE_FORMAT).replace(tzinfo=timezone.utc)
+    normalized = re.sub(r"\s+", " ", raw_value.strip())
+    return datetime.strptime(normalized, DATE_FORMAT).replace(tzinfo=timezone.utc)
 
 
-def _run_openssl_extract(path: Path, password: str) -> str:
+def _run_openssl_extract(path: Path, password: str, *, legacy: bool = False) -> str:
     try:
         pkcs12_cmd = [
             str(settings.openssl_path),
@@ -62,6 +65,8 @@ def _run_openssl_extract(path: Path, password: str) -> str:
             "-clcerts",
             "-nodes",
         ]
+        if legacy:
+            pkcs12_cmd.append("-legacy")
         pem_bytes = subprocess.check_output(pkcs12_cmd, stderr=subprocess.PIPE)
         x509_cmd = [
             str(settings.openssl_path),
@@ -86,8 +91,7 @@ def _extract_metadata(path: Path, candidates: Iterable[str]) -> tuple[ParsedCert
     last_error: str | None = None
     for password in dict.fromkeys(candidates):
         try:
-            raw_output = _run_openssl_extract(path, password)
-            parsed = _parse_metadata_output(raw_output)
+            parsed = parse_pkcs12(path, password)
             return (
                 ParsedCertificate(
                     path=path,
@@ -98,9 +102,30 @@ def _extract_metadata(path: Path, candidates: Iterable[str]) -> tuple[ParsedCert
                 ),
                 True,
             )
-        except CertificateParserError as exc:
+        except Exception as exc:
             last_error = str(exc)
             continue
+    for password in dict.fromkeys(candidates):
+        try:
+            raw_output = _run_openssl_extract(path, password)
+        except CertificateParserError as exc:
+            last_error = str(exc)
+            try:
+                raw_output = _run_openssl_extract(path, password, legacy=True)
+            except CertificateParserError as legacy_exc:
+                last_error = str(legacy_exc)
+                continue
+        parsed = _parse_metadata_output(raw_output)
+        return (
+            ParsedCertificate(
+                path=path,
+                name=path.stem,
+                password_used=password or None,
+                parse_error=None,
+                **parsed,
+            ),
+            True,
+        )
     return (
         ParsedCertificate(
             path=path,
@@ -127,7 +152,7 @@ def _parse_metadata_output(raw_output: str) -> dict[str, str | datetime | None]:
         elif line.startswith("issuer="):
             issuer = line.removeprefix("issuer=").strip()
         elif line.startswith("serial="):
-            serial = line.removeprefix("serial=").strip()
+            serial = _normalize_serial(line.removeprefix("serial=").strip())
         elif line.startswith("notBefore="):
             try:
                 not_before = _parse_datetime(line.removeprefix("notBefore=").strip())
@@ -154,13 +179,88 @@ def _candidate_passwords(path: Path) -> list[str]:
     guessed = _guess_password(path)
     candidates: list[str] = []
     if guessed is not None:
-        candidates.append(guessed)
+        candidates.extend(_password_variations(guessed))
     candidates.append("")
     return candidates
 
 
+def _password_variations(password: str) -> list[str]:
+    variations = [password, password.strip()]
+    for quote in ('"', "'"):
+        variations.append(password.strip().strip(quote))
+    return [value for value in dict.fromkeys(variations) if value]
+
+
+def dotnet_serial_from_int(serial_int: int) -> str:
+    length = max(1, (serial_int.bit_length() + 7) // 8)
+    raw_bytes = serial_int.to_bytes(length, byteorder="big")
+    reversed_bytes = raw_bytes[::-1]
+    return reversed_bytes.hex().upper()
+
+
+def _normalize_serial(serial_value: str | None) -> str | None:
+    if not serial_value:
+        return None
+    cleaned = serial_value.strip()
+    if cleaned.lower().startswith("0x"):
+        cleaned = cleaned[2:]
+    try:
+        serial_int = int(cleaned, 16)
+        return dotnet_serial_from_int(serial_int)
+    except ValueError:
+        try:
+            serial_int = int(cleaned)
+            return dotnet_serial_from_int(serial_int)
+        except ValueError:
+            return None
+
+
+def _certificate_datetime(cert_value: datetime) -> datetime:
+    return cert_value.astimezone(timezone.utc) if cert_value.tzinfo else cert_value.replace(
+        tzinfo=timezone.utc
+    )
+
+
+def parse_pkcs12(path: Path, password: str) -> dict[str, str | datetime | None]:
+    raw_bytes = path.read_bytes()
+    password_bytes = password.encode() if password else b""
+    try:
+        _key, cert, _additional = load_key_and_certificates(raw_bytes, password_bytes)
+    except Exception as exc:
+        if password == "":
+            _key, cert, _additional = load_key_and_certificates(raw_bytes, None)
+        else:
+            raise exc
+    if cert is None:
+        raise CertificateParserError("certificate not found in PKCS12 bundle")
+    subject = cert.subject.rfc4514_string()
+    issuer = cert.issuer.rfc4514_string()
+    serial_number = dotnet_serial_from_int(cert.serial_number)
+    not_before = getattr(cert, "not_valid_before_utc", None)
+    if not_before is None:
+        not_before = _certificate_datetime(cert.not_valid_before)
+    not_after = getattr(cert, "not_valid_after_utc", None)
+    if not_after is None:
+        not_after = _certificate_datetime(cert.not_valid_after)
+    sha1_fingerprint = cert.fingerprint(hashes.SHA1()).hex().upper()
+    return {
+        "subject": subject,
+        "issuer": issuer,
+        "serial_number": serial_number,
+        "not_before": not_before,
+        "not_after": not_after,
+        "sha1_fingerprint": sha1_fingerprint,
+    }
+
+
 def ingest_certificates_from_fs(
-    db: Session, *, org_id: int, dry_run: bool = False, limit: int = 0
+    db: Session,
+    *,
+    org_id: int,
+    dry_run: bool = False,
+    limit: int = 0,
+    prune_missing: bool = False,
+    dedupe: bool = False,
 ) -> dict[str, int | list[dict[str, str | None]]]:
     root_path = settings.certs_root_path.expanduser()
     if not root_path.exists() or not root_path.is_dir():
@@ -220,7 +320,14 @@ def ingest_certificates_from_fs(
             }
         )
 
+    pruned = 0
+    deduped = 0
+
     if not dry_run:
+        if prune_missing:
+            pruned = _prune_missing_certificates(db, org_id=org_id)
+        if dedupe:
+            deduped = _dedupe_certificates(db, org_id=org_id)
         db.commit()
 
     total = len(files)
@@ -238,6 +345,8 @@ def ingest_certificates_from_fs(
         "updated": updated,
         "failed": failed,
         "total": total,
+        "pruned": pruned,
+        "deduped": deduped,
         "errors": errors,
     }
 
@@ -306,3 +415,52 @@ def _mark_parse_failure(target: Certificate, parsed: ParsedCertificate) -> None:
     target.last_error_at = now
     if target.source_path is None:
         target.source_path = str(parsed.path)
+
+
+def _prune_missing_certificates(db: Session, *, org_id: int) -> int:
+    certificates = db.execute(
+        select(Certificate).where(
+            Certificate.org_id == org_id, Certificate.source_path.is_not(None)
+        )
+    ).scalars()
+    removed = 0
+    for certificate in certificates:
+        if certificate.source_path and not Path(certificate.source_path).exists():
+            db.delete(certificate)
+            removed += 1
+    return removed
+
+
+def _dedupe_certificates(db: Session, *, org_id: int) -> int:
+    certificates = db.execute(
+        select(Certificate).where(Certificate.org_id == org_id)
+    ).scalars()
+    by_sha1: dict[str, list[Certificate]] = {}
+    by_serial: dict[str, list[Certificate]] = {}
+    for certificate in certificates:
+        if certificate.sha1_fingerprint:
+            by_sha1.setdefault(certificate.sha1_fingerprint, []).append(certificate)
+        elif certificate.serial_number:
+            by_serial.setdefault(certificate.serial_number, []).append(certificate)
+
+    removed_ids: set[uuid.UUID] = set()
+
+    def remove_duplicates(groups: dict[str, list[Certificate]]) -> None:
+        for group in groups.values():
+            if len(group) <= 1:
+                continue
+            group_sorted = sorted(
+                group,
+                key=lambda cert: cert.last_ingested_at
+                or datetime.min.replace(tzinfo=timezone.utc),
+                reverse=True,
+            )
+            for duplicate in group_sorted[1:]:
+                if duplicate.id in removed_ids:
+                    continue
+                removed_ids.add(duplicate.id)
+                db.delete(duplicate)
+
+    remove_duplicates(by_sha1)
+    remove_duplicates(by_serial)
+    return len(removed_ids)
