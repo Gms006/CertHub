@@ -72,15 +72,7 @@ Você já tem um pipeline robusto:
 - Executa em background (tray app recomendado).
 - Registra a máquina (“device”).
 - Puxa jobs pendentes.
-- Instala no store do Windows do usuário (CurrentUser/My).
-- Registra no backend (sucesso/erro).
-- **Remove às 18h** os certificados que ele instalou como temporários.
-
-
-- Executa em background (tray app recomendado).
-- Registra a máquina (“device”).
-- Puxa jobs pendentes.
-- Instala no **Cert:\CurrentUser\My**.
+- Instala no **Cert:\CurrentUser\My** (store do usuário).
 - Registra no backend (sucesso/erro).
 - **Remove às 18h** os certificados que ele instalou como temporários.
 
@@ -324,8 +316,11 @@ O Agent **nunca** deve remover certificados que:
      -H "Content-Type: application/json" \
      -H "X-User-Id: <UUID_ADMIN_OU_VIEW_AUTO>" -H "X-Org-Id: 1" \
      -d '{"device_id": "<DEVICE_ID>"}'
+   ```- Aprovar job (ADMIN/DEV):
+   ```bash
+   curl -X POST "http://localhost:8000/api/v1/install-jobs/<JOB_ID>/approve" \
+     -H "X-User-Id: <UUID_ADMIN>" -H "X-Org-Id: 1"
    ```
-
 ---
 
 ## S2 — Auth (piloto) + RBAC + Skeleton do Front (protótipo)
@@ -529,8 +524,3 @@ Padrão atual: `nome_CPF/CNPJ Senha [senha].pfx`
 - O ingest continua deduzindo senha do nome.
 - No médio prazo, recomendação: parar de usar senha no nome e migrar para “secret store” (sem quebrar o portal).
 
-
-Padrão atual: `nome_CPF/CNPJ Senha [senha].pfx`
-
-- O ingest continua deduzindo senha do nome.
-- No médio prazo, recomendação: parar de usar senha no nome e migrar para “secret store” (sem quebrar o portal).
