@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from app.core.audit import log_audit
@@ -31,6 +31,7 @@ from app.schemas.auth import (
     PasswordSetInitRequest,
     RefreshRequest,
     RefreshResponse,
+    TokenInitResponse,
 )
 from app.schemas.user import UserRead
 
@@ -64,12 +65,12 @@ def _clear_refresh_cookie(response: Response) -> None:
     response.delete_cookie(REFRESH_COOKIE_NAME, path="/")
 
 
-@router.post("/password/set/init", response_model=MessageResponse)
+@router.post("/password/set/init", response_model=TokenInitResponse)
 def password_set_init(
     payload: PasswordSetInitRequest,
     db: Session = Depends(get_db),
     current_user=Depends(require_admin_or_dev),
-) -> MessageResponse:
+) -> TokenInitResponse:
     statement = select(User).where(
         func.lower(User.email) == payload.email.lower(),
         User.org_id == current_user.org_id,
@@ -90,10 +91,11 @@ def password_set_init(
     )
     db.add(auth_token)
     db.commit()
-    return MessageResponse(
-        message="setup token generated",
-        token=raw_token,
-        expires_at=expires_at,
+    token_value = raw_token if settings.env.lower() == "dev" else None
+    return TokenInitResponse(
+        ok=True,
+        token=token_value,
+        expires_at=expires_at if token_value else None,
     )
 
 
@@ -124,6 +126,16 @@ def password_set_confirm(
     user.failed_login_attempts = 0
     user.locked_until = None
     auth_token.used_at = now
+    db.execute(
+        update(AuthToken)
+        .where(
+            AuthToken.user_id == user.id,
+            AuthToken.purpose == AUTH_TOKEN_PURPOSE_SET_PASSWORD,
+            AuthToken.used_at.is_(None),
+            AuthToken.id != auth_token.id,
+        )
+        .values(used_at=now)
+    )
     log_audit(
         db=db,
         org_id=user.org_id,
@@ -151,7 +163,7 @@ def login(
         log_audit(
             db=db,
             org_id=settings.default_org_id,
-            action="LOGIN_ATTEMPT_FAILED",
+            action="LOGIN_FAILED",
             entity_type="user",
             entity_id=None,
             ip=request.client.host if request.client else None,
@@ -164,7 +176,7 @@ def login(
         log_audit(
             db=db,
             org_id=user.org_id,
-            action="LOGIN_ATTEMPT_FAILED",
+            action="LOGIN_FAILED",
             entity_type="user",
             entity_id=user.id,
             actor_user_id=user.id,
@@ -178,7 +190,7 @@ def login(
         log_audit(
             db=db,
             org_id=user.org_id,
-            action="LOGIN_ATTEMPT_LOCKED",
+            action="LOGIN_LOCKED",
             entity_type="user",
             entity_id=user.id,
             actor_user_id=user.id,
@@ -195,7 +207,7 @@ def login(
         log_audit(
             db=db,
             org_id=user.org_id,
-            action="LOGIN_ATTEMPT_FAILED",
+            action="LOGIN_FAILED",
             entity_type="user",
             entity_id=user.id,
             actor_user_id=user.id,
@@ -212,6 +224,11 @@ def login(
                 entity_id=user.id,
                 actor_user_id=user.id,
                 ip=request.client.host if request.client else None,
+            )
+            db.commit()
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="too many login attempts",
             )
         db.commit()
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid credentials")
@@ -232,7 +249,7 @@ def login(
     log_audit(
         db=db,
         org_id=user.org_id,
-        action="LOGIN_ATTEMPT_SUCCESS",
+        action="LOGIN_SUCCESS",
         entity_type="user",
         entity_id=user.id,
         actor_user_id=user.id,
@@ -242,7 +259,7 @@ def login(
     _set_refresh_cookie(response, refresh_token)
     return LoginResponse(
         access_token=access_token,
-        refresh_token=refresh_token,
+        refresh_token=None,
         user=UserRead.model_validate(user, from_attributes=True),
     )
 
@@ -312,15 +329,15 @@ def logout(
     return MessageResponse(message="logout ok")
 
 
-@router.post("/password/reset/init", response_model=MessageResponse)
+@router.post("/password/reset/init", response_model=TokenInitResponse)
 def password_reset_init(
     payload: PasswordResetInitRequest,
     db: Session = Depends(get_db),
-) -> MessageResponse:
+) -> TokenInitResponse:
     statement = select(User).where(func.lower(User.email) == payload.email.lower())
     user = db.execute(statement).scalar_one_or_none()
     if user is None:
-        return MessageResponse(message="reset requested")
+        return TokenInitResponse(ok=True)
 
     raw_token = generate_token()
     expires_at = datetime.now(timezone.utc) + timedelta(
@@ -334,10 +351,11 @@ def password_reset_init(
     )
     db.add(auth_token)
     db.commit()
-    return MessageResponse(
-        message="reset requested",
-        token=raw_token if settings.env.lower() == "dev" else None,
-        expires_at=expires_at if settings.env.lower() == "dev" else None,
+    token_value = raw_token if settings.env.lower() == "dev" else None
+    return TokenInitResponse(
+        ok=True,
+        token=token_value,
+        expires_at=expires_at if token_value else None,
     )
 
 
@@ -367,6 +385,16 @@ def password_reset_confirm(
     user.failed_login_attempts = 0
     user.locked_until = None
     auth_token.used_at = now
+    db.execute(
+        update(AuthToken)
+        .where(
+            AuthToken.user_id == user.id,
+            AuthToken.purpose == AUTH_TOKEN_PURPOSE_RESET_PASSWORD,
+            AuthToken.used_at.is_(None),
+            AuthToken.id != auth_token.id,
+        )
+        .values(used_at=now)
+    )
     log_audit(
         db=db,
         org_id=user.org_id,

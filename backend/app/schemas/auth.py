@@ -41,6 +41,12 @@ class RefreshResponse(BaseModel):
     token_type: str = "bearer"
 
 
+class TokenInitResponse(BaseModel):
+    ok: bool = True
+    token: str | None = None
+    expires_at: datetime | None = None
+
+
 class MessageResponse(BaseModel):
     message: str
     token: str | None = None

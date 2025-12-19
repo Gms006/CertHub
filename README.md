@@ -70,69 +70,83 @@ Veja `.env.example`.
 - `JWT_SECRET`, `ACCESS_TOKEN_TTL_MIN`, `REFRESH_TTL_DAYS`: chaves e TTLs para autenticação S2.
 - `ALLOW_LEGACY_HEADERS`: habilita headers `X-User-Id/X-Org-Id` **apenas em dev** para compatibilidade temporária.
 
-## S2 — Auth + RBAC (validação local)
+## S2 — Auth + RBAC (roteiro PowerShell)
 
-### 1) Aplicar migration
-```bash
-cd backend
-alembic upgrade head
+> Os exemplos abaixo usam PowerShell 7+ no Windows.
+
+### 1) Listar paths do OpenAPI
+```powershell
+$openapi = Invoke-RestMethod "http://localhost:8000/openapi.json"
+$openapi.paths.PSObject.Properties.Name | Sort-Object
 ```
 
-### 2) Verificar colunas/tabelas
-```bash
-psql "$DATABASE_URL" -c \
-  "SELECT column_name FROM information_schema.columns \
-   WHERE table_name='users' AND column_name IN \
-   ('password_hash', 'password_set_at', 'failed_login_attempts', 'locked_until');"
+### 2) Set password (DEV/ADMIN/VIEW)
+```powershell
+# DEV/ADMIN gera token 1x para um usuário alvo (VIEW/ADMIN/DEV)
+$setup = Invoke-RestMethod -Method Post "http://localhost:8000/api/v1/auth/password/set/init" `
+  -Headers @{ Authorization = "Bearer <JWT_DEV_OU_ADMIN>" } `
+  -ContentType "application/json" `
+  -Body '{"email": "view@netocontabilidade.com.br"}'
 
-psql "$DATABASE_URL" -c \
-  "SELECT tablename FROM pg_tables \
-   WHERE schemaname='public' AND tablename IN ('auth_tokens', 'user_sessions');"
+# Em DEV, o token é retornado no JSON; em PROD, apenas { ok: true }.
+$setup.token
+
+Invoke-RestMethod -Method Post "http://localhost:8000/api/v1/auth/password/set/confirm" `
+  -ContentType "application/json" `
+  -Body (@{ token = $setup.token; new_password = "SenhaForte123!" } | ConvertTo-Json)
 ```
 
-### 3) Criar usuário (DEV) e gerar token 1x
-```bash
-curl -X POST "http://localhost:8000/api/v1/admin/users" \
-  -H "Authorization: Bearer <JWT_DEV>" \
-  -H "Content-Type: application/json" \
-  -d '{"email": "maria@netocontabilidade.com.br", "nome": "Maria", "role_global": "ADMIN"}'
+### 3) Login / me / refresh / logout (cookie HttpOnly)
+```powershell
+$session = New-Object Microsoft.PowerShell.Commands.WebRequestSession
+
+$login = Invoke-RestMethod -Method Post "http://localhost:8000/api/v1/auth/login" `
+  -WebSession $session `
+  -ContentType "application/json" `
+  -Body '{"email": "maria@netocontabilidade.com.br", "password": "SenhaForte123!"}'
+
+$access = $login.access_token
+
+Invoke-RestMethod "http://localhost:8000/api/v1/auth/me" `
+  -Headers @{ Authorization = "Bearer $access" }
+
+# Refresh usa o cookie HttpOnly (não precisa enviar refresh_token no body)
+$refreshed = Invoke-RestMethod -Method Post "http://localhost:8000/api/v1/auth/refresh" `
+  -WebSession $session
+$refreshed.access_token
+
+Invoke-RestMethod -Method Post "http://localhost:8000/api/v1/auth/logout" `
+  -WebSession $session `
+  -Headers @{ Authorization = "Bearer $access" }
 ```
 
-### 4) Definir senha (token 1x)
-```bash
-curl -X POST "http://localhost:8000/api/v1/auth/password/set/confirm" \
-  -H "Content-Type: application/json" \
-  -d '{"token": "<TOKEN_1X>", "new_password": "SenhaForte123!"}'
+### 4) Lockout (5 falhas → 429)
+```powershell
+1..5 | ForEach-Object {
+  Invoke-WebRequest -Method Post "http://localhost:8000/api/v1/auth/login" `
+    -ContentType "application/json" `
+    -Body '{"email": "maria@netocontabilidade.com.br", "password": "ERRADA"}' `
+    -SkipHttpErrorCheck | Select-Object StatusCode
+}
+
+# 6ª tentativa bloqueada
+Invoke-WebRequest -Method Post "http://localhost:8000/api/v1/auth/login" `
+  -ContentType "application/json" `
+  -Body '{"email": "maria@netocontabilidade.com.br", "password": "ERRADA"}' `
+  -SkipHttpErrorCheck | Select-Object StatusCode
 ```
 
-### 5) Login e /auth/me
-```bash
-curl -X POST "http://localhost:8000/api/v1/auth/login" \
-  -H "Content-Type: application/json" \
-  -d '{"email": "maria@netocontabilidade.com.br", "password": "SenhaForte123!"}'
+### 5) RBAC (VIEW 403 em /admin/users, 200 em /certificados)
+```powershell
+# VIEW tentando acessar admin/users → 403
+Invoke-WebRequest "http://localhost:8000/api/v1/admin/users" `
+  -Headers @{ Authorization = "Bearer <JWT_VIEW>" } `
+  -SkipHttpErrorCheck | Select-Object StatusCode
 
-curl -H "Authorization: Bearer <JWT_ADMIN>" \
-  "http://localhost:8000/api/v1/auth/me"
-```
-
-### 6) Lockout (5 falhas)
-```bash
-for i in {1..5}; do
-  curl -X POST "http://localhost:8000/api/v1/auth/login" \
-    -H "Content-Type: application/json" \
-    -d '{"email": "maria@netocontabilidade.com.br", "password": "ERRADA"}'
-done
-```
-
-### 7) RBAC (200 vs 403)
-```bash
-# VIEW não lista jobs
-curl -H "Authorization: Bearer <JWT_VIEW>" \
-  "http://localhost:8000/api/v1/install-jobs"
-
-# ADMIN lista jobs
-curl -H "Authorization: Bearer <JWT_ADMIN>" \
-  "http://localhost:8000/api/v1/install-jobs"
+# VIEW listando certificados → 200
+Invoke-WebRequest "http://localhost:8000/api/v1/certificados" `
+  -Headers @{ Authorization = "Bearer <JWT_VIEW>" } `
+  -SkipHttpErrorCheck | Select-Object StatusCode
 ```
 
 ## Ingestão de certificados a partir do filesystem (DEV)
