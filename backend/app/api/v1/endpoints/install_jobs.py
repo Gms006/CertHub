@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.audit import log_audit
-from app.core.security import get_current_user, require_admin_or_dev
+from app.core.security import require_admin_or_dev
 from app.db.session import get_db
 from app.models import (
     CertInstallJob,
@@ -25,11 +25,9 @@ router = APIRouter(prefix="/install-jobs", tags=["install-jobs"])
 async def list_install_jobs(
     mine: bool = Query(default=False),
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_admin_or_dev),
 ) -> list[CertInstallJob]:
     if not mine:
-        if current_user.role_global not in {"ADMIN", "DEV"}:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
         statement = select(CertInstallJob).where(CertInstallJob.org_id == current_user.org_id)
     else:
         statement = select(CertInstallJob).where(
@@ -42,7 +40,7 @@ async def list_install_jobs(
 
 @router.get("/mine", response_model=list[InstallJobRead])
 async def list_my_jobs(
-    db: Session = Depends(get_db), current_user=Depends(get_current_user)
+    db: Session = Depends(get_db), current_user=Depends(require_admin_or_dev)
 ) -> list[CertInstallJob]:
     statement = select(CertInstallJob).where(
         CertInstallJob.org_id == current_user.org_id,

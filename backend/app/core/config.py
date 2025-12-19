@@ -11,10 +11,24 @@ class Settings(BaseSettings):
         env_file=(".env", "../.env"), env_prefix="", extra="ignore"
     )
 
+    env: str = Field("dev", alias="ENV")
     database_url: str = Field(..., alias="DATABASE_URL")
+    default_org_id: int = Field(1, alias="DEFAULT_ORG_ID")
     api_v1_prefix: str = "/api/v1"
     certs_root_path: Path = Field(Path("certs"), alias="CERTS_ROOT_PATH")
     openssl_path: Path = Field(Path("openssl"), alias="OPENSSL_PATH")
+    jwt_secret: str = Field(..., alias="JWT_SECRET")
+    access_token_ttl_min: int = Field(30, alias="ACCESS_TOKEN_TTL_MIN")
+    refresh_ttl_days: int = Field(14, alias="REFRESH_TTL_DAYS")
+    set_password_token_ttl_min: int = Field(10, alias="SET_PASSWORD_TOKEN_TTL_MIN")
+    reset_password_token_ttl_min: int = Field(30, alias="RESET_PASSWORD_TOKEN_TTL_MIN")
+    bcrypt_cost: int = Field(12, alias="BCRYPT_COST")
+    lockout_max_attempts: int = Field(5, alias="LOCKOUT_MAX_ATTEMPTS")
+    lockout_minutes: int = Field(15, alias="LOCKOUT_MINUTES")
+    cookie_secure: bool = Field(False, alias="COOKIE_SECURE")
+    cookie_samesite: str = Field("lax", alias="COOKIE_SAMESITE")
+    cookie_httponly: bool = Field(True, alias="COOKIE_HTTPONLY")
+    allow_legacy_headers: bool = Field(False, alias="ALLOW_LEGACY_HEADERS")
 
 
 settings = Settings()

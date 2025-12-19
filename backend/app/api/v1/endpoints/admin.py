@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
@@ -8,12 +9,14 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.audit import log_audit
+from app.core.config import settings
 from app.core.security import require_admin_or_dev, require_dev
 from app.db.session import get_db
-from app.models import Device, User, UserDevice
+from app.core.security import AUTH_TOKEN_PURPOSE_SET_PASSWORD, generate_token, hash_token
+from app.models import AuthToken, Device, User, UserDevice
 from app.schemas.cert_ingest import CertIngestRequest, CertIngestResponse
 from app.schemas.device import DeviceCreate, DeviceRead
-from app.schemas.user import UserCreate, UserRead, UserUpdate
+from app.schemas.user import UserCreate, UserCreateResponse, UserRead, UserUpdate
 from app.schemas.user_device import UserDeviceCreate, UserDeviceRead
 from app.services.certificate_ingest import ingest_certificates_from_fs
 
@@ -23,15 +26,27 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 # User management
 
 
-@router.post("/users", response_model=UserRead, status_code=status.HTTP_201_CREATED)
+@router.post("/users", response_model=UserCreateResponse, status_code=status.HTTP_201_CREATED)
 def create_user(
     user_in: UserCreate,
     db: Session = Depends(get_db),
     current_user=Depends(require_dev),
-) -> User:
+) -> UserCreateResponse:
     org_id = current_user.org_id
     user = User(org_id=org_id, **user_in.model_dump())
     db.add(user)
+    db.flush()
+    setup_token = generate_token()
+    setup_expires_at = datetime.now(timezone.utc) + timedelta(
+        minutes=settings.set_password_token_ttl_min
+    )
+    auth_token = AuthToken(
+        user_id=user.id,
+        token_hash=hash_token(setup_token),
+        purpose=AUTH_TOKEN_PURPOSE_SET_PASSWORD,
+        expires_at=setup_expires_at,
+    )
+    db.add(auth_token)
     log_audit(
         db=db,
         org_id=org_id,
@@ -47,7 +62,8 @@ def create_user(
         db.rollback()
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc.orig))
     db.refresh(user)
-    return user
+    response = UserCreateResponse.model_validate(user, from_attributes=True)
+    return response.model_copy(update={"setup_token": setup_token})
 
 
 @router.get("/users", response_model=list[UserRead])
@@ -67,7 +83,7 @@ def update_user(
     user_id: uuid.UUID,
     user_in: UserUpdate,
     db: Session = Depends(get_db),
-    current_user=Depends(require_admin_or_dev),
+    current_user=Depends(require_dev),
 ) -> User:
     user = db.get(User, user_id)
     if user is None or user.org_id != current_user.org_id:
@@ -119,7 +135,7 @@ def update_user(
 def create_device(
     device_in: DeviceCreate,
     db: Session = Depends(get_db),
-    current_user=Depends(require_dev),
+    current_user=Depends(require_admin_or_dev),
 ) -> Device:
     org_id = current_user.org_id
     device = Device(org_id=org_id, **device_in.model_dump())
@@ -144,7 +160,7 @@ def create_device(
 
 @router.get("/devices", response_model=list[DeviceRead])
 def list_devices(
-    db: Session = Depends(get_db), current_user=Depends(require_dev)
+    db: Session = Depends(get_db), current_user=Depends(require_admin_or_dev)
 ) -> list[Device]:
     statement = (
         select(Device)
@@ -162,7 +178,7 @@ def list_devices(
 def link_user_device(
     payload: UserDeviceCreate,
     db: Session = Depends(get_db),
-    current_user=Depends(require_dev),
+    current_user=Depends(require_admin_or_dev),
 ) -> UserDevice:
     link = UserDevice(**payload.model_dump())
     db.add(link)

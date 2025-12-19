@@ -27,6 +27,12 @@ class User(Base):
     auto_approve_install_jobs: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default=text("false")
     )
+    password_hash: Mapped[str | None] = mapped_column(String, nullable=True)
+    password_set_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    failed_login_attempts: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
+    locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
