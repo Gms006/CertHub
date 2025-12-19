@@ -5,7 +5,7 @@
 Substituir o diretório público de arquivos **.pfx** por um fluxo controlado via **Portal (React) + API** e um **Agent Windows** em cada máquina, permitindo:
 
 - Instalação do certificado no **CurrentUser** sem o usuário ter acesso direto ao arquivo nem à senha.
-- Controle de permissões (usuário ↔ empresas).
+- Controle de acesso via **RBAC global** + flags por usuário (ex.: `auto_approve_install_jobs`).
 - **Auditoria** completa de uso/instalação.
 - **Desabilitar/remover automaticamente às 18h** todos os certificados “temporários” instalados pelo Agent.
 
@@ -35,7 +35,7 @@ Você já tem um pipeline robusto:
 - Mantém watcher/ingest.
 - Cria **Jobs de Instalação**.
 - Entrega “pacotes” de instalação **somente para o Agent**.
-- Armazena permissões, devices e auditoria.
+- Armazena RBAC global/flags, devices e auditoria.
 
 2. **Frontend/Portal (React) — base no protótipo SaaS (azul escuro)**
 
@@ -149,11 +149,7 @@ O Agent **nunca** deve remover certificados que:
 
 - vínculo: `user_id`, `device_id`, `is_allowed`
 
-4. `user_empresa_permission`
-
-- `user_id`, `empresa_id`, `role` (ex.: leitura, instalar)
-
-5. `cert_install_jobs`
+4. `cert_install_jobs`
 
 - `id` (uuid), `org_id`, `certificado_id`, `empresa_id` (opcional), `requested_by_user_id`
 - `target_user_id` (quem vai receber), `target_device_id`
@@ -164,7 +160,7 @@ O Agent **nunca** deve remover certificados que:
   - `approved_by_user_id` (nullable)
   - `approved_at` (nullable)
 
-6. `audit_log`
+5. `audit_log`
 
 - `id`, `org_id`, `actor_user_id` (ou `actor_device_id`), `action`, `entity_type`, `entity_id`, `timestamp`, `ip`, `meta_json`
 
@@ -187,7 +183,7 @@ O Agent **nunca** deve remover certificados que:
 ### Portal
 
 - `GET /api/v1/certificados` (já existe)
-- `POST /api/v1/certificados/{id}/install` → cria `cert_install_job` (valida permissão + device)
+- `POST /api/v1/certificados/{id}/install` → cria `cert_install_job` (valida RBAC global + auto-approve + device)
 - `GET /api/v1/install-jobs?mine=true` → status para o usuário
 
 ### Agent
@@ -267,7 +263,7 @@ O Agent **nunca** deve remover certificados que:
 **Entregáveis**
 
 - Documento de arquitetura (este) validado.
-- Lista de requisitos/políticas (18h, CurrentUser, auditoria, permissões).
+- Lista de requisitos/políticas (18h, CurrentUser, auditoria, RBAC).
 - Definição do modo de autenticação inicial: Windows Auth (preferido) ou Magic Link (piloto).
 
 **Aceite**
@@ -280,21 +276,61 @@ O Agent **nunca** deve remover certificados que:
 
 **Objetivo**: criar tabelas `users/devices/jobs/audit` e integrar ao `org_id`.
 
+**Decisão**: **visibilidade global de certificados (sem carteiras)**. Não há vínculo por empresa/certificado; apenas RBAC global + flags por usuário.
+
 **Entregáveis**
 
 - Migração Alembic.
-- Seeds/rotas admin mínimas para cadastrar usuários/permissões.
+- Seeds/rotas admin mínimas para cadastrar usuários e devices.
 - Middleware de auditoria (log básico por endpoint).
 
-**Aceite**
+**Status**: ✅ **Concluído**
 
-- Criar usuário e device manualmente via DB/API.
+**Evidências (S1)**
+
+- [x] Migrações aplicadas (`alembic upgrade head` OK).
+- [x] Ingest-from-fs funcionando: **323 total / 320 updated / 3 failed (esperados)**.
+- [x] `audit_log` registrando: `CERT_INGEST_FROM_FS`, `INSTALL_REQUESTED`, `INSTALL_APPROVED`.
+- [x] Smoke tests de install job:
+  - VIEW com `auto_approve_install_jobs=false` → `REQUESTED`.
+  - VIEW com `auto_approve_install_jobs=true` → `PENDING` + `approved_at`.
+  - ADMIN/DEV → `PENDING` + `approved_at`.
+
+**Checklist de validação S1 (reproduzível)**
+
+1. Contar certificados:
+   ```bash
+   psql "$DATABASE_URL" -c "select count(*) from certificates;"
+   ```
+2. Ver últimos logs de auditoria:
+   ```bash
+   psql "$DATABASE_URL" -c "select action, entity_type, entity_id, timestamp from audit_log order by timestamp desc limit 10;"
+   ```
+3. Listar certificados via API (retorna todos do org):
+   ```bash
+   curl -H "X-User-Id: <UUID_VIEW>" -H "X-Org-Id: 1" \
+     "http://localhost:8000/api/v1/certificados"
+   ```
+4. Criar install job (VIEW, sem auto-approve → REQUESTED):
+   ```bash
+   curl -X POST "http://localhost:8000/api/v1/certificados/<CERT_ID>/install" \
+     -H "Content-Type: application/json" \
+     -H "X-User-Id: <UUID_VIEW>" -H "X-Org-Id: 1" \
+     -d '{"device_id": "<DEVICE_ID>"}'
+   ```
+5. Criar install job (VIEW com auto-approve ou ADMIN/DEV → PENDING + approved):
+   ```bash
+   curl -X POST "http://localhost:8000/api/v1/certificados/<CERT_ID>/install" \
+     -H "Content-Type: application/json" \
+     -H "X-User-Id: <UUID_ADMIN_OU_VIEW_AUTO>" -H "X-Org-Id: 1" \
+     -d '{"device_id": "<DEVICE_ID>"}'
+   ```
 
 ---
 
 ## S2 — Auth (piloto) + RBAC + Skeleton do Front (protótipo)
 
-**Objetivo**: login no portal e autorização por empresa, já com a UI do protótipo rodando.
+**Objetivo**: login no portal e RBAC global, já com a UI do protótipo rodando.
 
 **Caminho A (intranet/ideal)**
 
@@ -307,7 +343,7 @@ O Agent **nunca** deve remover certificados que:
 **Entregáveis**
 
 - JWT interno.
-- RBAC: usuário só enxerga certificados das empresas permitidas.
+- RBAC: usuário enxerga todos os certificados do `org_id` (sem carteiras).
 - Perfis (globais):
   - DEV (você): acesso total (todas as abas e ações).
   - ADMIN (4 usuários): acesso às abas Certificados, Jobs e Dispositivos.
@@ -321,7 +357,7 @@ O Agent **nunca** deve remover certificados que:
 
 **Aceite**
 
-- Usuário loga e vê apenas sua carteira.
+- Usuário loga e vê todos os certificados do org (sem carteira).
 - UI do protótipo abre e renderiza “Certificados/Jobs/Dispositivos/Auditoria” (ainda que com mocks).
 
 ---
@@ -498,4 +534,3 @@ Padrão atual: `nome_CPF/CNPJ Senha [senha].pfx`
 
 - O ingest continua deduzindo senha do nome.
 - No médio prazo, recomendação: parar de usar senha no nome e migrar para “secret store” (sem quebrar o portal).
-

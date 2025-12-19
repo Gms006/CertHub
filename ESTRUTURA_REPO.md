@@ -24,7 +24,8 @@ certhub/
 │  │  │  ├─ base.py
 │  │  │  ├─ user.py
 │  │  │  ├─ device.py
-│  │  │  ├─ permissions.py
+│  │  │  ├─ user_device.py
+│  │  │  ├─ certificate.py
 │  │  │  ├─ cert_install_job.py
 │  │  │  └─ audit_log.py
 │  │  ├─ schemas/

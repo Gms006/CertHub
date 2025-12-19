@@ -193,7 +193,7 @@ def test_view_without_flag_does_not_auto_approve(test_client_and_session):
         assert audits[0].action == "INSTALL_REQUESTED"
 
 
-def test_view_listing_permissions(test_client_and_session):
+def test_view_listing_jobs_mine_only(test_client_and_session):
     client, SessionLocal = test_client_and_session
     with SessionLocal() as db:
         viewer = create_user(db, role="VIEW")
@@ -215,3 +215,22 @@ def test_view_listing_permissions(test_client_and_session):
     mine_payload = mine_list.json()
     assert len(mine_payload) == 1
     assert mine_payload[0]["requested_by_user_id"] == str(viewer.id)
+
+
+def test_list_certificates_returns_all_org_certs(test_client_and_session):
+    client, SessionLocal = test_client_and_session
+    with SessionLocal() as db:
+        viewer = create_user(db, role="VIEW")
+        create_user(db, role="VIEW")
+        cert_a = create_certificate(db)
+        cert_b = create_certificate(db)
+        other_org_cert = models.Certificate(org_id=2, name="Other org cert")
+        db.add(other_org_cert)
+        db.commit()
+
+    response = client.get("/api/v1/certificados", headers=headers(viewer))
+    assert response.status_code == 200
+    payload = response.json()
+    returned_ids = {item["id"] for item in payload}
+    assert {str(cert_a.id), str(cert_b.id)}.issubset(returned_ids)
+    assert str(other_org_cert.id) not in returned_ids
