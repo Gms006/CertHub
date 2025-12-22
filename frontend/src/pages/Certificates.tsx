@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import Modal from "../components/Modal";
 import SectionTabs from "../components/SectionTabs";
@@ -41,25 +41,6 @@ type StatusInfo = {
   meta: string;
 };
 
-const statusStyles: Record<StatusKey, { badge: string; dot: string }> = {
-  valid: {
-    badge: "bg-emerald-50 text-emerald-700",
-    dot: "bg-emerald-500",
-  },
-  expiring7: {
-    badge: "bg-amber-50 text-amber-700",
-    dot: "bg-amber-500",
-  },
-  expiring30: {
-    badge: "bg-sky-50 text-sky-700",
-    dot: "bg-sky-500",
-  },
-  expired: {
-    badge: "bg-rose-50 text-rose-700",
-    dot: "bg-rose-500",
-  },
-};
-
 const getStatusInfo = (notAfter?: string | null): StatusInfo => {
   const remaining = daysUntil(notAfter);
   if (remaining === null) {
@@ -80,6 +61,274 @@ const getStatusInfo = (notAfter?: string | null): StatusInfo => {
   }
   return { key: "valid", label: "Válido", meta: `${remaining} dias` };
 };
+
+type CertStatus = "VALIDO" | "VENCE_7D" | "VENCIDO";
+
+type CertCardProps = {
+  empresa: string;
+  cnpj: string;
+  status: CertStatus;
+  validadeISO: string;
+  diasLabel?: string;
+  titular?: string;
+  serial?: string;
+  sha1?: string;
+  footerUser?: string;
+  onInstall?: () => void;
+  onDetails?: () => void;
+};
+
+const mapStatusToCert = (status: StatusKey): CertStatus => {
+  if (status === "expired") return "VENCIDO";
+  if (status === "expiring7") return "VENCE_7D";
+  return "VALIDO";
+};
+
+const toISODate = (value?: string | null) => {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toISOString().slice(0, 10);
+};
+
+const maskCnpj = (value: string) => {
+  const digits = (value || "").replace(/\D/g, "").padStart(14, "0").slice(0, 14);
+  return digits.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5");
+};
+
+const statusUI = (status: CertStatus) => {
+  if (status === "VENCIDO") {
+    return {
+      Icon: XCircleIcon,
+      iconClass: "text-red-600",
+      badgeClass: "bg-red-600 text-white",
+      label: "Vencido",
+    };
+  }
+  if (status === "VENCE_7D") {
+    return {
+      Icon: AlertTriangleIcon,
+      iconClass: "text-amber-600",
+      badgeClass: "bg-amber-500 text-white",
+      label: "Vence em ≤ 7d",
+    };
+  }
+  return {
+    Icon: BadgeCheckIcon,
+    iconClass: "text-emerald-600",
+    badgeClass: "bg-emerald-600 text-white",
+    label: "Válido",
+  };
+};
+
+const FileBadge2Icon = ({ className }: { className?: string }) => (
+  <svg
+    className={className}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M6 2h9l5 5v15a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Z" />
+    <path d="M14 2v6h6" />
+    <path d="M8 18h8" />
+    <path d="M8 14h8" />
+  </svg>
+);
+
+const KeyRoundIcon = ({ className }: { className?: string }) => (
+  <svg
+    className={className}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <circle cx="7.5" cy="15.5" r="5.5" />
+    <path d="M11 15.5h9l2-2-2-2h-2l-2-2" />
+  </svg>
+);
+
+const InfoIcon = ({ className }: { className?: string }) => (
+  <svg
+    className={className}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <circle cx="12" cy="12" r="10" />
+    <path d="M12 16v-4" />
+    <path d="M12 8h.01" />
+  </svg>
+);
+
+const AlertTriangleIcon = ({ className }: { className?: string }) => (
+  <svg
+    className={className}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
+    <path d="M12 9v4" />
+    <path d="M12 17h.01" />
+  </svg>
+);
+
+const BadgeCheckIcon = ({ className }: { className?: string }) => (
+  <svg
+    className={className}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M12 2 5 5v6c0 5.25 3.44 10 7 11 3.56-1 7-5.75 7-11V5l-7-3Z" />
+    <path d="m9 12 2 2 4-4" />
+  </svg>
+);
+
+const XCircleIcon = ({ className }: { className?: string }) => (
+  <svg
+    className={className}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <circle cx="12" cy="12" r="10" />
+    <path d="m15 9-6 6" />
+    <path d="m9 9 6 6" />
+  </svg>
+);
+
+const CertCard = ({
+  empresa,
+  cnpj,
+  status,
+  validadeISO,
+  diasLabel,
+  titular,
+  serial,
+  sha1,
+  footerUser,
+  onInstall,
+  onDetails,
+}: CertCardProps) => {
+  const ui = statusUI(status);
+  const StatusIcon = ui.Icon;
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div className="p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 items-start gap-3">
+            <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-slate-50">
+              <FileBadge2Icon className="h-4 w-4 text-slate-600" />
+            </div>
+
+            <div className="min-w-0">
+              <div className="truncate text-sm font-semibold text-slate-900">
+                {empresa}
+              </div>
+              <div className="mt-0.5 text-xs text-slate-500">
+                CNPJ: {maskCnpj(cnpj)}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex shrink-0 flex-col gap-2">
+            <button
+              onClick={onInstall}
+              className="inline-flex h-9 w-[120px] items-center justify-center gap-2 rounded-lg bg-slate-900 px-3 text-xs font-semibold text-white hover:bg-slate-800"
+            >
+              <KeyRoundIcon className="h-4 w-4" />
+              Instalar
+            </button>
+
+            <button
+              onClick={onDetails}
+              className="inline-flex h-9 w-[120px] items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              <InfoIcon className="h-4 w-4" />
+              Detalhes
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-3 flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-2">
+            <StatusIcon className={`h-4 w-4 ${ui.iconClass}`} />
+            <span
+              className={`inline-flex max-w-full items-center truncate rounded-full px-2.5 py-1 text-xs font-semibold ${ui.badgeClass}`}
+            >
+              {ui.label}
+            </span>
+          </div>
+
+          <span className="inline-flex max-w-full items-center truncate rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700">
+            Validade: {validadeISO}
+          </span>
+        </div>
+
+        {diasLabel ? (
+          <div className="mt-2">
+            <span className="inline-flex max-w-full items-center truncate rounded-full bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-700">
+              {diasLabel}
+            </span>
+          </div>
+        ) : null}
+
+        <div className="mt-4 grid grid-cols-2 gap-3">
+          <div className="rounded-xl bg-slate-50 p-3">
+            <div className="text-[11px] font-semibold text-slate-500">Titular</div>
+            <div className="mt-1 truncate text-xs font-semibold text-slate-900">
+              {titular || "-"}
+            </div>
+          </div>
+
+          <div className="rounded-xl bg-slate-50 p-3">
+            <div className="text-[11px] font-semibold text-slate-500">
+              Identificadores
+            </div>
+
+            <div className="mt-1 text-[11px] text-slate-600">
+              <span className="font-semibold text-slate-700">Serial:</span>{" "}
+              <span className="truncate">{serial || "-"}</span>
+            </div>
+            <div className="mt-1 text-[11px] text-slate-600">
+              <span className="font-semibold text-slate-700">SHA1:</span>{" "}
+              <span className="truncate">{sha1 || "-"}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-4 text-[11px] leading-relaxed text-slate-500">
+          Instalação via Agent ({footerUser || "CurrentUser"}). Certificados
+          temporários serão removidos automaticamente às 18:00.
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const CertCardsGrid = ({ children }: { children: ReactNode }) => (
+  <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">{children}</div>
+);
 
 const extractTaxId = (value?: string | null) => {
   if (!value) return "-";
@@ -402,113 +651,45 @@ const CertificatesPage = () => {
       </div>
 
       {loading ? (
-        <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+        <CertCardsGrid>
           {Array.from({ length: 6 }).map((_, index) => (
             <div
               key={`skeleton-${index}`}
               className="h-56 rounded-3xl border border-dashed border-slate-200 bg-white/70"
             />
           ))}
-        </div>
+        </CertCardsGrid>
       ) : filteredCertificates.length === 0 ? (
         <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-10 text-center text-sm text-slate-500">
           Nenhum certificado encontrado para os filtros atuais.
         </div>
       ) : (
-        <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+        <CertCardsGrid>
           {pagedCertificates.map((cert) => {
-            const status = getStatusInfo(cert.not_after);
-            const styles = statusStyles[status.key];
+            const statusInfo = getStatusInfo(cert.not_after);
+            const certStatus = mapStatusToCert(statusInfo.key);
+            const taxDigits = extractDigits(cert.subject ?? cert.name);
             return (
-              <div
+              <CertCard
                 key={cert.id}
-                className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm"
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex items-start gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-100 text-slate-500">
-                      <svg
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="M12 2 5 5v6c0 5.25 3.44 10 7 11 3.56-1 7-5.75 7-11V5l-7-3Z" />
-                      </svg>
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-slate-900">
-                        {cert.name}
-                      </p>
-                      <p className="text-xs text-slate-400">
-                        CNPJ/CPF: {extractTaxId(cert.subject ?? cert.name)}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex flex-col items-end gap-2">
-                    <span
-                      className={`rounded-full px-3 py-1 text-xs font-semibold ${styles.badge}`}
-                    >
-                      {status.label}
-                    </span>
-                    <span className="flex items-center gap-1 text-[11px] text-slate-400">
-                      <span className={`h-2 w-2 rounded-full ${styles.dot}`} />
-                      {status.meta}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="mt-4 grid gap-3 md:grid-cols-2">
-                  <div className="rounded-2xl bg-slate-50 p-4">
-                    <p className="text-xs text-slate-400">Titular</p>
-                    <p className="mt-2 text-sm font-semibold text-slate-900">
-                      {cert.subject ?? cert.name}
-                    </p>
-                  </div>
-                  <div className="rounded-2xl bg-slate-50 p-4">
-                    <p className="text-xs text-slate-400">Identificadores</p>
-                    <p className="mt-2 text-sm text-slate-700">
-                      Serial: {cert.serial_number ?? "-"}
-                    </p>
-                    <p className="mt-1 text-sm text-slate-700">
-                      SHA1: {cert.sha1_fingerprint ?? "-"}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="mt-4 flex flex-wrap gap-3">
-                  <button
-                    className="h-10 rounded-2xl bg-[#0e2659] px-4 text-sm font-semibold text-white"
-                    onClick={() => handleOpenInstall(cert.id)}
-                  >
-                    Instalar
-                  </button>
-                  <button
-                    className="h-10 rounded-2xl border border-slate-200 px-4 text-sm text-slate-600"
-                    onClick={() => {
-                      setSelectedCertificate(cert);
-                      setDetailModalOpen(true);
-                    }}
-                  >
-                    Detalhes
-                  </button>
-                  <div className="ml-auto flex items-center text-xs text-slate-400">
-                    Validade: {formatDate(cert.not_after)}
-                  </div>
-                </div>
-
-                <p className="mt-4 text-xs text-slate-400">
-                  Instalação via Agent ({user?.ad_username ?? "CurrentUser"}).
-                  Certificados temporários serão removidos automaticamente às 18:00.
-                </p>
-              </div>
+                empresa={cert.name}
+                cnpj={taxDigits}
+                status={certStatus}
+                validadeISO={toISODate(cert.not_after)}
+                diasLabel={statusInfo.meta}
+                titular={cert.subject ?? cert.name}
+                serial={cert.serial_number ?? undefined}
+                sha1={cert.sha1_fingerprint ?? undefined}
+                footerUser={user?.ad_username ?? "CurrentUser"}
+                onInstall={() => handleOpenInstall(cert.id)}
+                onDetails={() => {
+                  setSelectedCertificate(cert);
+                  setDetailModalOpen(true);
+                }}
+              />
             );
           })}
-        </div>
+        </CertCardsGrid>
       )}
 
       <div className="flex items-center justify-between text-sm text-slate-500">
