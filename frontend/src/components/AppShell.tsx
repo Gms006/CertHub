@@ -3,7 +3,7 @@ import { Outlet } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 
 const AppShell = () => {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const displayName =
     user?.nome || user?.ad_username || user?.email || "Usuário";
 
@@ -61,8 +61,16 @@ const AppShell = () => {
               Preferências
             </button>
           </div>
-          <div className="flex items-center gap-3 rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white">
-            {displayName}
+          <div className="flex items-center gap-2 rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white">
+            <span>{displayName}</span>
+            <span className="text-white/40">•</span>
+            <button
+              type="button"
+              onClick={logout}
+              className="text-xs font-semibold text-white/80 transition hover:text-white"
+            >
+              Sair
+            </button>
           </div>
         </div>
       </header>
