@@ -7,6 +7,8 @@ npm install
 npm run dev
 ```
 
+O frontend sobe em `http://localhost:8010` para evitar conflito com outros portais locais.
+
 ### Variáveis de ambiente
 
 Copie `.env.example` para `.env` e ajuste conforme necessário:
