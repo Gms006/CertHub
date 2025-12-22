@@ -15,6 +15,7 @@ from app.models import (
     JOB_STATUS_CANCELED,
     JOB_STATUS_PENDING,
     JOB_STATUS_REQUESTED,
+    UserDevice,
 )
 from app.schemas.install_job import InstallJobApproveRequest, InstallJobRead
 
@@ -47,6 +48,23 @@ async def list_my_jobs(
         CertInstallJob.requested_by_user_id == current_user.id,
     )
     statement = statement.order_by(CertInstallJob.created_at.desc())
+    return db.execute(statement).scalars().all()
+
+
+@router.get("/my-device", response_model=list[InstallJobRead])
+async def list_my_device_jobs(
+    db: Session = Depends(get_db), current_user=Depends(require_view_or_higher)
+) -> list[CertInstallJob]:
+    statement = (
+        select(CertInstallJob)
+        .join(UserDevice, UserDevice.device_id == CertInstallJob.device_id)
+        .where(
+            CertInstallJob.org_id == current_user.org_id,
+            UserDevice.user_id == current_user.id,
+            UserDevice.is_allowed.is_(True),
+        )
+        .order_by(CertInstallJob.created_at.desc())
+    )
     return db.execute(statement).scalars().all()
 
 
