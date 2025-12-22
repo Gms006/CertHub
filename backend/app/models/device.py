@@ -1,9 +1,9 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Index, Integer, String, UniqueConstraint, func, text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, String, UniqueConstraint, func, text
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 
@@ -14,10 +14,16 @@ class Device(Base):
         UniqueConstraint("org_id", "hostname", name="uq_devices_org_id_hostname"),
         Index("ix_devices_org_id", "org_id"),
         Index("ix_devices_hostname", "hostname"),
+        Index("ix_devices_assigned_user_id", "assigned_user_id"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     org_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    assigned_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL", onupdate="CASCADE"),
+        nullable=True,
+    )
     hostname: Mapped[str] = mapped_column(String, nullable=False)
     domain: Mapped[str | None] = mapped_column(String, nullable=True)
     os_version: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -26,4 +32,9 @@ class Device(Base):
     is_allowed: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    assigned_user: Mapped["User | None"] = relationship(
+        "User",
+        back_populates="devices_assigned",
+        lazy="selectin",
     )
