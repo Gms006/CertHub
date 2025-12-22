@@ -10,14 +10,14 @@ from sqlalchemy.orm import Session
 
 from app.core.audit import log_audit
 from app.core.config import settings
-from app.core.security import require_admin_or_dev, require_dev
+from app.core.security import require_admin_or_dev, require_dev, require_view_or_higher
 from app.db.session import get_db
 from app.core.security import AUTH_TOKEN_PURPOSE_SET_PASSWORD, generate_token, hash_token
 from app.models import AuthToken, Device, User, UserDevice
 from app.schemas.cert_ingest import CertIngestRequest, CertIngestResponse
-from app.schemas.device import DeviceCreate, DeviceRead
+from app.schemas.device import DeviceCreate, DeviceRead, DeviceUpdate
 from app.schemas.user import UserCreate, UserCreateResponse, UserRead, UserUpdate
-from app.schemas.user_device import UserDeviceCreate, UserDeviceRead
+from app.schemas.user_device import UserDeviceCreate, UserDeviceRead, UserDeviceReadWithUser
 from app.services.certificate_ingest import ingest_certificates_from_fs
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -160,7 +160,7 @@ def create_device(
 
 @router.get("/devices", response_model=list[DeviceRead])
 def list_devices(
-    db: Session = Depends(get_db), current_user=Depends(require_admin_or_dev)
+    db: Session = Depends(get_db), current_user=Depends(require_view_or_higher)
 ) -> list[Device]:
     statement = (
         select(Device)
@@ -168,6 +168,44 @@ def list_devices(
         .order_by(Device.created_at)
     )
     return db.execute(statement).scalars().all()
+
+
+@router.patch("/devices/{device_id}", response_model=DeviceRead)
+def update_device(
+    device_id: uuid.UUID,
+    payload: DeviceUpdate,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_admin_or_dev),
+) -> Device:
+    device = db.get(Device, device_id)
+    if device is None or device.org_id != current_user.org_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="device not found")
+
+    changes: dict[str, list] = {}
+
+    def apply_change(field: str, value) -> None:
+        if value is None:
+            return
+        old_value = getattr(device, field)
+        if old_value != value:
+            setattr(device, field, value)
+            changes[field] = [old_value, value]
+
+    apply_change("is_allowed", payload.is_allowed)
+
+    if changes:
+        log_audit(
+            db=db,
+            org_id=current_user.org_id,
+            action="DEVICE_UPDATED",
+            entity_type="device",
+            entity_id=device.id,
+            actor_user_id=current_user.id,
+            meta={"changes": changes},
+        )
+        db.commit()
+        db.refresh(device)
+    return device
 
 
 @router.post(
@@ -197,6 +235,32 @@ def link_user_device(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc.orig))
     db.refresh(link)
     return link
+
+
+@router.get("/user-devices", response_model=list[UserDeviceReadWithUser])
+def list_user_devices(
+    db: Session = Depends(get_db), current_user=Depends(require_admin_or_dev)
+) -> list[UserDeviceReadWithUser]:
+    statement = (
+        select(UserDevice, User)
+        .join(User, UserDevice.user_id == User.id)
+        .join(Device, UserDevice.device_id == Device.id)
+        .where(Device.org_id == current_user.org_id)
+        .order_by(UserDevice.created_at.desc())
+    )
+    results = db.execute(statement).all()
+    payload: list[UserDeviceReadWithUser] = []
+    for link, user in results:
+        payload.append(
+            UserDeviceReadWithUser(
+                user_id=link.user_id,
+                device_id=link.device_id,
+                is_allowed=link.is_allowed,
+                created_at=link.created_at,
+                user=UserRead.model_validate(user, from_attributes=True),
+            )
+        )
+    return payload
 
 
 @router.post(

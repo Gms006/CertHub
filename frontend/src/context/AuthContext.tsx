@@ -12,6 +12,7 @@ import { API_BASE, createApiClient } from "../lib/apiClient";
 
 type AuthUser = {
   id: string;
+  ad_username?: string;
   email: string | null;
   nome?: string | null;
   role_global?: string;
@@ -33,6 +34,7 @@ type AuthContextValue = {
   user: AuthUser | null;
   accessToken: string | null;
   loading: boolean;
+  initializing: boolean;
   message: string | null;
   login: (email: string, password: string) => Promise<LoginResponse | null>;
   logout: () => Promise<void>;
@@ -63,6 +65,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return raw ? (JSON.parse(raw) as AuthUser) : null;
   });
   const [loading, setLoading] = useState(false);
+  const [initializing, setInitializing] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
 
   const persistUser = (nextUser: AuthUser | null, token: string | null) => {
@@ -78,6 +81,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const clearAuth = useCallback(() => {
+    setAccessToken(null);
+    setUser(null);
+    persistUser(null, null);
+  }, []);
+
   const refreshAccessToken = useCallback(async () => {
     try {
       const response = await fetch(`${API_BASE}/auth/refresh`, {
@@ -90,19 +99,36 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       persistUser(user, data.access_token);
       return data.access_token;
     } catch {
-      setAccessToken(null);
-      persistUser(user, null);
+      clearAuth();
       return null;
     }
-  }, [user]);
+  }, [clearAuth, user]);
 
   const apiFetch = useMemo(
     () =>
       createApiClient({
         getAccessToken: () => accessToken,
         refreshAccessToken,
+        onUnauthorized: () => {
+          clearAuth();
+          window.location.assign("/login");
+        },
       }),
-    [accessToken, refreshAccessToken],
+    [accessToken, clearAuth, refreshAccessToken],
+  );
+
+  const fetchCurrentUser = useCallback(
+    async (token: string) => {
+      const response = await fetch(`${API_BASE}/auth/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+        credentials: "include",
+      });
+      const data = await parseJson<AuthUser>(response);
+      setUser(data);
+      persistUser(data, token);
+      return data;
+    },
+    [],
   );
 
   const login = async (email: string, password: string) => {
@@ -139,10 +165,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         credentials: "include",
       });
     } finally {
-      setAccessToken(null);
-      setUser(null);
-      persistUser(null, null);
+      clearAuth();
       setLoading(false);
+      window.location.assign("/login");
     }
   };
 
@@ -201,15 +226,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   useEffect(() => {
-    if (!accessToken) {
-      refreshAccessToken();
-    }
-  }, [accessToken, refreshAccessToken]);
+    const initialize = async () => {
+      try {
+        if (accessToken) {
+          await fetchCurrentUser(accessToken);
+        } else {
+          const token = await refreshAccessToken();
+          if (token) {
+            await fetchCurrentUser(token);
+          }
+        }
+      } catch {
+        clearAuth();
+      } finally {
+        setInitializing(false);
+      }
+    };
+    initialize();
+  }, [accessToken, clearAuth, fetchCurrentUser, refreshAccessToken]);
 
   const value: AuthContextValue = {
     user,
     accessToken,
     loading,
+    initializing,
     message,
     login,
     logout,

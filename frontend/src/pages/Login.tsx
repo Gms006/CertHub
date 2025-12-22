@@ -1,18 +1,29 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { motion } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 
 import { useAuth } from "../hooks/useAuth";
 
 const Login = () => {
-  const { login, loading, message } = useAuth();
+  const { login, loading, message, accessToken } = useAuth();
+  const navigate = useNavigate();
   const [email, setEmail] = useState("maria.clara@netocontabilidade.com.br");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    await login(email, password);
+    const result = await login(email, password);
+    if (result) {
+      navigate("/certificados", { replace: true });
+    }
   };
+
+  useEffect(() => {
+    if (accessToken) {
+      navigate("/certificados", { replace: true });
+    }
+  }, [accessToken, navigate]);
 
   return (
     <div className="relative min-h-screen bg-slate-100">
@@ -211,7 +222,7 @@ const Login = () => {
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="rounded-2xl bg-white/10 p-4 text-xs text-white/70">
-                    <p className="text-white">Device (mock)</p>
+                    <p className="text-white">Device</p>
                     <p className="mt-2 text-sm text-white">
                       NETOCMS\\NCTON-05
                     </p>
