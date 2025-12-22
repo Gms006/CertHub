@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 from pydantic import Field
@@ -29,6 +30,12 @@ class Settings(BaseSettings):
     cookie_samesite: str = Field("strict", alias="COOKIE_SAMESITE")
     cookie_httponly: bool = Field(True, alias="COOKIE_HTTPONLY")
     allow_legacy_headers: bool = Field(False, alias="ALLOW_LEGACY_HEADERS")
+
+    def model_post_init(self, __context) -> None:
+        if "COOKIE_SECURE" not in os.environ and self.env.lower() != "prod":
+            object.__setattr__(self, "cookie_secure", False)
+        if "COOKIE_SAMESITE" not in os.environ and self.env.lower() != "prod":
+            object.__setattr__(self, "cookie_samesite", "lax")
 
 
 settings = Settings()
