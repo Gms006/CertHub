@@ -1,12 +1,4 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import {
-  AlertTriangle,
-  BadgeCheck,
-  FileBadge2,
-  Info,
-  KeyRound,
-  XCircle,
-} from "lucide-react";
 
 import Modal from "../components/Modal";
 import SectionTabs from "../components/SectionTabs";
@@ -107,7 +99,7 @@ const maskCnpj = (value: string) => {
 const statusUI = (status: CertStatus) => {
   if (status === "VENCIDO") {
     return {
-      Icon: XCircle,
+      Icon: XCircleIcon,
       iconClass: "text-red-600",
       badgeClass: "bg-red-600 text-white",
       label: "Vencido",
@@ -115,19 +107,114 @@ const statusUI = (status: CertStatus) => {
   }
   if (status === "VENCE_7D") {
     return {
-      Icon: AlertTriangle,
+      Icon: AlertTriangleIcon,
       iconClass: "text-amber-600",
       badgeClass: "bg-amber-500 text-white",
       label: "Vence em ≤ 7d",
     };
   }
   return {
-    Icon: BadgeCheck,
+    Icon: BadgeCheckIcon,
     iconClass: "text-emerald-600",
     badgeClass: "bg-emerald-600 text-white",
     label: "Válido",
   };
 };
+
+const FileBadge2Icon = ({ className }: { className?: string }) => (
+  <svg
+    className={className}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M6 2h9l5 5v15a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Z" />
+    <path d="M14 2v6h6" />
+    <path d="M8 18h8" />
+    <path d="M8 14h8" />
+  </svg>
+);
+
+const KeyRoundIcon = ({ className }: { className?: string }) => (
+  <svg
+    className={className}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <circle cx="7.5" cy="15.5" r="5.5" />
+    <path d="M11 15.5h9l2-2-2-2h-2l-2-2" />
+  </svg>
+);
+
+const InfoIcon = ({ className }: { className?: string }) => (
+  <svg
+    className={className}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <circle cx="12" cy="12" r="10" />
+    <path d="M12 16v-4" />
+    <path d="M12 8h.01" />
+  </svg>
+);
+
+const AlertTriangleIcon = ({ className }: { className?: string }) => (
+  <svg
+    className={className}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
+    <path d="M12 9v4" />
+    <path d="M12 17h.01" />
+  </svg>
+);
+
+const BadgeCheckIcon = ({ className }: { className?: string }) => (
+  <svg
+    className={className}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M12 2 5 5v6c0 5.25 3.44 10 7 11 3.56-1 7-5.75 7-11V5l-7-3Z" />
+    <path d="m9 12 2 2 4-4" />
+  </svg>
+);
+
+const XCircleIcon = ({ className }: { className?: string }) => (
+  <svg
+    className={className}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <circle cx="12" cy="12" r="10" />
+    <path d="m15 9-6 6" />
+    <path d="m9 9 6 6" />
+  </svg>
+);
 
 const CertCard = ({
   empresa,
@@ -151,7 +238,7 @@ const CertCard = ({
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-start gap-3">
             <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-slate-50">
-              <FileBadge2 className="h-4 w-4 text-slate-600" />
+              <FileBadge2Icon className="h-4 w-4 text-slate-600" />
             </div>
 
             <div className="min-w-0">
@@ -169,7 +256,7 @@ const CertCard = ({
               onClick={onInstall}
               className="inline-flex h-9 w-[120px] items-center justify-center gap-2 rounded-lg bg-slate-900 px-3 text-xs font-semibold text-white hover:bg-slate-800"
             >
-              <KeyRound className="h-4 w-4" />
+              <KeyRoundIcon className="h-4 w-4" />
               Instalar
             </button>
 
@@ -177,7 +264,7 @@ const CertCard = ({
               onClick={onDetails}
               className="inline-flex h-9 w-[120px] items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50"
             >
-              <Info className="h-4 w-4" />
+              <InfoIcon className="h-4 w-4" />
               Detalhes
             </button>
           </div>
