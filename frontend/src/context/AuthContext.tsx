@@ -58,10 +58,10 @@ const parseJson = async <T,>(response: Response): Promise<T> => {
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [accessToken, setAccessToken] = useState<string | null>(() =>
-    localStorage.getItem("certhub_access_token"),
+    sessionStorage.getItem("certhub_access_token"),
   );
   const [user, setUser] = useState<AuthUser | null>(() => {
-    const raw = localStorage.getItem("certhub_user");
+    const raw = sessionStorage.getItem("certhub_user");
     return raw ? (JSON.parse(raw) as AuthUser) : null;
   });
   const [loading, setLoading] = useState(false);
@@ -70,14 +70,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const persistUser = (nextUser: AuthUser | null, token: string | null) => {
     if (token) {
-      localStorage.setItem("certhub_access_token", token);
+      sessionStorage.setItem("certhub_access_token", token);
     } else {
-      localStorage.removeItem("certhub_access_token");
+      sessionStorage.removeItem("certhub_access_token");
     }
     if (nextUser) {
-      localStorage.setItem("certhub_user", JSON.stringify(nextUser));
+      sessionStorage.setItem("certhub_user", JSON.stringify(nextUser));
     } else {
-      localStorage.removeItem("certhub_user");
+      sessionStorage.removeItem("certhub_user");
     }
   };
 
