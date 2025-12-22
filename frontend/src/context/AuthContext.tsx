@@ -101,14 +101,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const data = await parseJson<{ access_token: string }>(response);
       
       setAccessToken(data.access_token);
-      localStorage.setItem("certhub_access_token", data.access_token); // só token
-
+      localStorage.setItem("certhub_access_token", data.access_token);
       return data.access_token;
     } catch {
       clearAuth();
       return null;
     }
-  }, [accessToken, clearAuth, user]);
+  }, [clearAuth]);
 
   const apiFetch = useMemo(
     () =>
@@ -248,7 +247,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const clearSession = () => {
-      sessionStorage.removeItem("certhub_access_token");
+      localStorage.removeItem("certhub_access_token");
       sessionStorage.removeItem("certhub_user");
     };
 
