@@ -61,7 +61,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     localStorage.getItem("certhub_access_token"),
   );
   const [user, setUser] = useState<AuthUser | null>(() => {
-    const raw = localStorage.getItem("certhub_user");
+    const raw = sessionStorage.getItem("certhub_user");
     return raw ? (JSON.parse(raw) as AuthUser) : null;
   });
   const [loading, setLoading] = useState(false);
@@ -75,9 +75,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       localStorage.removeItem("certhub_access_token");
     }
     if (nextUser) {
-      localStorage.setItem("certhub_user", JSON.stringify(nextUser));
+      sessionStorage.setItem("certhub_user", JSON.stringify(nextUser));
     } else {
-      localStorage.removeItem("certhub_user");
+      sessionStorage.removeItem("certhub_user");
     }
   };
 
@@ -96,13 +96,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
       const data = await parseJson<{ access_token: string }>(response);
       setAccessToken(data.access_token);
-      persistUser(user, data.access_token);
+      localStorage.setItem("certhub_access_token", data.access_token);
       return data.access_token;
     } catch {
       clearAuth();
       return null;
     }
-  }, [clearAuth, user]);
+  }, [clearAuth]);
 
   const apiFetch = useMemo(
     () =>
@@ -230,11 +230,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try {
         if (accessToken) {
           await fetchCurrentUser(accessToken);
-        } else {
-          const token = await refreshAccessToken();
-          if (token) {
-            await fetchCurrentUser(token);
-          }
         }
       } catch {
         clearAuth();
@@ -244,6 +239,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
     initialize();
   }, [accessToken, clearAuth, fetchCurrentUser, refreshAccessToken]);
+
+  useEffect(() => {
+    const clearSession = () => {
+      localStorage.removeItem("certhub_access_token");
+      sessionStorage.removeItem("certhub_user");
+    };
+
+    window.addEventListener("beforeunload", clearSession);
+    window.addEventListener("pagehide", clearSession);
+    return () => {
+      window.removeEventListener("beforeunload", clearSession);
+      window.removeEventListener("pagehide", clearSession);
+    };
+  }, []);
 
   const value: AuthContextValue = {
     user,
