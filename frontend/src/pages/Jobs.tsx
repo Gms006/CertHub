@@ -55,11 +55,16 @@ const JobsPage = () => {
   const [loading, setLoading] = useState(true);
 
   const isAdmin = user?.role_global === "ADMIN" || user?.role_global === "DEV";
+  const isView = user?.role_global === "VIEW";
 
   const loadJobs = async () => {
     setLoading(true);
     try {
-      const endpoint = isAdmin ? "/install-jobs" : "/install-jobs/mine";
+      const endpoint = isAdmin
+        ? "/install-jobs"
+        : isView
+          ? "/install-jobs/my-device"
+          : "/install-jobs/mine";
       const response = await apiFetch(endpoint);
       if (!response.ok) {
         notify("Não foi possível carregar jobs.", "error");
