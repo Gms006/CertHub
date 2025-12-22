@@ -58,10 +58,10 @@ const parseJson = async <T,>(response: Response): Promise<T> => {
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [accessToken, setAccessToken] = useState<string | null>(() =>
-    localStorage.getItem("certhub_access_token"),
+    sessionStorage.getItem("certhub_access_token"),
   );
   const [user, setUser] = useState<AuthUser | null>(() => {
-    const raw = localStorage.getItem("certhub_user");
+    const raw = sessionStorage.getItem("certhub_user");
     return raw ? (JSON.parse(raw) as AuthUser) : null;
   });
   const [loading, setLoading] = useState(false);
@@ -70,14 +70,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const persistUser = (nextUser: AuthUser | null, token: string | null) => {
     if (token) {
-      localStorage.setItem("certhub_access_token", token);
+      sessionStorage.setItem("certhub_access_token", token);
     } else {
-      localStorage.removeItem("certhub_access_token");
+      sessionStorage.removeItem("certhub_access_token");
     }
     if (nextUser) {
-      localStorage.setItem("certhub_user", JSON.stringify(nextUser));
+      sessionStorage.setItem("certhub_user", JSON.stringify(nextUser));
     } else {
-      localStorage.removeItem("certhub_user");
+      sessionStorage.removeItem("certhub_user");
     }
   };
 
@@ -88,6 +88,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const refreshAccessToken = useCallback(async () => {
+    if (!accessToken) {
+      return null;
+    }
     try {
       const response = await fetch(`${API_BASE}/auth/refresh`, {
         method: "POST",
@@ -102,7 +105,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       clearAuth();
       return null;
     }
-  }, [clearAuth, user]);
+  }, [accessToken, clearAuth, user]);
 
   const apiFetch = useMemo(
     () =>
@@ -230,11 +233,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try {
         if (accessToken) {
           await fetchCurrentUser(accessToken);
-        } else {
-          const token = await refreshAccessToken();
-          if (token) {
-            await fetchCurrentUser(token);
-          }
         }
       } catch {
         clearAuth();
@@ -244,6 +242,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
     initialize();
   }, [accessToken, clearAuth, fetchCurrentUser, refreshAccessToken]);
+
+  useEffect(() => {
+    const clearSession = () => {
+      sessionStorage.removeItem("certhub_access_token");
+      sessionStorage.removeItem("certhub_user");
+    };
+
+    window.addEventListener("beforeunload", clearSession);
+    window.addEventListener("pagehide", clearSession);
+    return () => {
+      window.removeEventListener("beforeunload", clearSession);
+      window.removeEventListener("pagehide", clearSession);
+    };
+  }, []);
 
   const value: AuthContextValue = {
     user,

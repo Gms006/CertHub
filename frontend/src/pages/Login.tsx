@@ -7,7 +7,7 @@ import { useAuth } from "../hooks/useAuth";
 const Login = () => {
   const { login, loading, message, accessToken } = useAuth();
   const navigate = useNavigate();
-  const [email, setEmail] = useState("maria.clara@netocontabilidade.com.br");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
