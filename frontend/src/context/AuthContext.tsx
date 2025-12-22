@@ -58,7 +58,7 @@ const parseJson = async <T,>(response: Response): Promise<T> => {
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [accessToken, setAccessToken] = useState<string | null>(() =>
-    localStorage.getItem("certhub_access_token"),
+    sessionStorage.getItem("certhub_access_token"),
   );
   const [user, setUser] = useState<AuthUser | null>(() => {
     const raw = sessionStorage.getItem("certhub_user");
@@ -70,9 +70,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const persistUser = (nextUser: AuthUser | null, token: string | null) => {
     if (token) {
-      localStorage.setItem("certhub_access_token", token);
+      sessionStorage.setItem("certhub_access_token", token);
     } else {
-      localStorage.removeItem("certhub_access_token");
+      sessionStorage.removeItem("certhub_access_token");
     }
     if (nextUser) {
       sessionStorage.setItem("certhub_user", JSON.stringify(nextUser));
@@ -88,13 +88,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const refreshAccessToken = useCallback(async () => {
+    if (!accessToken) {
+      return null;
+    }
     try {
       const response = await fetch(`${API_BASE}/auth/refresh`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
       });
+
       const data = await parseJson<{ access_token: string }>(response);
+      
       setAccessToken(data.access_token);
       localStorage.setItem("certhub_access_token", data.access_token);
       return data.access_token;
