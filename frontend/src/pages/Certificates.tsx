@@ -271,23 +271,23 @@ const CertCard = ({
         </div>
 
         <div className="mt-3 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
+          <div className="flex min-w-0 items-center gap-2">
             <StatusIcon className={`h-4 w-4 ${ui.iconClass}`} />
             <span
-              className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${ui.badgeClass}`}
+              className={`inline-flex max-w-full items-center truncate rounded-full px-2.5 py-1 text-xs font-semibold ${ui.badgeClass}`}
             >
               {ui.label}
             </span>
           </div>
 
-          <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700">
+          <span className="inline-flex max-w-full items-center truncate rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700">
             Validade: {validadeISO}
           </span>
         </div>
 
         {diasLabel ? (
           <div className="mt-2">
-            <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-700">
+            <span className="inline-flex max-w-full items-center truncate rounded-full bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-700">
               {diasLabel}
             </span>
           </div>
