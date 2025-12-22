@@ -92,9 +92,12 @@ const toISODate = (value?: string | null) => {
   return date.toISOString().slice(0, 10);
 };
 
-const maskCnpj = (value: string) => {
-  const digits = (value || "").replace(/\D/g, "").padStart(14, "0").slice(0, 14);
-  return digits.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5");
+const formatDocument = (value: string) => {
+  const digits = (value || "").replace(/\D/g, "");
+  if (digits.length === 11 || digits.length === 14) {
+    return formatCnpjCpf(digits);
+  }
+  return "-";
 };
 
 const statusUI = (status: CertStatus) => {
@@ -247,7 +250,7 @@ const CertCard = ({
                 {empresa}
               </div>
               <div className="mt-0.5 text-xs text-slate-500">
-                CNPJ: {maskCnpj(cnpj)}
+                Documento: {formatDocument(cnpj)}
               </div>
             </div>
           </div>
@@ -331,13 +334,29 @@ const CertCardsGrid = ({ children }: { children: ReactNode }) => (
   <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">{children}</div>
 );
 
+const parseTitularInfo = (value?: string | null) => {
+  if (!value) {
+    return { name: "-", document: null };
+  }
+  const match = value.match(/CN=([^,]+)/i);
+  const cnValue = (match ? match[1] : value).trim();
+  const separatorIndex = cnValue.lastIndexOf(":");
+  if (separatorIndex > -1) {
+    const name = cnValue.slice(0, separatorIndex).trim();
+    const document = cnValue.slice(separatorIndex + 1).trim() || null;
+    return { name: name || "-", document };
+  }
+  return { name: cnValue || "-", document: null };
+};
+
 const extractTaxId = (value?: string | null) => {
-  if (!value) return "-";
-  const digits = extractDigits(value);
+  const { document } = parseTitularInfo(value);
+  const raw = document ?? value ?? "";
+  const digits = extractDigits(raw);
   if (digits.length === 11 || digits.length === 14) {
     return formatCnpjCpf(digits);
   }
-  const match = value.match(/\d{11}|\d{14}/);
+  const match = raw.match(/\d{11}|\d{14}/);
   if (match) {
     return formatCnpjCpf(match[0]);
   }
@@ -436,10 +455,11 @@ const CertificatesPage = () => {
         }
       }
       if (!term) return true;
-      const taxId = extractDigits(cert.subject ?? cert.name);
+      const { name: titularName, document } = parseTitularInfo(cert.subject ?? cert.name);
+      const taxId = extractDigits(document ?? cert.subject ?? cert.name);
       const haystack = [
+        titularName,
         cert.name,
-        cert.subject,
         cert.serial_number,
         cert.sha1_fingerprint,
         taxId,
@@ -452,7 +472,9 @@ const CertificatesPage = () => {
 
     const sorted = [...filtered].sort((a, b) => {
       if (orderBy === "empresa") {
-        return a.name.localeCompare(b.name);
+        const aName = parseTitularInfo(a.subject ?? a.name).name;
+        const bName = parseTitularInfo(b.subject ?? b.name).name;
+        return aName.localeCompare(bName);
       }
       const aTime = a.not_after ? new Date(a.not_after).getTime() : Number.MAX_SAFE_INTEGER;
       const bTime = b.not_after ? new Date(b.not_after).getTime() : Number.MAX_SAFE_INTEGER;
@@ -520,8 +542,9 @@ const CertificatesPage = () => {
   const handleExport = () => {
     const rows = filteredCertificates.map((cert) => {
       const status = getStatusInfo(cert.not_after);
+      const titularInfo = parseTitularInfo(cert.subject ?? cert.name);
       return {
-        Empresa: cert.name,
+        Empresa: titularInfo.name || cert.name,
         Documento: extractTaxId(cert.subject ?? cert.name),
         Titular: cert.subject ?? cert.name,
         Serial: cert.serial_number ?? "-",
@@ -669,12 +692,14 @@ const CertificatesPage = () => {
           {pagedCertificates.map((cert) => {
             const statusInfo = getStatusInfo(cert.not_after);
             const certStatus = mapStatusToCert(statusInfo.key);
-            const taxDigits = extractDigits(cert.subject ?? cert.name);
+            const titularInfo = parseTitularInfo(cert.subject ?? cert.name);
+            const empresaName = titularInfo.name || cert.name;
+            const documentValue = titularInfo.document ?? cert.subject ?? cert.name;
             return (
               <CertCard
                 key={cert.id}
-                empresa={cert.name}
-                cnpj={taxDigits}
+                empresa={empresaName}
+                cnpj={documentValue}
                 status={certStatus}
                 validadeISO={toISODate(cert.not_after)}
                 diasLabel={statusInfo.meta}
@@ -790,7 +815,7 @@ const CertificatesPage = () => {
             <div className="rounded-2xl bg-slate-50 p-4">
               <p className="text-xs text-slate-400">Empresa</p>
               <p className="mt-2 text-sm font-semibold text-slate-900">
-                {selectedCertificate.name}
+                {parseTitularInfo(selectedCertificate.subject ?? selectedCertificate.name).name}
               </p>
               <p className="mt-1 text-xs text-slate-500">
                 Documento: {extractTaxId(selectedCertificate.subject ?? selectedCertificate.name)}
