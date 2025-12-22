@@ -1,1 +1,3197 @@
-{"openapi": "3.1.0", "info": {"title": "CertHub API", "version": "0.1.0"}, "paths": {"/health": {"get": {"summary": "Healthcheck", "operationId": "healthcheck_health_get", "responses": {"200": {"description": "Successful Response", "content": {"application/json": {"schema": {"additionalProperties": {"type": "string"}, "type": "object", "title": "Response Healthcheck Health Get"}}}}}}}, "/api/v1/admin/users": {"post": {"tags": ["admin"], "summary": "Create User", "operationId": "create_user_api_v1_admin_users_post", "security": [{"HTTPBearer": []}], "parameters": [{"name": "X-Org-Id", "in": "header", "required": false, "schema": {"anyOf": [{"type": "integer"}, {"type": "null"}], "title": "X-Org-Id"}}, {"name": "X-User-Id", "in": "header", "required": false, "schema": {"anyOf": [{"type": "string", "format": "uuid"}, {"type": "null"}], "title": "X-User-Id"}}], "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/UserCreate"}}}}, "responses": {"201": {"description": "Successful Response", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/UserCreateResponse"}}}}, "422": {"description": "Validation Error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}}}}, "get": {"tags": ["admin"], "summary": "List Users", "operationId": "list_users_api_v1_admin_users_get", "security": [{"HTTPBearer": []}], "parameters": [{"name": "X-Org-Id", "in": "header", "required": false, "schema": {"anyOf": [{"type": "integer"}, {"type": "null"}], "title": "X-Org-Id"}}, {"name": "X-User-Id", "in": "header", "required": false, "schema": {"anyOf": [{"type": "string", "format": "uuid"}, {"type": "null"}], "title": "X-User-Id"}}], "responses": {"200": {"description": "Successful Response", "content": {"application/json": {"schema": {"type": "array", "items": {"$ref": "#/components/schemas/UserRead"}, "title": "Response List Users Api V1 Admin Users Get"}}}}, "422": {"description": "Validation Error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}}}}}, "/api/v1/admin/users/{user_id}": {"patch": {"tags": ["admin"], "summary": "Update User", "operationId": "update_user_api_v1_admin_users__user_id__patch", "security": [{"HTTPBearer": []}], "parameters": [{"name": "user_id", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid", "title": "User Id"}}, {"name": "X-Org-Id", "in": "header", "required": false, "schema": {"anyOf": [{"type": "integer"}, {"type": "null"}], "title": "X-Org-Id"}}, {"name": "X-User-Id", "in": "header", "required": false, "schema": {"anyOf": [{"type": "string", "format": "uuid"}, {"type": "null"}], "title": "X-User-Id"}}], "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/UserUpdate"}}}}, "responses": {"200": {"description": "Successful Response", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/UserRead"}}}}, "422": {"description": "Validation Error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}}}}}, "/api/v1/admin/devices": {"post": {"tags": ["admin"], "summary": "Create Device", "operationId": "create_device_api_v1_admin_devices_post", "security": [{"HTTPBearer": []}], "parameters": [{"name": "X-Org-Id", "in": "header", "required": false, "schema": {"anyOf": [{"type": "integer"}, {"type": "null"}], "title": "X-Org-Id"}}, {"name": "X-User-Id", "in": "header", "required": false, "schema": {"anyOf": [{"type": "string", "format": "uuid"}, {"type": "null"}], "title": "X-User-Id"}}], "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/DeviceCreate"}}}}, "responses": {"201": {"description": "Successful Response", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/DeviceRead"}}}}, "422": {"description": "Validation Error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}}}}, "get": {"tags": ["admin"], "summary": "List Devices", "operationId": "list_devices_api_v1_admin_devices_get", "security": [{"HTTPBearer": []}], "parameters": [{"name": "X-Org-Id", "in": "header", "required": false, "schema": {"anyOf": [{"type": "integer"}, {"type": "null"}], "title": "X-Org-Id"}}, {"name": "X-User-Id", "in": "header", "required": false, "schema": {"anyOf": [{"type": "string", "format": "uuid"}, {"type": "null"}], "title": "X-User-Id"}}], "responses": {"200": {"description": "Successful Response", "content": {"application/json": {"schema": {"type": "array", "items": {"$ref": "#/components/schemas/DeviceRead"}, "title": "Response List Devices Api V1 Admin Devices Get"}}}}, "422": {"description": "Validation Error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}}}}}, "/api/v1/admin/user-devices": {"post": {"tags": ["admin"], "summary": "Link User Device", "operationId": "link_user_device_api_v1_admin_user_devices_post", "security": [{"HTTPBearer": []}], "parameters": [{"name": "X-Org-Id", "in": "header", "required": false, "schema": {"anyOf": [{"type": "integer"}, {"type": "null"}], "title": "X-Org-Id"}}, {"name": "X-User-Id", "in": "header", "required": false, "schema": {"anyOf": [{"type": "string", "format": "uuid"}, {"type": "null"}], "title": "X-User-Id"}}], "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/UserDeviceCreate"}}}}, "responses": {"201": {"description": "Successful Response", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/UserDeviceRead"}}}}, "422": {"description": "Validation Error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}}}}}, "/api/v1/admin/certificates/ingest-from-fs": {"post": {"tags": ["admin"], "summary": "Ingest Certificates From Filesystem", "operationId": "ingest_certificates_from_filesystem_api_v1_admin_certificates_ingest_from_fs_post", "security": [{"HTTPBearer": []}], "parameters": [{"name": "X-Org-Id", "in": "header", "required": false, "schema": {"anyOf": [{"type": "integer"}, {"type": "null"}], "title": "X-Org-Id"}}, {"name": "X-User-Id", "in": "header", "required": false, "schema": {"anyOf": [{"type": "string", "format": "uuid"}, {"type": "null"}], "title": "X-User-Id"}}], "requestBody": {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/CertIngestRequest", "default": {"dry_run": false, "limit": 0, "prune_missing": false, "dedupe": false}}}}}, "responses": {"200": {"description": "Successful Response", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CertIngestResponse"}}}}, "422": {"description": "Validation Error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}}}}}, "/api/v1/auth/password/set/init": {"post": {"tags": ["auth"], "summary": "Password Set Init", "operationId": "password_set_init_api_v1_auth_password_set_init_post", "security": [{"HTTPBearer": []}], "parameters": [{"name": "X-Org-Id", "in": "header", "required": false, "schema": {"anyOf": [{"type": "integer"}, {"type": "null"}], "title": "X-Org-Id"}}, {"name": "X-User-Id", "in": "header", "required": false, "schema": {"anyOf": [{"type": "string", "format": "uuid"}, {"type": "null"}], "title": "X-User-Id"}}], "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/PasswordSetInitRequest"}}}}, "responses": {"200": {"description": "Successful Response", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/TokenInitResponse"}}}}, "422": {"description": "Validation Error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}}}}}, "/api/v1/auth/password/set/confirm": {"post": {"tags": ["auth"], "summary": "Password Set Confirm", "operationId": "password_set_confirm_api_v1_auth_password_set_confirm_post", "requestBody": {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/PasswordConfirmRequest"}}}, "required": true}, "responses": {"200": {"description": "Successful Response", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/MessageResponse"}}}}, "422": {"description": "Validation Error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}}}}}, "/api/v1/auth/login": {"post": {"tags": ["auth"], "summary": "Login", "operationId": "login_api_v1_auth_login_post", "requestBody": {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/LoginRequest"}}}, "required": true}, "responses": {"200": {"description": "Successful Response", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/LoginResponse"}}}}, "422": {"description": "Validation Error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}}}}}, "/api/v1/auth/refresh": {"post": {"tags": ["auth"], "summary": "Refresh Token", "operationId": "refresh_token_api_v1_auth_refresh_post", "requestBody": {"content": {"application/json": {"schema": {"anyOf": [{"$ref": "#/components/schemas/RefreshRequest"}, {"type": "null"}], "title": "Payload"}}}}, "responses": {"200": {"description": "Successful Response", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RefreshResponse"}}}}, "422": {"description": "Validation Error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}}}}}, "/api/v1/auth/logout": {"post": {"tags": ["auth"], "summary": "Logout", "operationId": "logout_api_v1_auth_logout_post", "security": [{"HTTPBearer": []}], "parameters": [{"name": "X-Org-Id", "in": "header", "required": false, "schema": {"anyOf": [{"type": "integer"}, {"type": "null"}], "title": "X-Org-Id"}}, {"name": "X-User-Id", "in": "header", "required": false, "schema": {"anyOf": [{"type": "string", "format": "uuid"}, {"type": "null"}], "title": "X-User-Id"}}], "requestBody": {"content": {"application/json": {"schema": {"anyOf": [{"$ref": "#/components/schemas/RefreshRequest"}, {"type": "null"}], "title": "Payload"}}}}, "responses": {"200": {"description": "Successful Response", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/MessageResponse"}}}}, "422": {"description": "Validation Error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}}}}}, "/api/v1/auth/password/reset/init": {"post": {"tags": ["auth"], "summary": "Password Reset Init", "operationId": "password_reset_init_api_v1_auth_password_reset_init_post", "requestBody": {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/PasswordResetInitRequest"}}}, "required": true}, "responses": {"200": {"description": "Successful Response", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/TokenInitResponse"}}}}, "422": {"description": "Validation Error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}}}}}, "/api/v1/auth/password/reset/confirm": {"post": {"tags": ["auth"], "summary": "Password Reset Confirm", "operationId": "password_reset_confirm_api_v1_auth_password_reset_confirm_post", "requestBody": {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/PasswordConfirmRequest"}}}, "required": true}, "responses": {"200": {"description": "Successful Response", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/MessageResponse"}}}}, "422": {"description": "Validation Error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}}}}}, "/api/v1/auth/me": {"get": {"tags": ["auth"], "summary": "Me", "operationId": "me_api_v1_auth_me_get", "security": [{"HTTPBearer": []}], "parameters": [{"name": "X-Org-Id", "in": "header", "required": false, "schema": {"anyOf": [{"type": "integer"}, {"type": "null"}], "title": "X-Org-Id"}}, {"name": "X-User-Id", "in": "header", "required": false, "schema": {"anyOf": [{"type": "string", "format": "uuid"}, {"type": "null"}], "title": "X-User-Id"}}], "responses": {"200": {"description": "Successful Response", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/UserRead"}}}}, "422": {"description": "Validation Error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}}}}}, "/api/v1/certificados": {"post": {"tags": ["certificados"], "summary": "Create Certificate", "operationId": "create_certificate_api_v1_certificados_post", "security": [{"HTTPBearer": []}], "parameters": [{"name": "X-Org-Id", "in": "header", "required": false, "schema": {"anyOf": [{"type": "integer"}, {"type": "null"}], "title": "X-Org-Id"}}, {"name": "X-User-Id", "in": "header", "required": false, "schema": {"anyOf": [{"type": "string", "format": "uuid"}, {"type": "null"}], "title": "X-User-Id"}}], "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CertificateCreate"}}}}, "responses": {"201": {"description": "Successful Response", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CertificateRead"}}}}, "422": {"description": "Validation Error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}}}}, "get": {"tags": ["certificados"], "summary": "List Certificates", "operationId": "list_certificates_api_v1_certificados_get", "security": [{"HTTPBearer": []}], "parameters": [{"name": "X-Org-Id", "in": "header", "required": false, "schema": {"anyOf": [{"type": "integer"}, {"type": "null"}], "title": "X-Org-Id"}}, {"name": "X-User-Id", "in": "header", "required": false, "schema": {"anyOf": [{"type": "string", "format": "uuid"}, {"type": "null"}], "title": "X-User-Id"}}], "responses": {"200": {"description": "Successful Response", "content": {"application/json": {"schema": {"type": "array", "items": {"$ref": "#/components/schemas/CertificateRead"}, "title": "Response List Certificates Api V1 Certificados Get"}}}}, "422": {"description": "Validation Error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}}}}}, "/api/v1/certificados/{certificate_id}/install": {"post": {"tags": ["certificados"], "summary": "Create Install Job", "operationId": "create_install_job_api_v1_certificados__certificate_id__install_post", "security": [{"HTTPBearer": []}], "parameters": [{"name": "certificate_id", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid", "title": "Certificate Id"}}, {"name": "X-Org-Id", "in": "header", "required": false, "schema": {"anyOf": [{"type": "integer"}, {"type": "null"}], "title": "X-Org-Id"}}, {"name": "X-User-Id", "in": "header", "required": false, "schema": {"anyOf": [{"type": "string", "format": "uuid"}, {"type": "null"}], "title": "X-User-Id"}}], "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/InstallJobCreate"}}}}, "responses": {"201": {"description": "Successful Response", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/InstallJobRead"}}}}, "422": {"description": "Validation Error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}}}}}, "/api/v1/install-jobs": {"get": {"tags": ["install-jobs"], "summary": "List Install Jobs", "operationId": "list_install_jobs_api_v1_install_jobs_get", "security": [{"HTTPBearer": []}], "parameters": [{"name": "mine", "in": "query", "required": false, "schema": {"type": "boolean", "default": false, "title": "Mine"}}, {"name": "X-Org-Id", "in": "header", "required": false, "schema": {"anyOf": [{"type": "integer"}, {"type": "null"}], "title": "X-Org-Id"}}, {"name": "X-User-Id", "in": "header", "required": false, "schema": {"anyOf": [{"type": "string", "format": "uuid"}, {"type": "null"}], "title": "X-User-Id"}}], "responses": {"200": {"description": "Successful Response", "content": {"application/json": {"schema": {"type": "array", "items": {"$ref": "#/components/schemas/InstallJobRead"}, "title": "Response List Install Jobs Api V1 Install Jobs Get"}}}}, "422": {"description": "Validation Error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}}}}}, "/api/v1/install-jobs/mine": {"get": {"tags": ["install-jobs"], "summary": "List My Jobs", "operationId": "list_my_jobs_api_v1_install_jobs_mine_get", "security": [{"HTTPBearer": []}], "parameters": [{"name": "X-Org-Id", "in": "header", "required": false, "schema": {"anyOf": [{"type": "integer"}, {"type": "null"}], "title": "X-Org-Id"}}, {"name": "X-User-Id", "in": "header", "required": false, "schema": {"anyOf": [{"type": "string", "format": "uuid"}, {"type": "null"}], "title": "X-User-Id"}}], "responses": {"200": {"description": "Successful Response", "content": {"application/json": {"schema": {"type": "array", "items": {"$ref": "#/components/schemas/InstallJobRead"}, "title": "Response List My Jobs Api V1 Install Jobs Mine Get"}}}}, "422": {"description": "Validation Error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}}}}}, "/api/v1/install-jobs/{job_id}/approve": {"post": {"tags": ["install-jobs"], "summary": "Approve Job", "operationId": "approve_job_api_v1_install_jobs__job_id__approve_post", "security": [{"HTTPBearer": []}], "parameters": [{"name": "job_id", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid", "title": "Job Id"}}, {"name": "X-Org-Id", "in": "header", "required": false, "schema": {"anyOf": [{"type": "integer"}, {"type": "null"}], "title": "X-Org-Id"}}, {"name": "X-User-Id", "in": "header", "required": false, "schema": {"anyOf": [{"type": "string", "format": "uuid"}, {"type": "null"}], "title": "X-User-Id"}}], "requestBody": {"content": {"application/json": {"schema": {"anyOf": [{"$ref": "#/components/schemas/InstallJobApproveRequest"}, {"type": "null"}], "title": "Payload"}}}}, "responses": {"200": {"description": "Successful Response", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/InstallJobRead"}}}}, "422": {"description": "Validation Error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}}}}}, "/api/v1/install-jobs/{job_id}/deny": {"post": {"tags": ["install-jobs"], "summary": "Deny Job", "operationId": "deny_job_api_v1_install_jobs__job_id__deny_post", "security": [{"HTTPBearer": []}], "parameters": [{"name": "job_id", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid", "title": "Job Id"}}, {"name": "X-Org-Id", "in": "header", "required": false, "schema": {"anyOf": [{"type": "integer"}, {"type": "null"}], "title": "X-Org-Id"}}, {"name": "X-User-Id", "in": "header", "required": false, "schema": {"anyOf": [{"type": "string", "format": "uuid"}, {"type": "null"}], "title": "X-User-Id"}}], "requestBody": {"content": {"application/json": {"schema": {"anyOf": [{"$ref": "#/components/schemas/InstallJobApproveRequest"}, {"type": "null"}], "title": "Payload"}}}}, "responses": {"200": {"description": "Successful Response", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/InstallJobRead"}}}}, "422": {"description": "Validation Error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}}}}}}, "components": {"schemas": {"CertIngestError": {"properties": {"filename": {"type": "string", "title": "Filename"}, "reason": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Reason"}, "exception": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Exception"}}, "type": "object", "required": ["filename"], "title": "CertIngestError"}, "CertIngestRequest": {"properties": {"dry_run": {"type": "boolean", "title": "Dry Run", "default": false}, "limit": {"type": "integer", "minimum": 0.0, "title": "Limit", "default": 0}, "prune_missing": {"type": "boolean", "title": "Prune Missing", "default": false}, "dedupe": {"type": "boolean", "title": "Dedupe", "default": false}}, "type": "object", "title": "CertIngestRequest"}, "CertIngestResponse": {"properties": {"inserted": {"type": "integer", "title": "Inserted"}, "updated": {"type": "integer", "title": "Updated"}, "failed": {"type": "integer", "title": "Failed"}, "total": {"type": "integer", "title": "Total"}, "pruned": {"type": "integer", "title": "Pruned", "default": 0}, "deduped": {"type": "integer", "title": "Deduped", "default": 0}, "errors": {"items": {"$ref": "#/components/schemas/CertIngestError"}, "type": "array", "title": "Errors"}}, "type": "object", "required": ["inserted", "updated", "failed", "total", "errors"], "title": "CertIngestResponse"}, "CertificateCreate": {"properties": {"name": {"type": "string", "title": "Name"}}, "type": "object", "required": ["name"], "title": "CertificateCreate"}, "CertificateRead": {"properties": {"name": {"type": "string", "title": "Name"}, "id": {"type": "string", "format": "uuid", "title": "Id"}, "org_id": {"type": "integer", "title": "Org Id"}, "subject": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Subject"}, "issuer": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Issuer"}, "serial_number": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Serial Number"}, "sha1_fingerprint": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Sha1 Fingerprint"}, "parse_error": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Parse Error"}, "source_path": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Source Path"}, "parse_ok": {"type": "boolean", "title": "Parse Ok"}, "last_ingested_at": {"anyOf": [{"type": "string", "format": "date-time"}, {"type": "null"}], "title": "Last Ingested At"}, "last_error_at": {"anyOf": [{"type": "string", "format": "date-time"}, {"type": "null"}], "title": "Last Error At"}, "not_before": {"anyOf": [{"type": "string", "format": "date-time"}, {"type": "null"}], "title": "Not Before"}, "not_after": {"anyOf": [{"type": "string", "format": "date-time"}, {"type": "null"}], "title": "Not After"}, "created_at": {"type": "string", "format": "date-time", "title": "Created At"}}, "type": "object", "required": ["name", "id", "org_id", "parse_ok", "created_at"], "title": "CertificateRead"}, "DeviceCreate": {"properties": {"hostname": {"type": "string", "title": "Hostname"}, "domain": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Domain"}, "os_version": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Os Version"}, "agent_version": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Agent Version"}, "last_seen_at": {"anyOf": [{"type": "string", "format": "date-time"}, {"type": "null"}], "title": "Last Seen At"}, "is_allowed": {"type": "boolean", "title": "Is Allowed", "default": true}}, "type": "object", "required": ["hostname"], "title": "DeviceCreate"}, "DeviceRead": {"properties": {"hostname": {"type": "string", "title": "Hostname"}, "domain": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Domain"}, "os_version": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Os Version"}, "agent_version": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Agent Version"}, "last_seen_at": {"anyOf": [{"type": "string", "format": "date-time"}, {"type": "null"}], "title": "Last Seen At"}, "is_allowed": {"type": "boolean", "title": "Is Allowed", "default": true}, "id": {"type": "string", "format": "uuid", "title": "Id"}, "org_id": {"type": "integer", "title": "Org Id"}, "created_at": {"type": "string", "format": "date-time", "title": "Created At"}}, "type": "object", "required": ["hostname", "id", "org_id", "created_at"], "title": "DeviceRead"}, "HTTPValidationError": {"properties": {"detail": {"items": {"$ref": "#/components/schemas/ValidationError"}, "type": "array", "title": "Detail"}}, "type": "object", "title": "HTTPValidationError"}, "InstallJobApproveRequest": {"properties": {"reason": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Reason"}}, "type": "object", "title": "InstallJobApproveRequest"}, "InstallJobCreate": {"properties": {"device_id": {"type": "string", "format": "uuid", "title": "Device Id"}}, "type": "object", "required": ["device_id"], "title": "InstallJobCreate"}, "InstallJobRead": {"properties": {"id": {"type": "string", "format": "uuid", "title": "Id"}, "org_id": {"type": "integer", "title": "Org Id"}, "cert_id": {"type": "string", "format": "uuid", "title": "Cert Id"}, "device_id": {"type": "string", "format": "uuid", "title": "Device Id"}, "requested_by_user_id": {"type": "string", "format": "uuid", "title": "Requested By User Id"}, "approved_by_user_id": {"anyOf": [{"type": "string", "format": "uuid"}, {"type": "null"}], "title": "Approved By User Id"}, "approved_at": {"anyOf": [{"type": "string", "format": "date-time"}, {"type": "null"}], "title": "Approved At"}, "status": {"type": "string", "enum": ["REQUESTED", "PENDING", "IN_PROGRESS", "DONE", "FAILED", "EXPIRED", "CANCELED"], "title": "Status"}, "created_at": {"type": "string", "format": "date-time", "title": "Created At"}, "updated_at": {"type": "string", "format": "date-time", "title": "Updated At"}}, "type": "object", "required": ["id", "org_id", "cert_id", "device_id", "requested_by_user_id", "approved_by_user_id", "approved_at", "status", "created_at", "updated_at"], "title": "InstallJobRead"}, "LoginRequest": {"properties": {"email": {"type": "string", "title": "Email"}, "password": {"type": "string", "title": "Password"}}, "type": "object", "required": ["email", "password"], "title": "LoginRequest"}, "LoginResponse": {"properties": {"access_token": {"type": "string", "title": "Access Token"}, "refresh_token": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Refresh Token"}, "token_type": {"type": "string", "title": "Token Type", "default": "bearer"}, "user": {"$ref": "#/components/schemas/UserRead"}}, "type": "object", "required": ["access_token", "user"], "title": "LoginResponse"}, "MessageResponse": {"properties": {"message": {"type": "string", "title": "Message"}, "token": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Token"}, "expires_at": {"anyOf": [{"type": "string", "format": "date-time"}, {"type": "null"}], "title": "Expires At"}}, "type": "object", "required": ["message"], "title": "MessageResponse"}, "PasswordConfirmRequest": {"properties": {"token": {"type": "string", "title": "Token"}, "new_password": {"type": "string", "title": "New Password"}}, "type": "object", "required": ["token", "new_password"], "title": "PasswordConfirmRequest"}, "PasswordResetInitRequest": {"properties": {"email": {"type": "string", "title": "Email"}}, "type": "object", "required": ["email"], "title": "PasswordResetInitRequest"}, "PasswordSetInitRequest": {"properties": {"email": {"type": "string", "title": "Email"}}, "type": "object", "required": ["email"], "title": "PasswordSetInitRequest"}, "RefreshRequest": {"properties": {"refresh_token": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Refresh Token"}}, "type": "object", "title": "RefreshRequest"}, "RefreshResponse": {"properties": {"access_token": {"type": "string", "title": "Access Token"}, "token_type": {"type": "string", "title": "Token Type", "default": "bearer"}}, "type": "object", "required": ["access_token"], "title": "RefreshResponse"}, "TokenInitResponse": {"properties": {"ok": {"type": "boolean", "title": "Ok", "default": true}, "token": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Token"}, "expires_at": {"anyOf": [{"type": "string", "format": "date-time"}, {"type": "null"}], "title": "Expires At"}}, "type": "object", "title": "TokenInitResponse"}, "UserCreate": {"properties": {"ad_username": {"type": "string", "title": "Ad Username"}, "email": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Email"}, "nome": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Nome"}, "is_active": {"type": "boolean", "title": "Is Active", "default": true}, "role_global": {"type": "string", "title": "Role Global", "default": "VIEW"}, "auto_approve_install_jobs": {"type": "boolean", "title": "Auto Approve Install Jobs", "default": false}}, "type": "object", "required": ["ad_username"], "title": "UserCreate"}, "UserCreateResponse": {"properties": {"ad_username": {"type": "string", "title": "Ad Username"}, "email": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Email"}, "nome": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Nome"}, "is_active": {"type": "boolean", "title": "Is Active", "default": true}, "role_global": {"type": "string", "title": "Role Global", "default": "VIEW"}, "auto_approve_install_jobs": {"type": "boolean", "title": "Auto Approve Install Jobs", "default": false}, "id": {"type": "string", "format": "uuid", "title": "Id"}, "org_id": {"type": "integer", "title": "Org Id"}, "created_at": {"type": "string", "format": "date-time", "title": "Created At"}, "updated_at": {"type": "string", "format": "date-time", "title": "Updated At"}, "setup_token": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Setup Token"}}, "type": "object", "required": ["ad_username", "id", "org_id", "created_at", "updated_at"], "title": "UserCreateResponse"}, "UserDeviceCreate": {"properties": {"user_id": {"type": "string", "format": "uuid", "title": "User Id"}, "device_id": {"type": "string", "format": "uuid", "title": "Device Id"}, "is_allowed": {"type": "boolean", "title": "Is Allowed", "default": true}}, "type": "object", "required": ["user_id", "device_id"], "title": "UserDeviceCreate"}, "UserDeviceRead": {"properties": {"user_id": {"type": "string", "format": "uuid", "title": "User Id"}, "device_id": {"type": "string", "format": "uuid", "title": "Device Id"}, "is_allowed": {"type": "boolean", "title": "Is Allowed", "default": true}, "created_at": {"type": "string", "format": "date-time", "title": "Created At"}}, "type": "object", "required": ["user_id", "device_id", "created_at"], "title": "UserDeviceRead"}, "UserRead": {"properties": {"ad_username": {"type": "string", "title": "Ad Username"}, "email": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Email"}, "nome": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Nome"}, "is_active": {"type": "boolean", "title": "Is Active", "default": true}, "role_global": {"type": "string", "title": "Role Global", "default": "VIEW"}, "auto_approve_install_jobs": {"type": "boolean", "title": "Auto Approve Install Jobs", "default": false}, "id": {"type": "string", "format": "uuid", "title": "Id"}, "org_id": {"type": "integer", "title": "Org Id"}, "created_at": {"type": "string", "format": "date-time", "title": "Created At"}, "updated_at": {"type": "string", "format": "date-time", "title": "Updated At"}}, "type": "object", "required": ["ad_username", "id", "org_id", "created_at", "updated_at"], "title": "UserRead"}, "UserUpdate": {"properties": {"ad_username": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Ad Username"}, "email": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Email"}, "nome": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Nome"}, "is_active": {"anyOf": [{"type": "boolean"}, {"type": "null"}], "title": "Is Active"}, "role_global": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Role Global"}, "auto_approve_install_jobs": {"anyOf": [{"type": "boolean"}, {"type": "null"}], "title": "Auto Approve Install Jobs"}}, "type": "object", "title": "UserUpdate"}, "ValidationError": {"properties": {"loc": {"items": {"anyOf": [{"type": "string"}, {"type": "integer"}]}, "type": "array", "title": "Location"}, "msg": {"type": "string", "title": "Message"}, "type": {"type": "string", "title": "Error Type"}}, "type": "object", "required": ["loc", "msg", "type"], "title": "ValidationError"}}, "securitySchemes": {"HTTPBearer": {"type": "http", "scheme": "bearer"}}}}
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "CertHub API",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "Healthcheck",
+        "operationId": "healthcheck_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Healthcheck Health Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/users": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Create User",
+        "operationId": "create_user_api_v1_admin_users_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Org-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Org-Id"
+            }
+          },
+          {
+            "name": "X-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserCreateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "List Users",
+        "operationId": "list_users_api_v1_admin_users_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Org-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Org-Id"
+            }
+          },
+          {
+            "name": "X-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UserRead"
+                  },
+                  "title": "Response List Users Api V1 Admin Users Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/users/{user_id}": {
+      "patch": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Update User",
+        "operationId": "update_user_api_v1_admin_users__user_id__patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "User Id"
+            }
+          },
+          {
+            "name": "X-Org-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Org-Id"
+            }
+          },
+          {
+            "name": "X-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/devices": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Create Device",
+        "operationId": "create_device_api_v1_admin_devices_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Org-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Org-Id"
+            }
+          },
+          {
+            "name": "X-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "List Devices",
+        "operationId": "list_devices_api_v1_admin_devices_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Org-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Org-Id"
+            }
+          },
+          {
+            "name": "X-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DeviceRead"
+                  },
+                  "title": "Response List Devices Api V1 Admin Devices Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/devices/{device_id}": {
+      "patch": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Update Device",
+        "operationId": "update_device_api_v1_admin_devices__device_id__patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "device_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Device Id"
+            }
+          },
+          {
+            "name": "X-Org-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Org-Id"
+            }
+          },
+          {
+            "name": "X-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/user-devices": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Link User Device",
+        "operationId": "link_user_device_api_v1_admin_user_devices_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Org-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Org-Id"
+            }
+          },
+          {
+            "name": "X-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserDeviceCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserDeviceRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "List User Devices",
+        "operationId": "list_user_devices_api_v1_admin_user_devices_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Org-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Org-Id"
+            }
+          },
+          {
+            "name": "X-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UserDeviceReadWithUser"
+                  },
+                  "title": "Response List User Devices Api V1 Admin User Devices Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/certificates/ingest-from-fs": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Ingest Certificates From Filesystem",
+        "operationId": "ingest_certificates_from_filesystem_api_v1_admin_certificates_ingest_from_fs_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Org-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Org-Id"
+            }
+          },
+          {
+            "name": "X-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CertIngestRequest",
+                "default": {
+                  "dry_run": false,
+                  "limit": 0,
+                  "prune_missing": false,
+                  "dedupe": false
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CertIngestResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/password/set/init": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Password Set Init",
+        "operationId": "password_set_init_api_v1_auth_password_set_init_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Org-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Org-Id"
+            }
+          },
+          {
+            "name": "X-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordSetInitRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenInitResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/password/set/confirm": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Password Set Confirm",
+        "operationId": "password_set_confirm_api_v1_auth_password_set_confirm_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordConfirmRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Login",
+        "operationId": "login_api_v1_auth_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/refresh": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Refresh Token",
+        "operationId": "refresh_token_api_v1_auth_refresh_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/RefreshRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefreshResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Logout",
+        "operationId": "logout_api_v1_auth_logout_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Org-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Org-Id"
+            }
+          },
+          {
+            "name": "X-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/RefreshRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/password/reset/init": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Password Reset Init",
+        "operationId": "password_reset_init_api_v1_auth_password_reset_init_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordResetInitRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenInitResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/password/reset/confirm": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Password Reset Confirm",
+        "operationId": "password_reset_confirm_api_v1_auth_password_reset_confirm_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordConfirmRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/me": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Me",
+        "operationId": "me_api_v1_auth_me_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Org-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Org-Id"
+            }
+          },
+          {
+            "name": "X-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/certificados": {
+      "post": {
+        "tags": [
+          "certificados"
+        ],
+        "summary": "Create Certificate",
+        "operationId": "create_certificate_api_v1_certificados_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Org-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Org-Id"
+            }
+          },
+          {
+            "name": "X-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CertificateCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CertificateRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "certificados"
+        ],
+        "summary": "List Certificates",
+        "operationId": "list_certificates_api_v1_certificados_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Org-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Org-Id"
+            }
+          },
+          {
+            "name": "X-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CertificateRead"
+                  },
+                  "title": "Response List Certificates Api V1 Certificados Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/certificados/{certificate_id}/install": {
+      "post": {
+        "tags": [
+          "certificados"
+        ],
+        "summary": "Create Install Job",
+        "operationId": "create_install_job_api_v1_certificados__certificate_id__install_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "certificate_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Certificate Id"
+            }
+          },
+          {
+            "name": "X-Org-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Org-Id"
+            }
+          },
+          {
+            "name": "X-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InstallJobCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstallJobRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/install-jobs": {
+      "get": {
+        "tags": [
+          "install-jobs"
+        ],
+        "summary": "List Install Jobs",
+        "operationId": "list_install_jobs_api_v1_install_jobs_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "mine",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Mine"
+            }
+          },
+          {
+            "name": "X-Org-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Org-Id"
+            }
+          },
+          {
+            "name": "X-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/InstallJobRead"
+                  },
+                  "title": "Response List Install Jobs Api V1 Install Jobs Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/install-jobs/mine": {
+      "get": {
+        "tags": [
+          "install-jobs"
+        ],
+        "summary": "List My Jobs",
+        "operationId": "list_my_jobs_api_v1_install_jobs_mine_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Org-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Org-Id"
+            }
+          },
+          {
+            "name": "X-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/InstallJobRead"
+                  },
+                  "title": "Response List My Jobs Api V1 Install Jobs Mine Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/install-jobs/{job_id}/approve": {
+      "post": {
+        "tags": [
+          "install-jobs"
+        ],
+        "summary": "Approve Job",
+        "operationId": "approve_job_api_v1_install_jobs__job_id__approve_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          },
+          {
+            "name": "X-Org-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Org-Id"
+            }
+          },
+          {
+            "name": "X-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/InstallJobApproveRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstallJobRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/install-jobs/{job_id}/deny": {
+      "post": {
+        "tags": [
+          "install-jobs"
+        ],
+        "summary": "Deny Job",
+        "operationId": "deny_job_api_v1_install_jobs__job_id__deny_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          },
+          {
+            "name": "X-Org-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Org-Id"
+            }
+          },
+          {
+            "name": "X-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/InstallJobApproveRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstallJobRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/audit": {
+      "get": {
+        "tags": [
+          "audit"
+        ],
+        "summary": "List Audit Logs",
+        "operationId": "list_audit_logs_api_v1_audit_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "action",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Action"
+            }
+          },
+          {
+            "name": "actor_user_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Actor User Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 200,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "X-Org-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Org-Id"
+            }
+          },
+          {
+            "name": "X-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AuditLogRead"
+                  },
+                  "title": "Response List Audit Logs Api V1 Audit Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AuditLogRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          },
+          "action": {
+            "type": "string",
+            "title": "Action"
+          },
+          "entity_type": {
+            "type": "string",
+            "title": "Entity Type"
+          },
+          "entity_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entity Id"
+          },
+          "actor_user_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor User Id"
+          },
+          "actor_device_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor Device Id"
+          },
+          "actor_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor Label"
+          },
+          "meta_json": {
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Meta Json"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "timestamp",
+          "action",
+          "entity_type"
+        ],
+        "title": "AuditLogRead"
+      },
+      "CertIngestError": {
+        "properties": {
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "exception": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exception"
+          }
+        },
+        "type": "object",
+        "required": [
+          "filename"
+        ],
+        "title": "CertIngestError"
+      },
+      "CertIngestRequest": {
+        "properties": {
+          "dry_run": {
+            "type": "boolean",
+            "title": "Dry Run",
+            "default": false
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Limit",
+            "default": 0
+          },
+          "prune_missing": {
+            "type": "boolean",
+            "title": "Prune Missing",
+            "default": false
+          },
+          "dedupe": {
+            "type": "boolean",
+            "title": "Dedupe",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "CertIngestRequest"
+      },
+      "CertIngestResponse": {
+        "properties": {
+          "inserted": {
+            "type": "integer",
+            "title": "Inserted"
+          },
+          "updated": {
+            "type": "integer",
+            "title": "Updated"
+          },
+          "failed": {
+            "type": "integer",
+            "title": "Failed"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "pruned": {
+            "type": "integer",
+            "title": "Pruned",
+            "default": 0
+          },
+          "deduped": {
+            "type": "integer",
+            "title": "Deduped",
+            "default": 0
+          },
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/CertIngestError"
+            },
+            "type": "array",
+            "title": "Errors"
+          }
+        },
+        "type": "object",
+        "required": [
+          "inserted",
+          "updated",
+          "failed",
+          "total",
+          "errors"
+        ],
+        "title": "CertIngestResponse"
+      },
+      "CertificateCreate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "CertificateCreate"
+      },
+      "CertificateRead": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "org_id": {
+            "type": "integer",
+            "title": "Org Id"
+          },
+          "subject": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subject"
+          },
+          "issuer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issuer"
+          },
+          "serial_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Serial Number"
+          },
+          "sha1_fingerprint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sha1 Fingerprint"
+          },
+          "parse_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parse Error"
+          },
+          "source_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Path"
+          },
+          "parse_ok": {
+            "type": "boolean",
+            "title": "Parse Ok"
+          },
+          "last_ingested_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Ingested At"
+          },
+          "last_error_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error At"
+          },
+          "not_before": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Not Before"
+          },
+          "not_after": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Not After"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "id",
+          "org_id",
+          "parse_ok",
+          "created_at"
+        ],
+        "title": "CertificateRead"
+      },
+      "DeviceCreate": {
+        "properties": {
+          "hostname": {
+            "type": "string",
+            "title": "Hostname"
+          },
+          "domain": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Domain"
+          },
+          "os_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Os Version"
+          },
+          "agent_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Version"
+          },
+          "last_seen_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Seen At"
+          },
+          "is_allowed": {
+            "type": "boolean",
+            "title": "Is Allowed",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "hostname"
+        ],
+        "title": "DeviceCreate"
+      },
+      "DeviceRead": {
+        "properties": {
+          "hostname": {
+            "type": "string",
+            "title": "Hostname"
+          },
+          "domain": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Domain"
+          },
+          "os_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Os Version"
+          },
+          "agent_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Version"
+          },
+          "last_seen_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Seen At"
+          },
+          "is_allowed": {
+            "type": "boolean",
+            "title": "Is Allowed",
+            "default": true
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "org_id": {
+            "type": "integer",
+            "title": "Org Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "hostname",
+          "id",
+          "org_id",
+          "created_at"
+        ],
+        "title": "DeviceRead"
+      },
+      "DeviceUpdate": {
+        "properties": {
+          "is_allowed": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Allowed"
+          }
+        },
+        "type": "object",
+        "title": "DeviceUpdate"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "InstallJobApproveRequest": {
+        "properties": {
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "title": "InstallJobApproveRequest"
+      },
+      "InstallJobCreate": {
+        "properties": {
+          "device_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Device Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "device_id"
+        ],
+        "title": "InstallJobCreate"
+      },
+      "InstallJobRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "org_id": {
+            "type": "integer",
+            "title": "Org Id"
+          },
+          "cert_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Cert Id"
+          },
+          "device_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Device Id"
+          },
+          "requested_by_user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Requested By User Id"
+          },
+          "approved_by_user_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approved By User Id"
+          },
+          "approved_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approved At"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "REQUESTED",
+              "PENDING",
+              "IN_PROGRESS",
+              "DONE",
+              "FAILED",
+              "EXPIRED",
+              "CANCELED"
+            ],
+            "title": "Status"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "org_id",
+          "cert_id",
+          "device_id",
+          "requested_by_user_id",
+          "approved_by_user_id",
+          "approved_at",
+          "status",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "InstallJobRead"
+      },
+      "LoginRequest": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "password": {
+            "type": "string",
+            "title": "Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "title": "LoginRequest"
+      },
+      "LoginResponse": {
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "title": "Access Token"
+          },
+          "refresh_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refresh Token"
+          },
+          "token_type": {
+            "type": "string",
+            "title": "Token Type",
+            "default": "bearer"
+          },
+          "user": {
+            "$ref": "#/components/schemas/UserRead"
+          }
+        },
+        "type": "object",
+        "required": [
+          "access_token",
+          "user"
+        ],
+        "title": "LoginResponse"
+      },
+      "MessageResponse": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Token"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "title": "MessageResponse"
+      },
+      "PasswordConfirmRequest": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "title": "Token"
+          },
+          "new_password": {
+            "type": "string",
+            "title": "New Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "token",
+          "new_password"
+        ],
+        "title": "PasswordConfirmRequest"
+      },
+      "PasswordResetInitRequest": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "title": "Email"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email"
+        ],
+        "title": "PasswordResetInitRequest"
+      },
+      "PasswordSetInitRequest": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "title": "Email"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email"
+        ],
+        "title": "PasswordSetInitRequest"
+      },
+      "RefreshRequest": {
+        "properties": {
+          "refresh_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refresh Token"
+          }
+        },
+        "type": "object",
+        "title": "RefreshRequest"
+      },
+      "RefreshResponse": {
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "title": "Access Token"
+          },
+          "token_type": {
+            "type": "string",
+            "title": "Token Type",
+            "default": "bearer"
+          }
+        },
+        "type": "object",
+        "required": [
+          "access_token"
+        ],
+        "title": "RefreshResponse"
+      },
+      "TokenInitResponse": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok",
+            "default": true
+          },
+          "token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Token"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          }
+        },
+        "type": "object",
+        "title": "TokenInitResponse"
+      },
+      "UserCreate": {
+        "properties": {
+          "ad_username": {
+            "type": "string",
+            "title": "Ad Username"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "nome": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nome"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active",
+            "default": true
+          },
+          "role_global": {
+            "type": "string",
+            "title": "Role Global",
+            "default": "VIEW"
+          },
+          "auto_approve_install_jobs": {
+            "type": "boolean",
+            "title": "Auto Approve Install Jobs",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "ad_username"
+        ],
+        "title": "UserCreate"
+      },
+      "UserCreateResponse": {
+        "properties": {
+          "ad_username": {
+            "type": "string",
+            "title": "Ad Username"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "nome": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nome"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active",
+            "default": true
+          },
+          "role_global": {
+            "type": "string",
+            "title": "Role Global",
+            "default": "VIEW"
+          },
+          "auto_approve_install_jobs": {
+            "type": "boolean",
+            "title": "Auto Approve Install Jobs",
+            "default": false
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "org_id": {
+            "type": "integer",
+            "title": "Org Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "setup_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Setup Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ad_username",
+          "id",
+          "org_id",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "UserCreateResponse"
+      },
+      "UserDeviceCreate": {
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "User Id"
+          },
+          "device_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Device Id"
+          },
+          "is_allowed": {
+            "type": "boolean",
+            "title": "Is Allowed",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "device_id"
+        ],
+        "title": "UserDeviceCreate"
+      },
+      "UserDeviceRead": {
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "User Id"
+          },
+          "device_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Device Id"
+          },
+          "is_allowed": {
+            "type": "boolean",
+            "title": "Is Allowed",
+            "default": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "device_id",
+          "created_at"
+        ],
+        "title": "UserDeviceRead"
+      },
+      "UserDeviceReadWithUser": {
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "User Id"
+          },
+          "device_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Device Id"
+          },
+          "is_allowed": {
+            "type": "boolean",
+            "title": "Is Allowed",
+            "default": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "user": {
+            "$ref": "#/components/schemas/UserRead"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "device_id",
+          "created_at",
+          "user"
+        ],
+        "title": "UserDeviceReadWithUser"
+      },
+      "UserRead": {
+        "properties": {
+          "ad_username": {
+            "type": "string",
+            "title": "Ad Username"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "nome": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nome"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active",
+            "default": true
+          },
+          "role_global": {
+            "type": "string",
+            "title": "Role Global",
+            "default": "VIEW"
+          },
+          "auto_approve_install_jobs": {
+            "type": "boolean",
+            "title": "Auto Approve Install Jobs",
+            "default": false
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "org_id": {
+            "type": "integer",
+            "title": "Org Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ad_username",
+          "id",
+          "org_id",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "UserRead"
+      },
+      "UserUpdate": {
+        "properties": {
+          "ad_username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ad Username"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "nome": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nome"
+          },
+          "is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Active"
+          },
+          "role_global": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role Global"
+          },
+          "auto_approve_install_jobs": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Auto Approve Install Jobs"
+          }
+        },
+        "type": "object",
+        "title": "UserUpdate"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    },
+    "securitySchemes": {
+      "HTTPBearer": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    }
+  }
+}

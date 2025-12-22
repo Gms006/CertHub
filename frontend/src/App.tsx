@@ -1,8 +1,12 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
 import AppShell from "./components/AppShell";
+import ProtectedRoute from "./components/ProtectedRoute";
 import CertificatesPage from "./pages/Certificates";
+import DevicesPage from "./pages/Devices";
+import JobsPage from "./pages/Jobs";
 import Login from "./pages/Login";
+import AuditPage from "./pages/Audit";
 import ResetPassword from "./pages/ResetPassword";
 import SetPassword from "./pages/SetPassword";
 
@@ -13,8 +17,17 @@ const App = () => {
         <Route path="/login" element={<Login />} />
         <Route path="/auth/set-password" element={<SetPassword />} />
         <Route path="/auth/reset-password" element={<ResetPassword />} />
-        <Route element={<AppShell />}>
+        <Route
+          element={
+            <ProtectedRoute>
+              <AppShell />
+            </ProtectedRoute>
+          }
+        >
           <Route path="/certificados" element={<CertificatesPage />} />
+          <Route path="/jobs" element={<JobsPage />} />
+          <Route path="/dispositivos" element={<DevicesPage />} />
+          <Route path="/auditoria" element={<AuditPage />} />
           <Route path="/" element={<CertificatesPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/login" replace />} />

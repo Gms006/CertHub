@@ -17,6 +17,10 @@ class DeviceCreate(DeviceBase):
     pass
 
 
+class DeviceUpdate(BaseModel):
+    is_allowed: bool | None = None
+
+
 class DeviceRead(DeviceBase):
     id: uuid.UUID
     org_id: int

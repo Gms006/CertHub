@@ -3,6 +3,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict
 
+from app.schemas.user import UserRead
+
 
 class UserDeviceCreate(BaseModel):
     user_id: uuid.UUID
@@ -14,3 +16,7 @@ class UserDeviceRead(UserDeviceCreate):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class UserDeviceReadWithUser(UserDeviceRead):
+    user: UserRead

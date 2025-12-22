@@ -5,6 +5,7 @@ type ApiClientOptions = {
   baseUrl?: string;
   getAccessToken: () => string | null;
   refreshAccessToken: () => Promise<string | null>;
+  onUnauthorized?: () => void;
 };
 
 const withBaseUrl = (baseUrl: string, input: RequestInfo | URL) => {
@@ -21,6 +22,7 @@ export const createApiClient = ({
   baseUrl = API_BASE,
   getAccessToken,
   refreshAccessToken,
+  onUnauthorized,
 }: ApiClientOptions) => {
   return async (input: RequestInfo | URL, init: RequestInit = {}) => {
     const execute = async (token?: string | null) => {
@@ -42,6 +44,7 @@ export const createApiClient = ({
 
     const refreshedToken = await refreshAccessToken();
     if (!refreshedToken) {
+      onUnauthorized?.();
       return response;
     }
 
