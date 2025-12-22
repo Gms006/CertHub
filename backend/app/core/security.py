@@ -7,7 +7,8 @@ from datetime import datetime, timedelta, timezone
 from typing import Iterable
 
 import jwt
-from fastapi import Depends, Header, HTTPException, status
+from fastapi import Depends, Header, HTTPException, Request, Security, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 
@@ -18,7 +19,9 @@ from app.models import User
 ALLOWED_ROLES = {"DEV", "ADMIN", "VIEW"}
 AUTH_TOKEN_PURPOSE_SET_PASSWORD = "SET_PASSWORD"
 AUTH_TOKEN_PURPOSE_RESET_PASSWORD = "RESET_PASSWORD"
+BCRYPT_MAX_PASSWORD_BYTES = 72
 
+http_bearer = HTTPBearer(auto_error=False)
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto", bcrypt__rounds=settings.bcrypt_cost)
 
 
@@ -27,7 +30,16 @@ def _ensure_role(user: User, allowed: Iterable[str]) -> None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
 
 
+def _validate_password_length(password: str) -> None:
+    if len(password.encode("utf-8")) > BCRYPT_MAX_PASSWORD_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="password must be at most 72 bytes",
+        )
+
+
 def hash_password(password: str) -> str:
+    _validate_password_length(password)
     return pwd_context.hash(password)
 
 
@@ -77,12 +89,15 @@ def _get_bearer_token(authorization: str | None) -> str | None:
 
 
 async def get_current_user(
+    request: Request,
     db: Session = Depends(get_db),
-    authorization: str | None = Header(default=None, alias="Authorization"),
+    credentials: HTTPAuthorizationCredentials | None = Security(http_bearer),
     x_org_id: int | None = Header(default=None, alias="X-Org-Id"),
     x_user_id: uuid.UUID | None = Header(default=None, alias="X-User-Id"),
 ) -> User:
-    token = _get_bearer_token(authorization)
+    token = credentials.credentials if credentials else _get_bearer_token(
+        request.headers.get("Authorization") if request else None
+    )
     if token:
         payload = decode_access_token(token)
         user_id = payload.get("sub")

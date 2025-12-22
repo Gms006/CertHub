@@ -25,7 +25,7 @@ httpx==0.27.2
 # Segurança/crypto (p/ evoluir secret store / payload hardening)
 cryptography==43.0.3
 passlib[bcrypt]==1.7.4
-bcrypt<4
+bcrypt==3.2.2
 PyJWT==2.10.1
 
 # Uploads / forms

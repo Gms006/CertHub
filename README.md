@@ -25,6 +25,10 @@ Objetivo: substituir o diretório público de `.pfx` por um fluxo controlado via
 - Docker (recomendado para Postgres/Redis)
 - (Agent) .NET 8 SDK
 
+> Nota: o backend fixa `passlib[bcrypt]==1.7.4` com `bcrypt==3.2.2` para evitar o erro
+> "password cannot be longer than 72 bytes" introduzido em bcrypt 4+ (o passlib 1.7.4
+> espera truncamento). Não remova esse pin sem atualizar o passlib.
+
 ## Quickstart (dev)
 
 ### 1) Subir Postgres + Redis

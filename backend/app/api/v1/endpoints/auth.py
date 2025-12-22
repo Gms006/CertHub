@@ -336,21 +336,19 @@ def password_reset_init(
 ) -> TokenInitResponse:
     statement = select(User).where(func.lower(User.email) == payload.email.lower())
     user = db.execute(statement).scalar_one_or_none()
-    if user is None:
-        return TokenInitResponse(ok=True)
-
     raw_token = generate_token()
     expires_at = datetime.now(timezone.utc) + timedelta(
         minutes=settings.reset_password_token_ttl_min
     )
-    auth_token = AuthToken(
-        user_id=user.id,
-        token_hash=hash_token(raw_token),
-        purpose=AUTH_TOKEN_PURPOSE_RESET_PASSWORD,
-        expires_at=expires_at,
-    )
-    db.add(auth_token)
-    db.commit()
+    if user is not None:
+        auth_token = AuthToken(
+            user_id=user.id,
+            token_hash=hash_token(raw_token),
+            purpose=AUTH_TOKEN_PURPOSE_RESET_PASSWORD,
+            expires_at=expires_at,
+        )
+        db.add(auth_token)
+        db.commit()
     token_value = raw_token if settings.env.lower() == "dev" else None
     return TokenInitResponse(
         ok=True,
