@@ -94,16 +94,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         headers: { "Content-Type": "application/json" },
         credentials: "include",
       });
+
       const data = await parseJson<{ access_token: string }>(response);
+      
       setAccessToken(data.access_token);
-      persistUser(user, data.access_token);
+      localStorage.setItem("certhub_access_token", data.access_token); // só token
+
       return data.access_token;
     } catch {
       clearAuth();
       return null;
     }
-  }, [clearAuth, user]);
-
+  }, [clearAuth]);
   const apiFetch = useMemo(
     () =>
       createApiClient({
