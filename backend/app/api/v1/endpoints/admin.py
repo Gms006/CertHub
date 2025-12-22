@@ -26,6 +26,23 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 # User management
 
 
+def resolve_assigned_user(
+    db: Session, org_id: int, assigned_user_id: uuid.UUID | None
+) -> User | None:
+    if assigned_user_id is None:
+        return None
+    user = db.get(User, assigned_user_id)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="assigned user not found"
+        )
+    if user.org_id != org_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="assigned user not in org"
+        )
+    return user
+
+
 @router.post("/users", response_model=UserCreateResponse, status_code=status.HTTP_201_CREATED)
 def create_user(
     user_in: UserCreate,
@@ -138,7 +155,11 @@ def create_device(
     current_user=Depends(require_admin_or_dev),
 ) -> Device:
     org_id = current_user.org_id
-    device = Device(org_id=org_id, **device_in.model_dump())
+    payload = device_in.model_dump()
+    assigned_user_id = payload.pop("assigned_user_id", None)
+    assigned_user = resolve_assigned_user(db, org_id, assigned_user_id)
+    device = Device(org_id=org_id, **payload)
+    device.assigned_user = assigned_user
     db.add(device)
     log_audit(
         db=db,
@@ -192,6 +213,14 @@ def update_device(
             changes[field] = [old_value, value]
 
     apply_change("is_allowed", payload.is_allowed)
+    if "assigned_user_id" in payload.model_fields_set:
+        assigned_user_id = payload.assigned_user_id
+        assigned_user = resolve_assigned_user(db, current_user.org_id, assigned_user_id)
+        old_value = device.assigned_user_id
+        if old_value != assigned_user_id:
+            device.assigned_user_id = assigned_user_id
+            device.assigned_user = assigned_user
+            changes["assigned_user_id"] = [old_value, assigned_user_id]
 
     if changes:
         log_audit(
