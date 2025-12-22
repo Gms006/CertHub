@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { Key } from "lucide-react";
 
 import Modal from "../components/Modal";
 import SectionTabs from "../components/SectionTabs";
@@ -256,7 +257,7 @@ const CertCard = ({
               onClick={onInstall}
               className="inline-flex h-9 w-[120px] items-center justify-center gap-2 rounded-lg bg-slate-900 px-3 text-xs font-semibold text-white hover:bg-slate-800"
             >
-              <KeyRoundIcon className="h-4 w-4" />
+              <Key className="h-4 w-4" />
               Instalar
             </button>
 
