@@ -4,93 +4,132 @@
 certhub/
 ├─ backend/
 │  ├─ app/
+│  │  ├─ __init__.py
 │  │  ├─ api/
+│  │  │  ├─ __init__.py
 │  │  │  └─ v1/
+│  │  │     ├─ __init__.py
 │  │  │     ├─ api.py
-│  │  │     ├─ endpoints/
-│  │  │     │  ├─ certificados.py
-│  │  │     │  ├─ agent.py
-│  │  │     │  ├─ install_jobs.py
-│  │  │     │  ├─ admin.py
-│  │  │     │  └─ auth.py
+│  │  │     └─ endpoints/
+│  │  │        ├─ __init__.py
+│  │  │        ├─ admin.py
+│  │  │        ├─ audit.py
+│  │  │        ├─ auth.py
+│  │  │        ├─ certificados.py
+│  │  │        └─ install_jobs.py
 │  │  ├─ core/
+│  │  │  ├─ __init__.py
+│  │  │  ├─ audit.py
 │  │  │  ├─ config.py
-│  │  │  ├─ security.py
-│  │  │  └─ audit.py
+│  │  │  └─ security.py
 │  │  ├─ db/
+│  │  │  ├─ __init__.py
 │  │  │  ├─ base.py
-│  │  │  ├─ session.py
-│  │  │  └─ migrations_notes.md
+│  │  │  └─ session.py
 │  │  ├─ models/
-│  │  │  ├─ base.py
-│  │  │  ├─ user.py
+│  │  │  ├─ __init__.py
+│  │  │  ├─ audit_log.py
 │  │  │  ├─ auth_token.py
-│  │  │  ├─ user_session.py
-│  │  │  ├─ device.py
-│  │  │  ├─ user_device.py
-│  │  │  ├─ certificate.py
 │  │  │  ├─ cert_install_job.py
-│  │  │  └─ audit_log.py
-│  │  ├─ schemas/
+│  │  │  ├─ certificate.py
+│  │  │  ├─ device.py
 │  │  │  ├─ user.py
+│  │  │  ├─ user_device.py
+│  │  │  └─ user_session.py
+│  │  ├─ schemas/
+│  │  │  ├─ __init__.py
+│  │  │  ├─ audit.py
 │  │  │  ├─ auth.py
+│  │  │  ├─ cert_ingest.py
+│  │  │  ├─ certificate.py
 │  │  │  ├─ device.py
 │  │  │  ├─ install_job.py
-│  │  │  └─ audit.py
+│  │  │  ├─ user.py
+│  │  │  └─ user_device.py
 │  │  ├─ services/
-│  │  │  ├─ certificados_catalogo.py
-│  │  │  ├─ jobs_service.py
-│  │  │  └─ audit_service.py
-│  │  ├─ worker/
-│  │  │  ├─ rq_worker.py
-│  │  │  └─ watchers.py
+│  │  │  ├─ __init__.py
+│  │  │  └─ certificate_ingest.py
 │  │  └─ main.py
 │  ├─ alembic/
 │  │  ├─ env.py
 │  │  ├─ script.py.mako
 │  │  └─ versions/
+│  │     ├─ 0001_create_s1_tables.py
+│  │     ├─ 0002_rbac_auto_approve_jobs.py
+│  │     ├─ 0003_certificate_metadata.py
+│  │     ├─ 0004_certificate_parse_status.py
+│  │     ├─ 0005_user_updated_at.py
+│  │     ├─ 0006_remove_user_emp_perm.py
 │  │     ├─ 0007_auth_tokens_sessions.py
+│  │     └─ 0008_device_assigned_user.py
 │  ├─ tests/
-│  ├─ requirements.txt
+│  │  ├─ __init__.py
+│  │  ├─ conftest.py
+│  │  ├─ helpers.py
+│  │  ├─ test_admin_devices_assignment.py
+│  │  ├─ test_admin_users_update.py
+│  │  ├─ test_certificate_ingest.py
+│  │  └─ test_rbac_jobs.py
 │  ├─ alembic.ini
-│  └─ Dockerfile
+│  └─ requirements.txt
+│
+├─ docs/
+│  └─ api/
+│     └─ openapi.json
 │
 ├─ frontend/
 │  ├─ src/
 │  │  ├─ App.tsx
+│  │  ├─ components/
+│  │  │  ├─ AppShell.tsx
+│  │  │  ├─ Modal.tsx
+│  │  │  ├─ ProtectedRoute.tsx
+│  │  │  ├─ SectionTabs.tsx
+│  │  │  └─ Toast.tsx
+│  │  ├─ context/
+│  │  │  └─ AuthContext.tsx
+│  │  ├─ hooks/
+│  │  │  ├─ useAuth.ts
+│  │  │  └─ useToast.ts
+│  │  ├─ lib/
+│  │  │  ├─ apiClient.ts
+│  │  │  └─ formatters.ts
 │  │  ├─ pages/
+│  │  │  ├─ Audit.tsx
+│  │  │  ├─ Certificates.tsx
+│  │  │  ├─ Devices.tsx
+│  │  │  ├─ Jobs.tsx
 │  │  │  ├─ Login.tsx
 │  │  │  ├─ ResetPassword.tsx
 │  │  │  └─ SetPassword.tsx
-│  │  ├─ hooks/
-│  │  │  └─ useAuth.ts
-│  │  ├─ lib/
-│  │  │  └─ api.ts
+│  │  ├─ index.css
 │  │  └─ main.tsx
 │  ├─ index.html
+│  ├─ package-lock.json
 │  ├─ package.json
+│  ├─ postcss.config.cjs
+│  ├─ README.md
+│  ├─ tailwind.config.cjs
 │  ├─ tsconfig.json
 │  ├─ tsconfig.node.json
-│  ├─ vite.config.ts
-│  └─ README.md
-│
-├─ agent/
-│  ├─ CertHub.Agent/
-│  │  ├─ CertHub.Agent.csproj
-│  │  ├─ Program.cs
-│  │  ├─ Services/
-│  │  │  ├─ ApiClient.cs
-│  │  │  ├─ JobRunner.cs
-│  │  │  └─ CleanupScheduler.cs
-│  │  └─ Storage/
-│  │     └─ ThumbprintStore.cs
-│  └─ README.md
+│  └─ vite.config.ts
 │
 ├─ infra/
 │  └─ docker-compose.yml
 │
+├─ scripts/
+│  └─ http/
+│     ├─ login.admin.json
+│     ├─ login.dev.json
+│     ├─ payload_confirm.json
+│     ├─ payload_init.json
+│     ├─ set_confirm.json
+│     └─ set_init.json
+│
 ├─ .env.example
 ├─ .gitignore
-├─ requirements.txt
-└─ README.md
+├─ ESTRUTURA_REPO.md
+├─ PLANO_DESENVOLVIMENTO.md
+├─ README.md
+└─ requirements.txt
 ```
