@@ -20,7 +20,8 @@ def main() -> None:
     queue = get_queue(redis_conn)
     logger.info("rq_worker_started queue=%s", queue.name)
     worker = SimpleWorker([queue], connection=redis_conn)
-    worker.work(with_scheduler=False, death_penalty_class=TimerDeathPenalty)
+    worker.death_penalty_class = TimerDeathPenalty
+    worker.work(with_scheduler=False)
 
 
 if __name__ == "__main__":
