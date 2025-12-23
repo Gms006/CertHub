@@ -9,7 +9,7 @@ const SectionTabs = () => {
   const tabs = [
     { label: "Certificados", to: "/certificados", allow: true },
     { label: "Jobs", to: "/jobs", allow: true },
-    { label: "Dispositivos", to: "/dispositivos", allow: role !== "VIEW" },
+    { label: "Dispositivos e Usuários", to: "/dispositivos", allow: role !== "VIEW" },
     { label: "Auditoria", to: "/auditoria", allow: role !== "VIEW" },
   ];
 

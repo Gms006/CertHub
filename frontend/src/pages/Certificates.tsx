@@ -27,6 +27,12 @@ type DeviceRead = {
   agent_version?: string | null;
   last_seen_at?: string | null;
   is_allowed?: boolean;
+  assigned_user?: {
+    id: string;
+    ad_username: string;
+    email?: string | null;
+    nome?: string | null;
+  } | null;
 };
 
 type InstallJobRead = {
@@ -380,6 +386,7 @@ const CertificatesPage = () => {
   const [selectedCertificate, setSelectedCertificate] = useState<CertificateRead | null>(null);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
   const pageSize = 9;
+  const isView = user?.role_global === "VIEW";
 
   const loadCertificates = async () => {
     setLoading(true);
@@ -502,6 +509,16 @@ const CertificatesPage = () => {
       { label: "Devices OK", value: `${devices.filter((d) => d.is_allowed).length}`, meta: "autorizados" },
     ];
   }, [certificates, devices, jobs]);
+
+  const availableDevices = useMemo(() => {
+    if (!isView) {
+      return devices;
+    }
+    if (!user?.id) {
+      return [];
+    }
+    return devices.filter((device) => device.assigned_user?.id === user.id);
+  }, [devices, isView, user?.id]);
 
   const handleOpenInstall = (certificateId?: string) => {
     setInstallCertificateId(certificateId ?? null);
@@ -792,7 +809,7 @@ const CertificatesPage = () => {
             onChange={(event) => setSelectedDeviceId(event.target.value)}
           >
             <option value="">Selecione o device</option>
-            {devices.map((device) => (
+            {availableDevices.map((device) => (
               <option key={device.id} value={device.id}>
                 {device.hostname} {device.domain ? `(${device.domain})` : ""}
               </option>
