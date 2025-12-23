@@ -49,6 +49,14 @@ certhub/
 │  │  ├─ services/
 │  │  │  ├─ __init__.py
 │  │  │  └─ certificate_ingest.py
+│  │  ├─ watchers/
+│  │  │  ├─ __init__.py
+│  │  │  └─ pfx_directory.py
+│  │  ├─ workers/
+│  │  │  ├─ __init__.py
+│  │  │  ├─ jobs_certificates.py
+│  │  │  ├─ queue.py
+│  │  │  └─ rq_worker.py
 │  │  └─ main.py
 │  ├─ alembic/
 │  │  ├─ env.py
@@ -69,6 +77,7 @@ certhub/
 │  │  ├─ test_admin_devices_assignment.py
 │  │  ├─ test_admin_users_update.py
 │  │  ├─ test_certificate_ingest.py
+│  │  ├─ test_workers_queue.py
 │  │  └─ test_rbac_jobs.py
 │  ├─ alembic.ini
 │  └─ requirements.txt
