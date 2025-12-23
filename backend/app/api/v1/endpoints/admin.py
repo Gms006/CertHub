@@ -4,16 +4,16 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.core.audit import log_audit
 from app.core.config import settings
 from app.core.security import require_admin_or_dev, require_dev, require_view_or_higher
 from app.db.session import get_db
 from app.core.security import AUTH_TOKEN_PURPOSE_SET_PASSWORD, generate_token, hash_token
-from app.models import AuthToken, Device, User, UserDevice
+from app.models import AuthToken, CertInstallJob, Device, User, UserDevice
 from app.schemas.cert_ingest import CertIngestRequest, CertIngestResponse
 from app.schemas.device import DeviceCreate, DeviceRead, DeviceUpdate
 from app.schemas.user import UserCreate, UserCreateResponse, UserRead, UserUpdate
@@ -183,12 +183,29 @@ def create_device(
 def list_devices(
     db: Session = Depends(get_db), current_user=Depends(require_view_or_higher)
 ) -> list[Device]:
+    last_job_subquery = (
+        select(
+            CertInstallJob.device_id.label("device_id"),
+            func.max(CertInstallJob.created_at).label("last_job_created_at"),
+        )
+        .where(CertInstallJob.org_id == current_user.org_id)
+        .group_by(CertInstallJob.device_id)
+        .subquery()
+    )
     statement = (
-        select(Device)
+        select(Device, last_job_subquery.c.last_job_created_at)
+        .outerjoin(last_job_subquery, last_job_subquery.c.device_id == Device.id)
         .where(Device.org_id == current_user.org_id)
+        .options(selectinload(Device.assigned_user))
         .order_by(Device.created_at)
     )
-    return db.execute(statement).scalars().all()
+    results = db.execute(statement).all()
+    payload: list[DeviceRead] = []
+    for device, last_job_created_at in results:
+        response = DeviceRead.model_validate(device, from_attributes=True)
+        response = response.model_copy(update={"last_seen_at": last_job_created_at})
+        payload.append(response)
+    return payload
 
 
 @router.patch("/devices/{device_id}", response_model=DeviceRead)
