@@ -147,3 +147,4 @@ certhub/
 
 - `infra/docker-compose.yml`: incluir serviço Redis para fila do watcher/worker.
 - `backend/`: novos entrypoints do watcher e do worker RQ, além dos jobs de ingest/delete, serão adicionados dentro do pacote `app/`.
+- `backend/app/workers/jobs_certificates.py`: delete por `source_path` com fallback por `name` e logs de estratégia/rowcount.
