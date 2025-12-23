@@ -9,21 +9,20 @@ Objetivo: substituir o diretório público de `.pfx` por um fluxo controlado via
 > Regra de ouro: o **navegador nunca recebe PFX/senha** — a UI apenas cria/acompanha jobs.
 
 ## Arquitetura (alto nível)
-- **Backend/API**: mantém catálogo (ingest/watcher), cria jobs e entrega payload somente ao Agent
+- **Backend/API**: mantém catálogo (ingest), cria jobs e registra auditoria
 - **Frontend/Portal**: UI SaaS (tema azul escuro) com abas Certificados/Jobs/Dispositivos/Auditoria
-- **Agent Windows**: registra device, faz polling de jobs, instala no store do usuário e remove às 18h
+- **Agent Windows** (planejado): registra device, faz polling de jobs, instala no store do usuário e remove às 18h
 
 ## Estrutura do repo
-- `backend/`: FastAPI + Alembic + Postgres + Redis/RQ + watchers
-- `frontend/`: React (Vite) com layout do protótipo SaaS
-- `agent/`: app Windows (C#) responsável por instalação/limpeza
-- `infra/`: docker-compose (Postgres + Redis)
+- `backend/`: FastAPI + Alembic + Postgres
+- `frontend/`: React (Vite) com layout do protótipo SaaS e integração à API
+- `infra/`: docker-compose (Postgres)
 
 ## Requisitos
 - Python 3.10+
 - Node 18+
-- Docker (recomendado para Postgres/Redis)
-- (Agent) .NET 8 SDK
+- Docker (recomendado para Postgres)
+- (Agent futuro) .NET 8 SDK
 
 > Nota: o backend fixa `passlib[bcrypt]==1.7.4` com `bcrypt==3.2.2` para evitar o erro
 > "password cannot be longer than 72 bytes" introduzido em bcrypt 4+ (o passlib 1.7.4
@@ -31,7 +30,7 @@ Objetivo: substituir o diretório público de `.pfx` por um fluxo controlado via
 
 ## Quickstart (dev)
 
-### 1) Subir Postgres + Redis
+### 1) Subir Postgres
 ```bash
 docker compose -f infra/docker-compose.yml up -d
 ````
@@ -50,14 +49,7 @@ alembic upgrade head
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-### 3) Worker (RQ)
-
-```bash
-cd backend
-python -m app.worker.rq_worker
-```
-
-### 4) Frontend
+### 3) Frontend
 
 ```bash
 cd frontend
@@ -73,6 +65,7 @@ Veja `.env.example`.
 - `OPENSSL_PATH`: binário do OpenSSL (ex.: `openssl` no Linux/macOS ou `C:\\Program Files\\OpenSSL-Win64\\bin\\openssl.exe` no Windows).
 - `JWT_SECRET`, `ACCESS_TOKEN_TTL_MIN`, `REFRESH_TTL_DAYS`: chaves e TTLs para autenticação S2.
 - `ALLOW_LEGACY_HEADERS`: habilita headers `X-User-Id/X-Org-Id` **apenas em dev** para compatibilidade temporária.
+- (Front) `VITE_API_URL`: URL base da API (padrão `/api/v1`).
 
 ## S2 — Auth + RBAC (roteiro PowerShell)
 
@@ -171,7 +164,7 @@ curl -X POST "http://localhost:8000/api/v1/admin/certificates/ingest-from-fs" \
 
 ## Segurança (MVP)
 
-* payload de instalação entregue somente ao Agent (evolui no S6: token one-time + expiração + device binding)
+* payload de instalação entregue somente ao Agent (pendente no repo; evolui no S6: token one-time + expiração + device binding)
 * auditoria: INSTALL_REQUESTED / CLAIM / DONE / FAILED / REMOVED_18H
 * visibilidade de certificados é global por `org_id` (sem carteiras/permissões por certificado)
 
