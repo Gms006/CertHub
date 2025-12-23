@@ -869,6 +869,9 @@ psql "$DATABASE_URL" -c "DELETE FROM users WHERE email IN ('maria@netocontabilid
 
 - Watcher: evento recebido (`created/modified/deleted/moved`), path normalizado, ação enfileirada, `job_id`.
 - Worker: job iniciado/finalizado, sucesso/erro, path alvo, `job_id`.
+- Delete: `job_delete_started`, `job_delete_result` (strategy/rowcount/found_ids_count), `job_delete_finished`.
+- Delete fallback: quando `source_path` não encontra, tenta `name == <stem>` e registra `job_delete_not_found` ou `job_delete_ambiguous`.
+- Queue: `queue_deduped` para jobs ativos e `queue_reenqueue` quando um job finalizado é substituído.
 - Rate limit: eventos descartados ou coalescidos.
 
 **Checklist de aceite (S4.1)**
@@ -930,6 +933,24 @@ psql "$env:DATABASE_URL" -c "select id, source_path from certificates where sour
 # Após deletar o arquivo monitorado:
 # Remove-Item "C:\certs\teste.pfx"
 psql "$env:DATABASE_URL" -c "select id, source_path from certificates where source_path = 'C:\\certs\\teste.pfx';"
+```
+
+> Observação: se o `source_path` no DB estiver divergente (UNC vs drive), o delete faz fallback por `name == teste`.
+
+**Job ID por ação (S4.1)**
+
+- Ingest: `cert_ing__<org_id>__<sha1(path_lower_normalized)>`
+- Delete: `cert_del__<org_id>__<sha1(path_lower_normalized)>`
+
+**Inspeção rápida da fila (S4.1)**
+
+```powershell
+python - <<'PY'
+from app.workers.queue import get_queue, get_redis
+q = get_queue(get_redis())
+print("queued", q.count)
+print("job_ids", q.job_ids)
+PY
 ```
 
 ---

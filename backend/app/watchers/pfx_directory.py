@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import logging
 import os
 import time
@@ -12,7 +13,7 @@ from watchdog.observers import Observer
 
 from app.core.config import settings
 from app.workers.jobs_certificates import delete_certificate_by_path, ingest_pfx_file
-from app.workers.queue import enqueue_unique, get_queue, get_redis, normalize_path, sanitize_job_id
+from app.workers.queue import enqueue_unique, get_queue, get_redis, normalize_path
 
 logger = logging.getLogger(__name__)
 
@@ -107,8 +108,8 @@ class PfxDirectoryHandler(FileSystemEventHandler):
         if self._debounced(path):
             logger.info("watcher_debounced event=%s path=%s", event_name, path)
             return
-        job_id = sanitize_job_id(path)
-        enqueue_unique(
+        job_id = self._build_job_id("ing", path)
+        _, deduped = enqueue_unique(
             self.queue,
             ingest_pfx_file,
             self.config.org_id,
@@ -116,10 +117,11 @@ class PfxDirectoryHandler(FileSystemEventHandler):
             job_id=job_id,
         )
         logger.info(
-            "watcher_enqueue event=%s action=ingest path=%s job_id=%s",
+            "watcher_enqueue event=%s action=ingest path=%s job_id=%s result=%s",
             event_name,
             path,
             job_id,
+            "existing" if deduped else "new",
         )
 
     def _enqueue_delete(self, path: str, event_name: str) -> None:
@@ -129,8 +131,8 @@ class PfxDirectoryHandler(FileSystemEventHandler):
         if self._debounced(path):
             logger.info("watcher_debounced event=%s path=%s", event_name, path)
             return
-        job_id = sanitize_job_id(path)
-        enqueue_unique(
+        job_id = self._build_job_id("del", path)
+        _, deduped = enqueue_unique(
             self.queue,
             delete_certificate_by_path,
             self.config.org_id,
@@ -138,11 +140,18 @@ class PfxDirectoryHandler(FileSystemEventHandler):
             job_id=job_id,
         )
         logger.info(
-            "watcher_enqueue event=%s action=delete path=%s job_id=%s",
+            "watcher_enqueue event=%s action=delete path=%s job_id=%s result=%s",
             event_name,
             path,
             job_id,
+            "existing" if deduped else "new",
         )
+
+    def _build_job_id(self, action: str, path: str) -> str:
+        path_key = normalize_path(path).lower()
+        digest = hashlib.sha1(path_key.encode("utf-8")).hexdigest()
+        action_prefix = "cert_ing" if action == "ing" else "cert_del"
+        return f"{action_prefix}__{self.config.org_id}__{digest}"
 
 
 def _load_config() -> WatcherConfig:
