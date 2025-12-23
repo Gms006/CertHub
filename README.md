@@ -82,7 +82,7 @@ docker compose -f infra/docker-compose.yml up -d
 ```powershell
 # Worker (RQ)
 Set-Location backend
-$env:REDIS_URL="redis://localhost:6379/0"
+$env:REDIS_URL="redis://localhost:6380/0"
 $env:RQ_QUEUE_NAME="certs"
 python -m app.workers.rq_worker
 ```
@@ -94,7 +94,7 @@ $env:ORG_ID="1"
 $env:CERTIFICADOS_ROOT="C:\certs"
 $env:WATCHER_DEBOUNCE_SECONDS="2"
 $env:WATCHER_MAX_EVENTS_PER_MINUTE="60"
-$env:REDIS_URL="redis://localhost:6379/0"
+$env:REDIS_URL="redis://localhost:6380/0"
 $env:RQ_QUEUE_NAME="certs"
 python -m app.watchers.pfx_directory
 ```
