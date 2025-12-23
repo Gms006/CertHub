@@ -13,16 +13,17 @@ Substituir o diretório público de arquivos **.pfx** por um fluxo controlado vi
 
 ---
 
-## Contexto atual (reuso do seu projeto)
+## Contexto atual (estado real do repositório)
 
-Você já tem um pipeline robusto:
+O backend já possui o catálogo e o núcleo de RBAC/Jobs:
 
-- `app/services/certificados_ingest.py`: varre a raiz, extrai metadados (subject/issuer/serial/validade/sha1), deduz senha pelo nome, faz upsert/dedup por serial/sha1 e remove registros ausentes.
-- `app/worker/jobs_certificados.py`: jobs unitários/full/removal, com Redis/RQ.
-- `app/worker/watchers.py`: watcher (sem recursão) com debounce/rate limit, enfileira ingest unitário ou remoção.
-- API: `/api/v1/certificados/ingest` e `/api/v1/certificados` (via `v_certificados_status`).
+- `app/services/certificate_ingest.py`: varre a raiz, extrai metadados (subject/issuer/serial/validade/sha1), deduz senha pelo nome, faz upsert/dedup por serial/sha1 e remove registros ausentes.
+- Endpoint DEV para ingestão de filesystem: `POST /api/v1/admin/certificates/ingest-from-fs` (dry-run, limit, prune, dedupe).
+- Certificados/Jobs/Devices/Usuários já com CRUD mínimo e auditoria.
+- Autenticação email+senha com tokens 1x, lockout e refresh via cookie HttpOnly.
+- **Não há** worker Redis/RQ nem watcher em execução no repo atual.
 
-**O que muda:** você mantém o ingest/watcher como “catálogo” e adiciona um **módulo de distribuição controlada + auditoria + agent**.
+**O que muda:** o catálogo já existe; falta o **módulo de distribuição controlada + agent** e o pipeline real do Agent.
 
 ---
 
@@ -32,7 +33,7 @@ Você já tem um pipeline robusto:
 
 1. **Backend/API (máquina da Maria, inicialmente)**
 
-- Mantém watcher/ingest.
+- Mantém ingest (watcher pendente no repo atual).
 - Cria **Jobs de Instalação**.
 - Entrega “pacotes” de instalação **somente para o Agent**.
 - Armazena RBAC global/flags, devices e auditoria.
@@ -75,6 +76,8 @@ Você já tem um pipeline robusto:
 - Instala no **Cert:\CurrentUser\My** (store do usuário).
 - Registra no backend (sucesso/erro).
 - **Remove às 18h** os certificados que ele instalou como temporários.
+
+> Status no repo: **ainda não implementado** (sem endpoints `/agent/*`).
 
 ### Premissas que orientam o desenho
 
@@ -206,9 +209,9 @@ O Agent **nunca** deve remover certificados que:
 
 ### Portal
 
-- `GET /api/v1/certificados` (já existe)
-- `POST /api/v1/certificados/{id}/install` → cria `cert_install_job` (valida RBAC global + auto-approve + device)
-- `GET /api/v1/install-jobs?mine=true` → status para o usuário
+- `GET /api/v1/certificados` (**implementado**)
+- `POST /api/v1/certificados/{id}/install` (**implementado**) → cria `cert_install_job`
+- `GET /api/v1/install-jobs` (**implementado**, com filtros `mine/my-device`)
 
 ### Agent
 
@@ -218,6 +221,8 @@ O Agent **nunca** deve remover certificados que:
 - `POST /api/v1/agent/jobs/{job_id}/claim` → marca IN\_PROGRESS (one-time)
 - `GET /api/v1/agent/jobs/{job_id}/payload` → entrega pacote (pfx + senha) somente para agent
 - `POST /api/v1/agent/jobs/{job_id}/result` → DONE/FAILED + thumbprint
+
+> Status: **pendente** no backend.
 
 **Pacote de payload (recomendado):**
 
@@ -306,7 +311,7 @@ O Agent **nunca** deve remover certificados que:
 
 - Migração Alembic.
 - Seeds/rotas admin mínimas para cadastrar usuários e devices.
-- Middleware de auditoria (log básico por endpoint).
+- Helper `log_audit` aplicado nos endpoints críticos (registro manual por ação).
 
 **Status**: ✅ **Concluído**
 
@@ -315,10 +320,12 @@ O Agent **nunca** deve remover certificados que:
 - [x] Migrações aplicadas (`alembic upgrade head` OK).
 - [x] Ingest-from-fs funcionando: **323 total / 320 updated / 3 failed (esperados)**.
 - [x] `audit_log` registrando: `CERT_INGEST_FROM_FS`, `INSTALL_REQUESTED`, `INSTALL_APPROVED`.
+- [x] Endpoint `/api/v1/audit` disponível para consulta (filtros por ação/ator).
 - [x] Smoke tests de install job:
   - VIEW com `auto_approve_install_jobs=false` → `REQUESTED`.
   - VIEW com `auto_approve_install_jobs=true` → `PENDING` + `approved_at`.
   - ADMIN/DEV → `PENDING` + `approved_at`.
+- [x] Endpoints admin: criação/edição de usuários, devices e vínculo user-device.
 
 **Checklist de validação S1 (reproduzível)**
 
@@ -409,7 +416,7 @@ Não há auto-cadastro. Admin cria usuários no banco (is_active=true) e distrib
 **Entregáveis (Backend)**
 
 - Migração Alembic: adicionar colunas a `users` + tabelas `auth_tokens` + `user_sessions`.
-- Endpoints de Auth (a criar em S2: `backend/app/api/v1/endpoints/auth.py`):
+- Endpoints de Auth (implementados em `backend/app/api/v1/endpoints/auth.py`):
   - `POST /api/v1/auth/password/set/init` (envia link 1x, TTL 10 min)
   - `POST /api/v1/auth/password/set/confirm` (recebe token + new_password, valida hash do token no DB)
   - `POST /api/v1/auth/login` (valida email + password, checa lockout, gera JWT + refresh)
@@ -497,8 +504,8 @@ Não há auto-cadastro. Admin cria usuários no banco (is_active=true) e distrib
 
 - Tela de login: email + senha (com loader de submissão).
 - Tela de "Primeira vez": modal para definir senha (a partir do link enviado por admin).
-- Layout base (Shell + Tabs + KPI strip) com dados mock.
-- Hooks: `useAuth()`, `useCertificados()`, `useDevices()`, `useJobs()`, `useAudit()`.
+- Layout base (Shell + Tabs + KPI strip) consumindo dados reais via API.
+- Hooks: `useAuth()` (com `apiFetch` integrado à API real).
 
 **Variáveis de ambiente (S2)**
 
@@ -810,9 +817,16 @@ psql "$DATABASE_URL" -c "DELETE FROM users WHERE email IN ('maria@netocontabilid
    - Carrega `GET /install-jobs?mine=true` e exibe tabela com status.
   - Polling leve (ex.: 5–10s) só enquanto existir `PENDING/IN_PROGRESS`.
 
+**Status**: ✅ **Concluído**
+
+**Evidências (S3)**
+
+- API: `POST /certificados/{id}/install`, `GET /install-jobs`, `POST /install-jobs/{id}/approve|deny`.
+- Front: modal “Instalar” cria job, aba Jobs lista/atualiza e permite aprovar/negar (ADMIN/DEV).
+
 **Aceite**
 
-- Criar job pelo modal e ver status PENDING na aba Jobs.
+- Criar job pelo modal e ver status PENDING/REQUESTED na aba Jobs.
 
 ---
 
