@@ -830,6 +830,110 @@ psql "$DATABASE_URL" -c "DELETE FROM users WHERE email IN ('maria@netocontabilid
 
 ---
 
+## S4.1 — Watcher (PFX directory)
+
+**Objetivo**: operacionalizar o watcher event-driven do diretório de `.pfx` com **o mesmo comportamento do watcher legado**.
+
+**Comportamento obrigatório (paridade com o legado)**
+
+- `watchdog` observer.
+- **Debounce + rate limit** para evitar ingest duplicado.
+- Monitorar **apenas a raiz** do diretório (ignorar subpastas).
+- `created`/`modified` ⇒ enqueue **ingest por arquivo**.
+- `deleted` ⇒ enqueue **delete por caminho**.
+- `moved`:
+  - Se **saiu da raiz**: enqueue delete.
+  - Se **entrou na raiz**: enqueue ingest.
+- **Dedup** por `job_id` determinístico baseado no path normalizado:
+  - `job_id = sha1(path_lowercase_normalized)`.
+- **RQ/Redis** para fila e worker compatível com Windows (`SimpleWorker` + `TimerDeathPenalty`).
+
+**Entregáveis**
+
+1. Redis no `docker-compose` (se ainda não existir).
+2. Worker RQ (entrypoint).
+3. Watcher (entrypoint).
+4. Jobs: ingest por arquivo e delete por caminho.
+5. Logs e variáveis de ambiente documentadas.
+
+**Variáveis de ambiente (S4.1)**
+
+- `ORG_ID`: org padrão para os jobs do watcher.
+- `CERTIFICADOS_ROOT`: raiz a monitorar (apenas arquivos diretos).
+- `WATCHER_DEBOUNCE_SECONDS`: janela de debounce (segundos).
+- `WATCHER_MAX_EVENTS_PER_MINUTE`: limite de eventos por minuto.
+- `REDIS_URL`: URL do Redis.
+- `RQ_QUEUE_NAME`: nome da fila usada pelo watcher/worker.
+
+**Logs (S4.1)**
+
+- Watcher: evento recebido (`created/modified/deleted/moved`), path normalizado, ação enfileirada, `job_id`.
+- Worker: job iniciado/finalizado, sucesso/erro, path alvo, `job_id`.
+- Rate limit: eventos descartados ou coalescidos.
+
+**Checklist de aceite (S4.1)**
+
+- [ ] Redis disponível via `docker-compose`.
+- [ ] Watcher ignora subpastas e enfileira apenas eventos na raiz.
+- [ ] Debounce + rate limit impedem duplicidade de ingest.
+- [ ] `created/modified/deleted/moved` produzem o job correto.
+- [ ] Dedup por `job_id` determinístico (SHA1 do path lower-case).
+- [ ] Worker RQ processa ingest/delete com compatibilidade Windows.
+- [ ] Logs e variáveis de ambiente documentados.
+
+**Rollback (S4.1)**
+
+1. Parar watcher e worker.
+2. Remover o serviço Redis do `docker-compose` (se não utilizado).
+3. Reverter commits relacionados ao S4.1.
+
+**Critérios de aceite do S4.1**
+
+- Watcher reproduz o comportamento legado para create/modify/delete/move.
+- Jobs são deduplicados por `job_id` determinístico.
+- Worker RQ processa ingest/delete sem depender de Linux-specific features.
+- Logs deixam claro o fluxo evento → job → resultado.
+
+**Como validar**
+
+> Os comandos abaixo são **PowerShell** e assumem que o backend já está com dependências instaladas.
+
+1) Subir a infra (Postgres + Redis):
+```powershell
+docker compose -f infra/docker-compose.yml up -d
+```
+
+2) Rodar o worker (em um terminal):
+```powershell
+Set-Location backend
+python -m app.workers.rq_worker
+```
+
+3) Rodar o watcher (em outro terminal):
+```powershell
+Set-Location backend
+$env:ORG_ID="1"
+$env:CERTIFICADOS_ROOT="C:\certs"
+$env:WATCHER_DEBOUNCE_SECONDS="2"
+$env:WATCHER_MAX_EVENTS_PER_MINUTE="60"
+$env:REDIS_URL="redis://localhost:6379/0"
+$env:RQ_QUEUE_NAME="certs"
+python -m app.watchers.pfx_directory
+```
+
+4) Verificar ingest e delete no DB (psql):
+```powershell
+# Após copiar um .pfx válido para a raiz monitorada:
+# Copy-Item "C:\origem\teste.pfx" "C:\certs\teste.pfx"
+psql "$env:DATABASE_URL" -c "select id, source_path from certificates where source_path = 'C:\\certs\\teste.pfx';"
+
+# Após deletar o arquivo monitorado:
+# Remove-Item "C:\certs\teste.pfx"
+psql "$env:DATABASE_URL" -c "select id, source_path from certificates where source_path = 'C:\\certs\\teste.pfx';"
+```
+
+---
+
 ## S4 — Agent MVP (registro + polling + import)
 
 
