@@ -133,3 +133,8 @@ certhub/
 ├─ README.md
 └─ requirements.txt
 ```
+
+## S4.1 (planejado)
+
+- `infra/docker-compose.yml`: incluir serviço Redis para fila do watcher/worker.
+- `backend/`: novos entrypoints do watcher e do worker RQ, além dos jobs de ingest/delete, serão adicionados dentro do pacote `app/`.

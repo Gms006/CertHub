@@ -66,6 +66,38 @@ Veja `.env.example`.
 - `JWT_SECRET`, `ACCESS_TOKEN_TTL_MIN`, `REFRESH_TTL_DAYS`: chaves e TTLs para autenticação S2.
 - `ALLOW_LEGACY_HEADERS`: habilita headers `X-User-Id/X-Org-Id` **apenas em dev** para compatibilidade temporária.
 - (Front) `VITE_API_URL`: URL base da API (padrão `/api/v1`).
+- (Watcher S4.1) `ORG_ID`, `CERTIFICADOS_ROOT`, `WATCHER_DEBOUNCE_SECONDS`, `WATCHER_MAX_EVENTS_PER_MINUTE`, `REDIS_URL`, `RQ_QUEUE_NAME`.
+
+## Watcher (S4.1)
+
+> Planejado para rodar em paralelo ao backend, com Redis + RQ.
+
+**Rodar em dev (PowerShell, terminais separados):**
+
+```powershell
+# Infra (Postgres + Redis)
+docker compose -f infra/docker-compose.yml up -d
+```
+
+```powershell
+# Worker (RQ)
+Set-Location backend
+$env:REDIS_URL="redis://localhost:6379/0"
+$env:RQ_QUEUE_NAME="certs"
+python -m app.workers.rq_worker
+```
+
+```powershell
+# Watcher
+Set-Location backend
+$env:ORG_ID="1"
+$env:CERTIFICADOS_ROOT="C:\certs"
+$env:WATCHER_DEBOUNCE_SECONDS="2"
+$env:WATCHER_MAX_EVENTS_PER_MINUTE="60"
+$env:REDIS_URL="redis://localhost:6379/0"
+$env:RQ_QUEUE_NAME="certs"
+python -m app.watchers.pfx_directory
+```
 
 ## S2 — Auth + RBAC (roteiro PowerShell)
 
