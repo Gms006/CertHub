@@ -869,6 +869,8 @@ psql "$DATABASE_URL" -c "DELETE FROM users WHERE email IN ('maria@netocontabilid
 
 - Watcher: evento recebido (`created/modified/deleted/moved`), path normalizado, ação enfileirada, `job_id`.
 - Worker: job iniciado/finalizado, sucesso/erro, path alvo, `job_id`.
+- Delete: `job_delete_started`, `job_delete_result` (strategy/rowcount/found_ids_count), `job_delete_finished`.
+- Delete fallback: quando `source_path` não encontra, tenta `name == <stem>` e registra `job_delete_not_found` ou `job_delete_ambiguous`.
 - Rate limit: eventos descartados ou coalescidos.
 
 **Checklist de aceite (S4.1)**
@@ -931,6 +933,8 @@ psql "$env:DATABASE_URL" -c "select id, source_path from certificates where sour
 # Remove-Item "C:\certs\teste.pfx"
 psql "$env:DATABASE_URL" -c "select id, source_path from certificates where source_path = 'C:\\certs\\teste.pfx';"
 ```
+
+> Observação: se o `source_path` no DB estiver divergente, o delete faz fallback por `name == teste`.
 
 ---
 

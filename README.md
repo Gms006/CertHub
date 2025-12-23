@@ -99,6 +99,22 @@ $env:RQ_QUEUE_NAME="certs"
 python -m app.watchers.pfx_directory
 ```
 
+**Notas de delete (S4.1)**
+
+- O worker tenta apagar primeiro por `source_path` normalizado.
+- Se não encontrar, faz fallback por `name == <stem do arquivo>`.
+- Logs do job mostram `strategy`, `rowcount` e `found_ids_count`.
+
+**Validação rápida (S4.1, PowerShell)**
+
+```powershell
+# Após copiar um .pfx válido para a raiz monitorada:
+psql "$env:DATABASE_URL" -c "select id, source_path from certificates where source_path = 'C:\\certs\\teste.pfx';"
+
+# Após deletar o arquivo monitorado:
+psql "$env:DATABASE_URL" -c "select id from certificates where source_path = 'C:\\certs\\teste.pfx';"
+```
+
 **Rollback (S4.1)**
 
 1. Parar watcher e worker.
