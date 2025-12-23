@@ -31,6 +31,13 @@ class InstallJobRead(BaseModel):
     requested_by_user_id: uuid.UUID
     approved_by_user_id: uuid.UUID | None
     approved_at: datetime | None
+    claimed_by_device_id: uuid.UUID | None
+    claimed_at: datetime | None
+    started_at: datetime | None
+    finished_at: datetime | None
+    error_code: str | None
+    error_message: str | None
+    thumbprint: str | None
     status: JobStatus
     created_at: datetime
     updated_at: datetime

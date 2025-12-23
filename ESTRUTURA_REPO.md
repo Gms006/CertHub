@@ -12,6 +12,7 @@ certhub/
 │  │  │     ├─ api.py
 │  │  │     └─ endpoints/
 │  │  │        ├─ __init__.py
+│  │  │        ├─ agent.py
 │  │  │        ├─ admin.py
 │  │  │        ├─ audit.py
 │  │  │        ├─ auth.py
@@ -38,6 +39,7 @@ certhub/
 │  │  │  └─ user_session.py
 │  │  ├─ schemas/
 │  │  │  ├─ __init__.py
+│  │  │  ├─ agent.py
 │  │  │  ├─ audit.py
 │  │  │  ├─ auth.py
 │  │  │  ├─ cert_ingest.py

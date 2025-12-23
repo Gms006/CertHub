@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     openssl_path: Path = Field(Path("openssl"), alias="OPENSSL_PATH")
     jwt_secret: str = Field(..., alias="JWT_SECRET")
     access_token_ttl_min: int = Field(30, alias="ACCESS_TOKEN_TTL_MIN")
+    device_token_ttl_min: int = Field(10, alias="DEVICE_TOKEN_TTL_MIN")
     refresh_ttl_days: int = Field(14, alias="REFRESH_TTL_DAYS")
     set_password_token_ttl_min: int = Field(10, alias="SET_PASSWORD_TOKEN_TTL_MIN")
     reset_password_token_ttl_min: int = Field(30, alias="RESET_PASSWORD_TOKEN_TTL_MIN")
