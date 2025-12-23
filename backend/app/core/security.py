@@ -14,9 +14,10 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.db.session import get_db
-from app.models import User
+from app.models import Device, User
 
 ALLOWED_ROLES = {"DEV", "ADMIN", "VIEW"}
+DEVICE_ROLE = "DEVICE"
 AUTH_TOKEN_PURPOSE_SET_PASSWORD = "SET_PASSWORD"
 AUTH_TOKEN_PURPOSE_RESET_PASSWORD = "RESET_PASSWORD"
 BCRYPT_MAX_PASSWORD_BYTES = 72
@@ -68,6 +69,18 @@ def create_access_token(user: User) -> str:
     return jwt.encode(payload, settings.jwt_secret, algorithm="HS256")
 
 
+def create_device_access_token(device: Device) -> str:
+    now = datetime.now(timezone.utc)
+    exp = now + timedelta(minutes=settings.device_token_ttl_min)
+    payload = {
+        "sub": str(device.id),
+        "role": DEVICE_ROLE,
+        "iat": int(now.timestamp()),
+        "exp": int(exp.timestamp()),
+    }
+    return jwt.encode(payload, settings.jwt_secret, algorithm="HS256")
+
+
 def decode_access_token(token: str) -> dict:
     try:
         return jwt.decode(token, settings.jwt_secret, algorithms=["HS256"])
@@ -75,6 +88,13 @@ def decode_access_token(token: str) -> dict:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="token expired") from exc
     except jwt.InvalidTokenError as exc:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid token") from exc
+
+
+def decode_device_token(token: str) -> dict:
+    payload = decode_access_token(token)
+    if payload.get("role") != DEVICE_ROLE:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid device token")
+    return payload
 
 
 def _get_bearer_token(authorization: str | None) -> str | None:
@@ -136,3 +156,25 @@ async def require_admin_or_dev(current_user: User = Depends(get_current_user)) -
 async def require_dev(current_user: User = Depends(get_current_user)) -> User:
     _ensure_role(current_user, {"DEV"})
     return current_user
+
+
+async def require_device(
+    request: Request,
+    db: Session = Depends(get_db),
+    credentials: HTTPAuthorizationCredentials | None = Security(http_bearer),
+) -> Device:
+    token = credentials.credentials if credentials else _get_bearer_token(
+        request.headers.get("Authorization") if request else None
+    )
+    if not token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="missing token")
+    payload = decode_device_token(token)
+    device_id = payload.get("sub")
+    if not device_id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid token")
+    device = db.get(Device, uuid.UUID(device_id))
+    if device is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid device")
+    if not device.is_allowed:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="device blocked")
+    return device

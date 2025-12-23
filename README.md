@@ -64,6 +64,7 @@ Veja `.env.example`.
 - `CERTS_ROOT_PATH`: caminho do diretório raiz com os `.pfx/.p12` (somente os arquivos diretos, subpastas são ignoradas).
 - `OPENSSL_PATH`: binário do OpenSSL (ex.: `openssl` no Linux/macOS ou `C:\\Program Files\\OpenSSL-Win64\\bin\\openssl.exe` no Windows).
 - `JWT_SECRET`, `ACCESS_TOKEN_TTL_MIN`, `REFRESH_TTL_DAYS`: chaves e TTLs para autenticação S2.
+- `DEVICE_TOKEN_TTL_MIN`: TTL do JWT do device (agent).
 - `ALLOW_LEGACY_HEADERS`: habilita headers `X-User-Id/X-Org-Id` **apenas em dev** para compatibilidade temporária.
 - (Front) `VITE_API_URL`: URL base da API (padrão `/api/v1`).
 - (Watcher S4.1) `ORG_ID`, `CERTIFICADOS_ROOT`, `WATCHER_DEBOUNCE_SECONDS`, `WATCHER_MAX_EVENTS_PER_MINUTE`, `REDIS_URL`, `RQ_QUEUE_NAME`.
@@ -143,6 +144,82 @@ psql "$env:DATABASE_URL" -c "select id from certificates where source_path = 'C:
 1. Parar watcher e worker.
 2. Remover o serviço Redis do `infra/docker-compose.yml` (se não utilizado).
 3. Reverter commits relacionados ao S4.1.
+
+## S4 — Agent MVP (backend)
+
+### Provisionar device/token (ADMIN/DEV)
+
+```powershell
+$device = Invoke-RestMethod -Method Post "http://localhost:8000/api/v1/admin/devices" `
+  -Headers @{ Authorization = "Bearer <JWT_ADMIN>" } `
+  -ContentType "application/json" `
+  -Body '{"hostname":"PC-01","domain":"NETOCMS","os_version":"Windows 11","agent_version":"1.0.0"}'
+
+# Guarde o token: ele só aparece nesta resposta.
+$device.device_token
+$device.id
+```
+
+### Rotacionar token do device (ADMIN/DEV)
+
+```powershell
+$rotated = Invoke-RestMethod -Method Post "http://localhost:8000/api/v1/admin/devices/$($device.id)/rotate-token" `
+  -Headers @{ Authorization = "Bearer <JWT_ADMIN>" }
+
+$rotated.device_token
+```
+
+### Auth do agent
+
+```powershell
+$auth = Invoke-RestMethod -Method Post "http://localhost:8000/api/v1/agent/auth" `
+  -ContentType "application/json" `
+  -Body (@{ device_id = $device.id; device_token = $device.device_token } | ConvertTo-Json)
+
+$agentJwt = $auth.access_token
+```
+
+### Heartbeat
+
+```powershell
+Invoke-RestMethod -Method Post "http://localhost:8000/api/v1/agent/heartbeat" `
+  -Headers @{ Authorization = "Bearer $agentJwt" } `
+  -ContentType "application/json" `
+  -Body '{"agent_version":"1.0.0"}'
+```
+
+### Fluxo de jobs (agent)
+
+```powershell
+# Listar jobs PENDING/IN_PROGRESS do device
+Invoke-RestMethod "http://localhost:8000/api/v1/agent/jobs" `
+  -Headers @{ Authorization = "Bearer $agentJwt" }
+
+# Claim do job (PENDING -> IN_PROGRESS)
+Invoke-RestMethod -Method Post "http://localhost:8000/api/v1/agent/jobs/<JOB_ID>/claim" `
+  -Headers @{ Authorization = "Bearer $agentJwt" }
+
+# Payload (pfx_base64 + password)
+Invoke-RestMethod "http://localhost:8000/api/v1/agent/jobs/<JOB_ID>/payload" `
+  -Headers @{ Authorization = "Bearer $agentJwt" }
+
+# Resultado (IN_PROGRESS -> DONE/FAILED)
+Invoke-RestMethod -Method Post "http://localhost:8000/api/v1/agent/jobs/<JOB_ID>/result" `
+  -Headers @{ Authorization = "Bearer $agentJwt" } `
+  -ContentType "application/json" `
+  -Body '{"status":"DONE","thumbprint":"<TP>"}'
+```
+
+> Nota: o payload usa `certificate.source_path` e a senha é inferida do nome do arquivo (`senha` no filename).
+> Se não houver senha no nome, o endpoint retorna 422 e o agent deve reportar erro.
+
+### Rollback (S4)
+
+1. Reverter a migration:
+   ```bash
+   cd backend && alembic downgrade -1
+   ```
+2. Reverter o commit do S4.
 
 ## S2 — Auth + RBAC (roteiro PowerShell)
 

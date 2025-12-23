@@ -12,6 +12,7 @@ class DeviceBase(BaseModel):
     os_version: str | None = None
     agent_version: str | None = None
     last_seen_at: datetime | None = None
+    last_heartbeat_at: datetime | None = None
     is_allowed: bool = True
     assigned_user_id: uuid.UUID | None = None
 
@@ -32,3 +33,13 @@ class DeviceRead(DeviceBase):
     assigned_user: UserRead | None = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class DeviceCreateResponse(DeviceRead):
+    device_token: str
+
+
+class DeviceTokenRotateResponse(BaseModel):
+    device_id: uuid.UUID
+    device_token: str
+    token_created_at: datetime

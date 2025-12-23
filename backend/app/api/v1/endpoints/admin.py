@@ -15,7 +15,13 @@ from app.db.session import get_db
 from app.core.security import AUTH_TOKEN_PURPOSE_SET_PASSWORD, generate_token, hash_token
 from app.models import AuthToken, CertInstallJob, Device, User, UserDevice
 from app.schemas.cert_ingest import CertIngestRequest, CertIngestResponse
-from app.schemas.device import DeviceCreate, DeviceRead, DeviceUpdate
+from app.schemas.device import (
+    DeviceCreate,
+    DeviceCreateResponse,
+    DeviceRead,
+    DeviceTokenRotateResponse,
+    DeviceUpdate,
+)
 from app.schemas.user import UserCreate, UserCreateResponse, UserRead, UserUpdate
 from app.schemas.user_device import UserDeviceCreate, UserDeviceRead, UserDeviceReadWithUser
 from app.services.certificate_ingest import ingest_certificates_from_fs
@@ -148,35 +154,99 @@ def update_user(
     return user
 
 
-@router.post("/devices", response_model=DeviceRead, status_code=status.HTTP_201_CREATED)
+@router.post("/devices", response_model=DeviceCreateResponse, status_code=status.HTTP_201_CREATED)
 def create_device(
     device_in: DeviceCreate,
     db: Session = Depends(get_db),
     current_user=Depends(require_admin_or_dev),
-) -> Device:
+) -> DeviceCreateResponse:
     org_id = current_user.org_id
     payload = device_in.model_dump()
     assigned_user_id = payload.pop("assigned_user_id", None)
     assigned_user = resolve_assigned_user(db, org_id, assigned_user_id)
-    device = Device(org_id=org_id, **payload)
-    device.assigned_user = assigned_user
-    db.add(device)
-    log_audit(
-        db=db,
-        org_id=org_id,
-        action="DEVICE_CREATED",
-        entity_type="device",
-        entity_id=device.id,
-        actor_user_id=current_user.id,
-        meta={"hostname": device.hostname},
-    )
+    device_token = generate_token()
+    token_created_at = datetime.now(timezone.utc)
     try:
+        device = Device(org_id=org_id, **payload)
+        device.assigned_user = assigned_user
+        device.device_token_hash = hash_token(device_token)
+        device.token_created_at = token_created_at
+        db.add(device)
+        db.flush()
+        db.refresh(device)
+        log_audit(
+            db=db,
+            org_id=org_id,
+            action="DEVICE_CREATED",
+            entity_type="device",
+            entity_id=device.id,
+            actor_user_id=current_user.id,
+            meta={"hostname": device.hostname},
+        )
+        response = DeviceCreateResponse(
+            id=device.id,
+            org_id=device.org_id,
+            hostname=device.hostname,
+            domain=device.domain,
+            os_version=device.os_version,
+            agent_version=device.agent_version,
+            last_seen_at=device.last_seen_at,
+            last_heartbeat_at=device.last_heartbeat_at,
+            is_allowed=device.is_allowed,
+            assigned_user_id=device.assigned_user_id,
+            created_at=device.created_at,
+            assigned_user=UserRead.model_validate(assigned_user, from_attributes=True)
+            if assigned_user
+            else None,
+            device_token=device_token,
+        )
         db.commit()
     except IntegrityError as exc:
         db.rollback()
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc.orig))
-    db.refresh(device)
-    return device
+    except Exception:
+        db.rollback()
+        raise
+    return response
+
+
+@router.post("/devices/{device_id}/rotate-token", response_model=DeviceTokenRotateResponse)
+def rotate_device_token(
+    device_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_admin_or_dev),
+) -> DeviceTokenRotateResponse:
+    device = db.get(Device, device_id)
+    if device is None or device.org_id != current_user.org_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="device not found")
+    device_token = generate_token()
+    token_created_at = datetime.now(timezone.utc)
+    try:
+        device.device_token_hash = hash_token(device_token)
+        device.token_created_at = token_created_at
+        db.add(device)
+        db.flush()
+        log_audit(
+            db=db,
+            org_id=current_user.org_id,
+            action="DEVICE_TOKEN_ROTATED",
+            entity_type="device",
+            entity_id=device.id,
+            actor_user_id=current_user.id,
+            meta={"device_id": str(device.id)},
+        )
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc.orig))
+    except Exception:
+        db.rollback()
+        raise
+    return DeviceTokenRotateResponse(
+        device_id=device.id,
+        device_token=device_token,
+        token_created_at=token_created_at,
+    )
 
 
 @router.get("/devices", response_model=list[DeviceRead])
