@@ -18,6 +18,11 @@ passlib[bcrypt]==1.7.4
 bcrypt==3.2.2
 PyJWT==2.10.1
 
+# Watcher / fila
+watchdog==5.0.3
+rq==1.16.2
+redis==5.2.1
+
 # --- Dev/Test ---
 pytest==8.3.4
 pytest-asyncio==0.24.0
