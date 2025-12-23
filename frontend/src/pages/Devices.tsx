@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 import Modal from "../components/Modal";
 import SectionTabs from "../components/SectionTabs";
@@ -14,22 +14,17 @@ type DeviceRead = {
   agent_version?: string | null;
   last_seen_at?: string | null;
   is_allowed: boolean;
-};
-
-type UserDeviceReadWithUser = {
-  device_id: string;
-  user: {
+  assigned_user?: {
     ad_username: string;
     email?: string | null;
     nome?: string | null;
-  };
+  } | null;
 };
 
 const DevicesPage = () => {
   const { apiFetch, user } = useAuth();
   const { toast, notify } = useToast();
   const [devices, setDevices] = useState<DeviceRead[]>([]);
-  const [links, setLinks] = useState<UserDeviceReadWithUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDevice, setSelectedDevice] = useState<DeviceRead | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -53,34 +48,23 @@ const DevicesPage = () => {
     }
   };
 
-  const loadLinks = async () => {
-    try {
-      const response = await apiFetch("/admin/user-devices");
-      if (!response.ok) {
-        return;
-      }
-      const data = (await response.json()) as UserDeviceReadWithUser[];
-      setLinks(data);
-    } catch {
-      // silencioso
-    }
-  };
-
   useEffect(() => {
     if (isAdmin) {
       loadDevices();
-      loadLinks();
     }
   }, [isAdmin]);
 
-  const deviceUserMap = useMemo(() => {
-    const map = new Map<string, string>();
-    links.forEach((link) => {
-      const label = link.user.nome || link.user.ad_username || link.user.email || "-";
-      map.set(link.device_id, label);
-    });
-    return map;
-  }, [links]);
+  const formatUserLabel = (device: DeviceRead | null) => {
+    if (!device?.assigned_user) {
+      return "Não vinculado";
+    }
+    return (
+      device.assigned_user.nome ||
+      device.assigned_user.ad_username ||
+      device.assigned_user.email ||
+      "-"
+    );
+  };
 
   const handleToggle = async (deviceId: string, nextAllowed: boolean) => {
     try {
@@ -106,7 +90,9 @@ const DevicesPage = () => {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Dispositivos</h1>
+          <h1 className="text-2xl font-semibold text-slate-900">
+            Dispositivos e Usuários
+          </h1>
           <p className="text-sm text-slate-500">
             Acesso restrito para administradores e desenvolvedores.
           </p>
@@ -122,7 +108,9 @@ const DevicesPage = () => {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-slate-900">Dispositivos</h1>
+        <h1 className="text-2xl font-semibold text-slate-900">
+          Dispositivos e Usuários
+        </h1>
         <p className="text-sm text-slate-500">
           Gerencie autorizações do Agent e acompanhe status dos hosts.
         </p>
@@ -149,7 +137,7 @@ const DevicesPage = () => {
                     {device.hostname}
                   </p>
                   <p className="text-xs text-slate-400">
-                    Usuário: {deviceUserMap.get(device.id) ?? "Não vinculado"}
+                    Usuário: {formatUserLabel(device)}
                   </p>
                 </div>
                 <span
@@ -219,7 +207,7 @@ const DevicesPage = () => {
                 {selectedDevice.hostname}
               </p>
               <p className="mt-1 text-xs text-slate-500">
-                Usuário: {deviceUserMap.get(selectedDevice.id) ?? "Não vinculado"}
+                Usuário: {formatUserLabel(selectedDevice)}
               </p>
             </div>
             <div className="grid gap-3 md:grid-cols-2">
