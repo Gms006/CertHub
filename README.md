@@ -160,6 +160,15 @@ $device.device_token
 $device.id
 ```
 
+### Rotacionar token do device (ADMIN/DEV)
+
+```powershell
+$rotated = Invoke-RestMethod -Method Post "http://localhost:8000/api/v1/admin/devices/$($device.id)/rotate-token" `
+  -Headers @{ Authorization = "Bearer <JWT_ADMIN>" }
+
+$rotated.device_token
+```
+
 ### Auth do agent
 
 ```powershell

@@ -37,3 +37,9 @@ class DeviceRead(DeviceBase):
 
 class DeviceCreateResponse(DeviceRead):
     device_token: str
+
+
+class DeviceTokenRotateResponse(BaseModel):
+    device_id: uuid.UUID
+    device_token: str
+    token_created_at: datetime
