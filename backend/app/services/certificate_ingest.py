@@ -47,6 +47,10 @@ def _guess_password(path: Path) -> str | None:
     return None
 
 
+def guess_password_from_path(path: Path) -> str | None:
+    return _guess_password(path)
+
+
 def _parse_datetime(raw_value: str) -> datetime:
     normalized = re.sub(r"\s+", " ", raw_value.strip())
     return datetime.strptime(normalized, DATE_FORMAT).replace(tzinfo=timezone.utc)

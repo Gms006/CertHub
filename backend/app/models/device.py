@@ -28,7 +28,10 @@ class Device(Base):
     domain: Mapped[str | None] = mapped_column(String, nullable=True)
     os_version: Mapped[str | None] = mapped_column(String, nullable=True)
     agent_version: Mapped[str | None] = mapped_column(String, nullable=True)
+    device_token_hash: Mapped[str | None] = mapped_column(String, nullable=True)
+    token_created_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     is_allowed: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

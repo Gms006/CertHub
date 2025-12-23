@@ -834,6 +834,8 @@ psql "$DATABASE_URL" -c "DELETE FROM users WHERE email IN ('maria@netocontabilid
 
 **Objetivo**: operacionalizar o watcher event-driven do diretório de `.pfx` com **o mesmo comportamento do watcher legado**.
 
+**Status**: ✅ **Concluído**
+
 **Comportamento obrigatório (paridade com o legado)**
 
 - `watchdog` observer.
@@ -968,9 +970,69 @@ PY
 - Import no CurrentUser e report DONE.
 - Local store de thumbprints instalados (DPAPI).
 
+**Backend (API do agent)**
+
+- `POST /api/v1/agent/auth` → device token → JWT role=DEVICE.
+- `POST /api/v1/agent/heartbeat` → atualiza `last_seen_at`/`last_heartbeat_at`.
+- `GET /api/v1/agent/jobs` → jobs PENDING/IN_PROGRESS do device.
+- `POST /api/v1/agent/jobs/{job_id}/claim` → PENDING → IN_PROGRESS.
+- `GET /api/v1/agent/jobs/{job_id}/payload` → retorna `pfx_base64` + `password`.
+- `POST /api/v1/agent/jobs/{job_id}/result` → IN_PROGRESS → DONE/FAILED.
+
+**Observação de senha**: o payload usa `certificate.source_path` e a senha é inferida do nome do arquivo (padrão `senha`).
+Se não houver senha, a API retorna erro explícito.
+
 **Aceite**
 
 - Portal cria job → agent instala → status vira DONE.
+
+**Como validar (PowerShell)**
+
+1) Provisionar device/token:
+```powershell
+$device = Invoke-RestMethod -Method Post "http://localhost:8000/api/v1/admin/devices" `
+  -Headers @{ Authorization = "Bearer <JWT_ADMIN>" } `
+  -ContentType "application/json" `
+  -Body '{"hostname":"PC-01","domain":"NETOCMS","os_version":"Windows 11","agent_version":"1.0.0"}'
+$device.device_token
+$device.id
+```
+
+2) Autenticar agent:
+```powershell
+$auth = Invoke-RestMethod -Method Post "http://localhost:8000/api/v1/agent/auth" `
+  -ContentType "application/json" `
+  -Body (@{ device_id = $device.id; device_token = $device.device_token } | ConvertTo-Json)
+$agentJwt = $auth.access_token
+```
+
+3) Heartbeat:
+```powershell
+Invoke-RestMethod -Method Post "http://localhost:8000/api/v1/agent/heartbeat" `
+  -Headers @{ Authorization = "Bearer $agentJwt" } `
+  -ContentType "application/json" `
+  -Body '{"agent_version":"1.0.0"}'
+```
+
+4) Jobs:
+```powershell
+Invoke-RestMethod "http://localhost:8000/api/v1/agent/jobs" `
+  -Headers @{ Authorization = "Bearer $agentJwt" }
+```
+
+5) Claim + payload + result:
+```powershell
+Invoke-RestMethod -Method Post "http://localhost:8000/api/v1/agent/jobs/<JOB_ID>/claim" `
+  -Headers @{ Authorization = "Bearer $agentJwt" }
+
+Invoke-RestMethod "http://localhost:8000/api/v1/agent/jobs/<JOB_ID>/payload" `
+  -Headers @{ Authorization = "Bearer $agentJwt" }
+
+Invoke-RestMethod -Method Post "http://localhost:8000/api/v1/agent/jobs/<JOB_ID>/result" `
+  -Headers @{ Authorization = "Bearer $agentJwt" } `
+  -ContentType "application/json" `
+  -Body '{"status":"DONE","thumbprint":"<TP>"}'
+```
 
 ---
 
