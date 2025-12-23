@@ -105,6 +105,29 @@ python -m app.watchers.pfx_directory
 - Se não encontrar, faz fallback por `name == <stem do arquivo>`.
 - Logs do job mostram `strategy`, `rowcount` e `found_ids_count`.
 
+**Job ID por ação (S4.1)**
+
+- Ingest usa `cert_ing__<org_id>__<sha1(path_lower_normalized)>`.
+- Delete usa `cert_del__<org_id>__<sha1(path_lower_normalized)>`.
+- Isso evita colisões entre delete/ingest quando o mesmo arquivo é removido e reinserido.
+
+**Paths UNC vs drive letter (S4.1)**
+
+- Em Windows, paths como `\\servidor\share\certs\arquivo.pfx` podem divergir de `G:\certs\arquivo.pfx`.
+- Para depuração, valide também por `name` (stem do arquivo), além de `source_path`.
+
+**Inspeção rápida da fila (S4.1)**
+
+```powershell
+# Ver jobs na fila
+python - <<'PY'
+from app.workers.queue import get_queue, get_redis
+q = get_queue(get_redis())
+print("queued", q.count)
+print("job_ids", q.job_ids)
+PY
+```
+
 **Validação rápida (S4.1, PowerShell)**
 
 ```powershell
