@@ -1,1 +1,4 @@
 -r ../requirements.txt
+watchdog==5.0.3
+rq==1.16.2
+redis==5.2.1

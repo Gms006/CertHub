@@ -99,6 +99,12 @@ $env:RQ_QUEUE_NAME="certs"
 python -m app.watchers.pfx_directory
 ```
 
+**Rollback (S4.1)**
+
+1. Parar watcher e worker.
+2. Remover o serviço Redis do `infra/docker-compose.yml` (se não utilizado).
+3. Reverter commits relacionados ao S4.1.
+
 ## S2 — Auth + RBAC (roteiro PowerShell)
 
 > Os exemplos abaixo usam PowerShell 7+ no Windows.
