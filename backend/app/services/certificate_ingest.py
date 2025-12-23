@@ -351,6 +351,49 @@ def ingest_certificates_from_fs(
     }
 
 
+def ingest_certificate_from_path(
+    db: Session, *, org_id: int, path: Path
+) -> dict[str, str | uuid.UUID | None]:
+    normalized_path = path.expanduser().resolve(strict=False)
+    if not normalized_path.exists() or not normalized_path.is_file():
+        raise FileNotFoundError(f"Certificate file not found: {normalized_path}")
+    if normalized_path.suffix.lower() not in CERT_EXTENSIONS:
+        raise ValueError(f"Unsupported certificate extension: {normalized_path.suffix}")
+
+    parsed, success = _extract_metadata(normalized_path, _candidate_passwords(normalized_path))
+    existing = _find_existing_certificate(
+        db,
+        org_id=org_id,
+        sha1=parsed.sha1_fingerprint,
+        serial=parsed.serial_number,
+        name=parsed.name,
+    )
+
+    if success:
+        if existing:
+            _update_certificate(existing, parsed)
+            action = "updated"
+            cert_id = existing.id
+        else:
+            certificate = _build_certificate(org_id, parsed)
+            db.add(certificate)
+            action = "inserted"
+            cert_id = certificate.id
+    else:
+        action = "failed"
+        cert_id = existing.id if existing else None
+        if existing:
+            _mark_parse_failure(existing, parsed)
+
+    db.commit()
+    return {
+        "action": action,
+        "cert_id": cert_id,
+        "file": normalized_path.name,
+        "error": parsed.parse_error if not success else None,
+    }
+
+
 def _find_existing_certificate(
     db: Session, *, org_id: int, sha1: str | None, serial: str | None, name: str
 ) -> Certificate | None:
