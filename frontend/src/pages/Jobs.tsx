@@ -99,7 +99,7 @@ const JobsPage = () => {
   useEffect(() => {
     loadJobs();
     loadReferences();
-  }, [isAdmin]);
+  }, [user?.role_global]);
 
   const certMap = useMemo(
     () => new Map(certificates.map((cert) => [cert.id, cert.name])),
