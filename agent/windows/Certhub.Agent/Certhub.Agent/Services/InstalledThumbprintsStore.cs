@@ -31,7 +31,7 @@ public sealed class InstalledThumbprintsStore
         {
             var json = System.Text.Encoding.UTF8.GetString(data);
             var list = JsonSerializer.Deserialize<List<string>>(json, JsonOptions);
-            return list ?? Array.Empty<string>();
+            return list ?? new List<string>();
         }
         catch (Exception ex)
         {
