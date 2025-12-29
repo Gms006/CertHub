@@ -24,6 +24,10 @@ Objetivo: substituir o diretório público de `.pfx` por um fluxo controlado via
 - Docker (recomendado para Postgres)
 - (Agent Windows) .NET 8 SDK
 
+> Nota (Agent Windows): o `global.json` fixa o SDK em `8.0.404` com roll-forward para
+> `latestMinor`. Caso você tenha outra versão 8.0.x instalada, ajuste o `global.json`
+> para a versão disponível no seu ambiente.
+
 > Nota: o backend fixa `passlib[bcrypt]==1.7.4` com `bcrypt==3.2.2` para evitar o erro
 > "password cannot be longer than 72 bytes" introduzido em bcrypt 4+ (o passlib 1.7.4
 > espera truncamento). Não remova esse pin sem atualizar o passlib.
@@ -78,6 +82,18 @@ Set-Location agent\windows\Certhub.Agent
 dotnet restore
 dotnet publish -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true /p:IncludeNativeLibrariesForSelfExtract=true
 ```
+
+## Agent Windows – Build/Publish
+
+```powershell
+Set-Location agent\windows\Certhub.Agent
+dotnet restore
+dotnet build -c Release
+dotnet publish -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true /p:IncludeNativeLibrariesForSelfExtract=true
+```
+
+O executável fica em:
+`agent\windows\Certhub.Agent\Certhub.Agent\bin\Release\net8.0-windows\win-x64\publish\Certhub.Agent.exe`.
 
 3) Executar o `Certhub.Agent.exe` (tray app). No menu do tray:
 
