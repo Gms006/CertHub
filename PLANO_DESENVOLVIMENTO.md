@@ -986,6 +986,11 @@ Se não houver senha, a API retorna erro explícito.
 
 - Portal cria job → agent instala → status vira DONE.
 
+**Evidências/validação reproduzível (S4)**
+
+- Portal: criar request → job `PENDING` → agent faz claim → job `DONE`.
+- Windows: validar no `certmgr.msc` em **Current User > Personal** (certificado presente).
+
 **Checklist de aceite (S4)**
 
 - [x] Agent abre no tray e persiste configuração.
