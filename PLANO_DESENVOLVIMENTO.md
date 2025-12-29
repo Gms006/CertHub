@@ -340,24 +340,24 @@ O Agent **nunca** deve remover certificados que:
 3. Listar certificados via API (retorna todos do org):
    ```bash
    curl -H "X-User-Id: <UUID_VIEW>" -H "X-Org-Id: 1" \
-     "http://localhost:8000/api/v1/certificados"
+     "http://localhost:8010/api/v1/certificados"
    ```
 4. Criar install job (VIEW, sem auto-approve → REQUESTED):
    ```bash
-   curl -X POST "http://localhost:8000/api/v1/certificados/<CERT_ID>/install" \
+   curl -X POST "http://localhost:8010/api/v1/certificados/<CERT_ID>/install" \
      -H "Content-Type: application/json" \
      -H "X-User-Id: <UUID_VIEW>" -H "X-Org-Id: 1" \
      -d '{"device_id": "<DEVICE_ID>"}'
    ```
 5. Criar install job (VIEW com auto-approve ou ADMIN/DEV → PENDING + approved):
    ```bash
-   curl -X POST "http://localhost:8000/api/v1/certificados/<CERT_ID>/install" \
+   curl -X POST "http://localhost:8010/api/v1/certificados/<CERT_ID>/install" \
      -H "Content-Type: application/json" \
      -H "X-User-Id: <UUID_ADMIN_OU_VIEW_AUTO>" -H "X-Org-Id: 1" \
      -d '{"device_id": "<DEVICE_ID>"}'
    ```- Aprovar job (ADMIN/DEV):
    ```bash
-   curl -X POST "http://localhost:8000/api/v1/install-jobs/<JOB_ID>/approve" \
+   curl -X POST "http://localhost:8010/api/v1/install-jobs/<JOB_ID>/approve" \
      -H "X-User-Id: <UUID_ADMIN>" -H "X-Org-Id: 1"
    ```
 ---
@@ -477,26 +477,26 @@ Não há auto-cadastro. Admin cria usuários no banco (is_active=true) e distrib
   ```bash
   # VIEW tentando listar jobs (sem acesso) → 403
   curl -H "Authorization: Bearer $JWT_VIEW" \
-    "http://localhost:8000/api/v1/install-jobs"
+    "http://localhost:8010/api/v1/install-jobs"
   # Resposta: {"detail": "Forbidden"}
   
   # ADMIN listando jobs (com acesso) → 200
   curl -H "Authorization: Bearer $JWT_ADMIN" \
-    "http://localhost:8000/api/v1/install-jobs"
+    "http://localhost:8010/api/v1/install-jobs"
   # Resposta: [{"id": "...", "status": "PENDING", ...}]
   
   # VIEW tentando gerenciar usuários → 403
   curl -X POST -H "Authorization: Bearer $JWT_VIEW" \
     -H "Content-Type: application/json" \
     -d '{"email": "new@netocontabilidade.com.br", "role": "ADMIN"}' \
-    "http://localhost:8000/api/v1/admin/users"
+    "http://localhost:8010/api/v1/admin/users"
   # Resposta: {"detail": "Forbidden"}
   
   # DEV gerenciando usuários (com acesso) → 201
   curl -X POST -H "Authorization: Bearer $JWT_DEV" \
     -H "Content-Type: application/json" \
     -d '{"email": "new@netocontabilidade.com.br", "role": "ADMIN"}' \
-    "http://localhost:8000/api/v1/admin/users"
+    "http://localhost:8010/api/v1/admin/users"
   # Resposta: {"id": "...", "email": "...", "role_global": "ADMIN"}
   ```
 
@@ -563,7 +563,7 @@ psql "$DATABASE_URL" -c \
 
 Ou via POST /api/v1/admin/users (requer user DEV/ADMIN já no DB):
 ```bash
-curl -X POST "http://localhost:8000/api/v1/admin/users" \
+curl -X POST "http://localhost:8010/api/v1/admin/users" \
   -H "Authorization: Bearer <JWT_ADMIN>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -579,7 +579,7 @@ curl -X POST "http://localhost:8000/api/v1/admin/users" \
 ```bash
 SETUP_TOKEN="<TOKEN_RETORNADO_ACIMA>"
 
-curl -X POST "http://localhost:8000/api/v1/auth/password/set/confirm" \
+curl -X POST "http://localhost:8010/api/v1/auth/password/set/confirm" \
   -H "Content-Type: application/json" \
   -d "{\"token\": \"${SETUP_TOKEN}\", \"new_password\": \"SenhaForte123!\"}"
 
@@ -595,7 +595,7 @@ psql "$DATABASE_URL" -c \
 
 **4) Login (email + password):**
 ```bash
-LOGIN_RESPONSE=$(curl -s -c cookies.txt -X POST "http://localhost:8000/api/v1/auth/login" \
+LOGIN_RESPONSE=$(curl -s -c cookies.txt -X POST "http://localhost:8010/api/v1/auth/login" \
   -H "Content-Type: application/json" \
   -d '{
     "email": "maria@netocontabilidade.com.br",
@@ -621,18 +621,18 @@ psql "$DATABASE_URL" -c \
 **5) GET /api/v1/auth/me (autenticado):**
 ```bash
 curl -H "Authorization: Bearer ${ACCESS_JWT}" \
-  "http://localhost:8000/api/v1/auth/me"
+  "http://localhost:8010/api/v1/auth/me"
 
 # Esperado: 200 + user data
 # Sem JWT: 401
 
-curl "http://localhost:8000/api/v1/auth/me"
+curl "http://localhost:8010/api/v1/auth/me"
 # Esperado: 401 Unauthorized
 ```
 
 **6) Refresh token:**
 ```bash
-curl -s -X POST "http://localhost:8000/api/v1/auth/refresh" \
+curl -s -X POST "http://localhost:8010/api/v1/auth/refresh" \
   -b cookies.txt | jq '.access_token'
 
 # Esperado: novo access_token (diferente do anterior)
@@ -640,13 +640,13 @@ curl -s -X POST "http://localhost:8000/api/v1/auth/refresh" \
 
 **7) Logout (revoga refresh):**
 ```bash
-curl -X POST "http://localhost:8000/api/v1/auth/logout" \
+curl -X POST "http://localhost:8010/api/v1/auth/logout" \
   -H "Authorization: Bearer ${ACCESS_JWT}"
 
 # Esperado: 200 {"message": "Logout realizado"}
 
 # Tentar usar refresh revogado:
-curl -X POST "http://localhost:8000/api/v1/auth/refresh" \
+curl -X POST "http://localhost:8010/api/v1/auth/refresh" \
   -b cookies.txt
 
 # Esperado: 401 {"detail": "Refresh token revoked"}
@@ -655,7 +655,7 @@ curl -X POST "http://localhost:8000/api/v1/auth/refresh" \
 **8) Lockout (5 tentativas + 15 min bloqueio):**
 ```bash
 for i in {1..5}; do
-  curl -X POST "http://localhost:8000/api/v1/auth/login" \
+  curl -X POST "http://localhost:8010/api/v1/auth/login" \
     -H "Content-Type: application/json" \
     -d '{"email": "maria@netocontabilidade.com.br", "password": "ERRADA"}' \
     2>/dev/null | jq '.detail // "falha"'
@@ -663,7 +663,7 @@ for i in {1..5}; do
 done
 
 # 6ª tentativa:
-curl -X POST "http://localhost:8000/api/v1/auth/login" \
+curl -X POST "http://localhost:8010/api/v1/auth/login" \
   -H "Content-Type: application/json" \
   -d '{"email": "maria@netocontabilidade.com.br", "password": "ERRADA"}'
 
@@ -689,14 +689,14 @@ psql "$DATABASE_URL" -c \
    WHERE email='maria@netocontabilidade.com.br';"
 
 # Login funciona novamente:
-curl -X POST "http://localhost:8000/api/v1/auth/login" \
+curl -X POST "http://localhost:8010/api/v1/auth/login" \
   -H "Content-Type: application/json" \
   -d '{"email": "maria@netocontabilidade.com.br", "password": "SenhaForte123!"}' | jq '.access_token'
 ```
 
 **9) Reset de senha (TTL 30 min):**
 ```bash
-curl -X POST "http://localhost:8000/api/v1/auth/password/reset/init" \
+curl -X POST "http://localhost:8010/api/v1/auth/password/reset/init" \
   -H "Content-Type: application/json" \
   -d '{"email": "maria@netocontabilidade.com.br"}'
 
@@ -705,7 +705,7 @@ curl -X POST "http://localhost:8000/api/v1/auth/password/reset/init" \
 
 RESET_TOKEN="<TOKEN_RESET>"
 
-curl -X POST "http://localhost:8000/api/v1/auth/password/reset/confirm" \
+curl -X POST "http://localhost:8010/api/v1/auth/password/reset/confirm" \
   -H "Content-Type: application/json" \
   -d "{\"token\": \"${RESET_TOKEN}\", \"new_password\": \"NovaSenha456!\"}"
 
@@ -730,7 +730,7 @@ psql "$DATABASE_URL" -c \
 VIEW tentando listar jobs (sem permissão) → 403:
 ```bash
 curl -H "Authorization: Bearer ${JWT_VIEW}" \
-  "http://localhost:8000/api/v1/install-jobs"
+  "http://localhost:8010/api/v1/install-jobs"
 
 # Esperado: 403 {"detail": "Forbidden"}
 ```
@@ -738,7 +738,7 @@ curl -H "Authorization: Bearer ${JWT_VIEW}" \
 ADMIN listando jobs (com permissão) → 200:
 ```bash
 curl -H "Authorization: Bearer ${JWT_ADMIN}" \
-  "http://localhost:8000/api/v1/install-jobs"
+  "http://localhost:8010/api/v1/install-jobs"
 
 # Esperado: 200 [{"id": "...", "status": "PENDING", ...}]
 ```
@@ -1002,7 +1002,7 @@ Se não houver senha, a API retorna erro explícito.
 
 1) Provisionar device/token:
 ```powershell
-$device = Invoke-RestMethod -Method Post "http://localhost:8000/api/v1/admin/devices" `
+$device = Invoke-RestMethod -Method Post "http://localhost:8010/api/v1/admin/devices" `
   -Headers @{ Authorization = "Bearer <JWT_ADMIN>" } `
   -ContentType "application/json" `
   -Body '{"hostname":"PC-01","domain":"NETOCMS","os_version":"Windows 11","agent_version":"1.0.0"}'
@@ -1012,14 +1012,14 @@ $device.id
 
 Opcional: rotacionar token do device:
 ```powershell
-$rotated = Invoke-RestMethod -Method Post "http://localhost:8000/api/v1/admin/devices/$($device.id)/rotate-token" `
+$rotated = Invoke-RestMethod -Method Post "http://localhost:8010/api/v1/admin/devices/$($device.id)/rotate-token" `
   -Headers @{ Authorization = "Bearer <JWT_ADMIN>" }
 $rotated.device_token
 ```
 
 2) Autenticar agent:
 ```powershell
-$auth = Invoke-RestMethod -Method Post "http://localhost:8000/api/v1/agent/auth" `
+$auth = Invoke-RestMethod -Method Post "http://localhost:8010/api/v1/agent/auth" `
   -ContentType "application/json" `
   -Body (@{ device_id = $device.id; device_token = $device.device_token } | ConvertTo-Json)
 $agentJwt = $auth.access_token
@@ -1027,7 +1027,7 @@ $agentJwt = $auth.access_token
 
 3) Heartbeat:
 ```powershell
-Invoke-RestMethod -Method Post "http://localhost:8000/api/v1/agent/heartbeat" `
+Invoke-RestMethod -Method Post "http://localhost:8010/api/v1/agent/heartbeat" `
   -Headers @{ Authorization = "Bearer $agentJwt" } `
   -ContentType "application/json" `
   -Body '{"agent_version":"1.0.0"}'
@@ -1035,19 +1035,19 @@ Invoke-RestMethod -Method Post "http://localhost:8000/api/v1/agent/heartbeat" `
 
 4) Jobs:
 ```powershell
-Invoke-RestMethod "http://localhost:8000/api/v1/agent/jobs" `
+Invoke-RestMethod "http://localhost:8010/api/v1/agent/jobs" `
   -Headers @{ Authorization = "Bearer $agentJwt" }
 ```
 
 5) Claim + payload + result:
 ```powershell
-Invoke-RestMethod -Method Post "http://localhost:8000/api/v1/agent/jobs/<JOB_ID>/claim" `
+Invoke-RestMethod -Method Post "http://localhost:8010/api/v1/agent/jobs/<JOB_ID>/claim" `
   -Headers @{ Authorization = "Bearer $agentJwt" }
 
-Invoke-RestMethod "http://localhost:8000/api/v1/agent/jobs/<JOB_ID>/payload" `
+Invoke-RestMethod "http://localhost:8010/api/v1/agent/jobs/<JOB_ID>/payload" `
   -Headers @{ Authorization = "Bearer $agentJwt" }
 
-Invoke-RestMethod -Method Post "http://localhost:8000/api/v1/agent/jobs/<JOB_ID>/result" `
+Invoke-RestMethod -Method Post "http://localhost:8010/api/v1/agent/jobs/<JOB_ID>/result" `
   -Headers @{ Authorization = "Bearer $agentJwt" } `
   -ContentType "application/json" `
   -Body '{"status":"DONE","thumbprint":"<TP>"}'
