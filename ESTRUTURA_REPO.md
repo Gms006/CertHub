@@ -88,6 +88,33 @@ certhub/
 │  └─ api/
 │     └─ openapi.json
 │
+├─ agent/
+│  └─ windows/
+│     └─ Certhub.Agent/
+│        ├─ Certhub.Agent.sln
+│        ├─ BUILD.md
+│        └─ Certhub.Agent/
+│           ├─ Certhub.Agent.csproj
+│           ├─ Program.cs
+│           ├─ ApplicationConfiguration.cs
+│           ├─ Forms/
+│           │  ├─ PairForm.cs
+│           │  └─ StatusForm.cs
+│           ├─ Models/
+│           │  ├─ AgentConfig.cs
+│           │  └─ AgentStatus.cs
+│           ├─ Services/
+│           │  ├─ AgentClient.cs
+│           │  ├─ AgentConfigStore.cs
+│           │  ├─ AgentLoop.cs
+│           │  ├─ DpapiStore.cs
+│           │  ├─ InstalledThumbprintsStore.cs
+│           │  ├─ Logger.cs
+│           │  ├─ PortalUrlHelper.cs
+│           │  └─ RegistryAutoStart.cs
+│           └─ Tray/
+│              └─ TrayAppContext.cs
+│
 ├─ frontend/
 │  ├─ src/
 │  │  ├─ App.tsx
@@ -145,8 +172,7 @@ certhub/
 └─ requirements.txt
 ```
 
-## S4.1 (planejado)
+## S4 e S4.1 (concluídos)
 
-- `infra/docker-compose.yml`: incluir serviço Redis para fila do watcher/worker.
-- `backend/`: novos entrypoints do watcher e do worker RQ, além dos jobs de ingest/delete, serão adicionados dentro do pacote `app/`.
-- `backend/app/workers/jobs_certificates.py`: delete por `source_path` com fallback por `name` e logs de estratégia/rowcount.
+- `agent/windows/Certhub.Agent`: aplicativo WinForms tray com polling/claim/payload/result e DPAPI local.
+- `backend/app/watchers` + `backend/app/workers`: watcher/worker RQ com Redis e jobs de ingest/delete.
