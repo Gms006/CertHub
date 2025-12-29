@@ -149,6 +149,8 @@ O executável fica em:
 - “API Base: Not configured” na tela de status → executar **Pair device** novamente.
 - “Auth failed” → Device ID/token inválido ou expirado.
 - Job demora para claim → confira o polling atual no **CertHub Agent Status**.
+- Erro 500 em login/agent auth com stacktrace de `psycopg2` → verifique se o Postgres está rodando
+  (ex.: `127.0.0.1:5433`) e se `DATABASE_URL` aponta para o host/porta corretos.
 
 ## Variáveis de ambiente (.env)
 
