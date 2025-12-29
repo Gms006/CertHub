@@ -24,6 +24,10 @@ Objetivo: substituir o diretório público de `.pfx` por um fluxo controlado via
 - Docker (recomendado para Postgres)
 - (Agent Windows) .NET 8 SDK
 
+> Nota (Agent Windows): o `global.json` fixa o SDK em `8.0.404` com roll-forward para
+> `latestMinor`. Caso você tenha outra versão 8.0.x instalada, ajuste o `global.json`
+> para a versão disponível no seu ambiente.
+
 > Nota: o backend fixa `passlib[bcrypt]==1.7.4` com `bcrypt==3.2.2` para evitar o erro
 > "password cannot be longer than 72 bytes" introduzido em bcrypt 4+ (o passlib 1.7.4
 > espera truncamento). Não remova esse pin sem atualizar o passlib.
@@ -46,7 +50,7 @@ pip install -r requirements.txt
 
 cd backend
 alembic upgrade head
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8010
 ```
 
 ### 3) Frontend
@@ -62,7 +66,7 @@ npm run dev
 1) Provisionar device e token (ADMIN/DEV) no portal ou via API:
 
 ```powershell
-$device = Invoke-RestMethod -Method Post "http://localhost:8000/api/v1/admin/devices" `
+$device = Invoke-RestMethod -Method Post "http://localhost:8010/api/v1/admin/devices" `
   -Headers @{ Authorization = "Bearer <JWT_ADMIN>" } `
   -ContentType "application/json" `
   -Body '{"hostname":"PC-01","domain":"NETOCMS","os_version":"Windows 11","agent_version":"1.0.0"}'
@@ -79,9 +83,21 @@ dotnet restore
 dotnet publish -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true /p:IncludeNativeLibrariesForSelfExtract=true
 ```
 
+## Agent Windows – Build/Publish
+
+```powershell
+Set-Location agent\windows\Certhub.Agent
+dotnet restore
+dotnet build -c Release
+dotnet publish -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true /p:IncludeNativeLibrariesForSelfExtract=true
+```
+
+O executável fica em:
+`agent\windows\Certhub.Agent\Certhub.Agent\bin\Release\net8.0-windows\win-x64\publish\Certhub.Agent.exe`.
+
 3) Executar o `Certhub.Agent.exe` (tray app). No menu do tray:
 
-- **Pair device**: informe `API Base URL` (ex.: `http://localhost:8000/api/v1`), `Device ID` e `Device Token`.
+- **Pair device**: informe `API Base URL` (ex.: `http://localhost:8010/api/v1`), `Device ID` e `Device Token`.
 - **Iniciar com Windows** fica habilitado por padrão (HKCU Run).
 - (Opcional) configurar `Portal URL` para abrir o frontend.
 
@@ -228,7 +244,7 @@ Move-Item "C:\\origem\\teste.pfx" "C:\\certs\\teste.pfx"
 ### Provisionar device/token (ADMIN/DEV)
 
 ```powershell
-$device = Invoke-RestMethod -Method Post "http://localhost:8000/api/v1/admin/devices" `
+$device = Invoke-RestMethod -Method Post "http://localhost:8010/api/v1/admin/devices" `
   -Headers @{ Authorization = "Bearer <JWT_ADMIN>" } `
   -ContentType "application/json" `
   -Body '{"hostname":"PC-01","domain":"NETOCMS","os_version":"Windows 11","agent_version":"1.0.0"}'
@@ -241,7 +257,7 @@ $device.id
 ### Rotacionar token do device (ADMIN/DEV)
 
 ```powershell
-$rotated = Invoke-RestMethod -Method Post "http://localhost:8000/api/v1/admin/devices/$($device.id)/rotate-token" `
+$rotated = Invoke-RestMethod -Method Post "http://localhost:8010/api/v1/admin/devices/$($device.id)/rotate-token" `
   -Headers @{ Authorization = "Bearer <JWT_ADMIN>" }
 
 $rotated.device_token
@@ -250,7 +266,7 @@ $rotated.device_token
 ### Auth do agent
 
 ```powershell
-$auth = Invoke-RestMethod -Method Post "http://localhost:8000/api/v1/agent/auth" `
+$auth = Invoke-RestMethod -Method Post "http://localhost:8010/api/v1/agent/auth" `
   -ContentType "application/json" `
   -Body (@{ device_id = $device.id; device_token = $device.device_token } | ConvertTo-Json)
 
@@ -260,7 +276,7 @@ $agentJwt = $auth.access_token
 ### Heartbeat
 
 ```powershell
-Invoke-RestMethod -Method Post "http://localhost:8000/api/v1/agent/heartbeat" `
+Invoke-RestMethod -Method Post "http://localhost:8010/api/v1/agent/heartbeat" `
   -Headers @{ Authorization = "Bearer $agentJwt" } `
   -ContentType "application/json" `
   -Body '{"agent_version":"1.0.0"}'
@@ -270,19 +286,19 @@ Invoke-RestMethod -Method Post "http://localhost:8000/api/v1/agent/heartbeat" `
 
 ```powershell
 # Listar jobs PENDING/IN_PROGRESS do device
-Invoke-RestMethod "http://localhost:8000/api/v1/agent/jobs" `
+Invoke-RestMethod "http://localhost:8010/api/v1/agent/jobs" `
   -Headers @{ Authorization = "Bearer $agentJwt" }
 
 # Claim do job (PENDING -> IN_PROGRESS)
-Invoke-RestMethod -Method Post "http://localhost:8000/api/v1/agent/jobs/<JOB_ID>/claim" `
+Invoke-RestMethod -Method Post "http://localhost:8010/api/v1/agent/jobs/<JOB_ID>/claim" `
   -Headers @{ Authorization = "Bearer $agentJwt" }
 
 # Payload (pfx_base64 + password)
-Invoke-RestMethod "http://localhost:8000/api/v1/agent/jobs/<JOB_ID>/payload" `
+Invoke-RestMethod "http://localhost:8010/api/v1/agent/jobs/<JOB_ID>/payload" `
   -Headers @{ Authorization = "Bearer $agentJwt" }
 
 # Resultado (IN_PROGRESS -> DONE/FAILED)
-Invoke-RestMethod -Method Post "http://localhost:8000/api/v1/agent/jobs/<JOB_ID>/result" `
+Invoke-RestMethod -Method Post "http://localhost:8010/api/v1/agent/jobs/<JOB_ID>/result" `
   -Headers @{ Authorization = "Bearer $agentJwt" } `
   -ContentType "application/json" `
   -Body '{"status":"DONE","thumbprint":"<TP>"}'
@@ -330,14 +346,14 @@ Invoke-RestMethod -Method Post "http://localhost:8000/api/v1/agent/jobs/<JOB_ID>
 
 ### 1) Listar paths do OpenAPI
 ```powershell
-$openapi = Invoke-RestMethod "http://localhost:8000/openapi.json"
+$openapi = Invoke-RestMethod "http://localhost:8010/openapi.json"
 $openapi.paths.PSObject.Properties.Name | Sort-Object
 ```
 
 ### 2) Set password (DEV/ADMIN/VIEW)
 ```powershell
 # DEV/ADMIN gera token 1x para um usuário alvo (VIEW/ADMIN/DEV)
-$setup = Invoke-RestMethod -Method Post "http://localhost:8000/api/v1/auth/password/set/init" `
+$setup = Invoke-RestMethod -Method Post "http://localhost:8010/api/v1/auth/password/set/init" `
   -Headers @{ Authorization = "Bearer <JWT_DEV_OU_ADMIN>" } `
   -ContentType "application/json" `
   -Body '{"email": "view@netocontabilidade.com.br"}'
@@ -345,7 +361,7 @@ $setup = Invoke-RestMethod -Method Post "http://localhost:8000/api/v1/auth/passw
 # Em DEV, o token é retornado no JSON; em PROD, apenas { ok: true }.
 $setup.token
 
-Invoke-RestMethod -Method Post "http://localhost:8000/api/v1/auth/password/set/confirm" `
+Invoke-RestMethod -Method Post "http://localhost:8010/api/v1/auth/password/set/confirm" `
   -ContentType "application/json" `
   -Body (@{ token = $setup.token; new_password = "SenhaForte123!" } | ConvertTo-Json)
 ```
@@ -354,22 +370,22 @@ Invoke-RestMethod -Method Post "http://localhost:8000/api/v1/auth/password/set/c
 ```powershell
 $session = New-Object Microsoft.PowerShell.Commands.WebRequestSession
 
-$login = Invoke-RestMethod -Method Post "http://localhost:8000/api/v1/auth/login" `
+$login = Invoke-RestMethod -Method Post "http://localhost:8010/api/v1/auth/login" `
   -WebSession $session `
   -ContentType "application/json" `
   -Body '{"email": "maria@netocontabilidade.com.br", "password": "SenhaForte123!"}'
 
 $access = $login.access_token
 
-Invoke-RestMethod "http://localhost:8000/api/v1/auth/me" `
+Invoke-RestMethod "http://localhost:8010/api/v1/auth/me" `
   -Headers @{ Authorization = "Bearer $access" }
 
 # Refresh usa o cookie HttpOnly (não precisa enviar refresh_token no body)
-$refreshed = Invoke-RestMethod -Method Post "http://localhost:8000/api/v1/auth/refresh" `
+$refreshed = Invoke-RestMethod -Method Post "http://localhost:8010/api/v1/auth/refresh" `
   -WebSession $session
 $refreshed.access_token
 
-Invoke-RestMethod -Method Post "http://localhost:8000/api/v1/auth/logout" `
+Invoke-RestMethod -Method Post "http://localhost:8010/api/v1/auth/logout" `
   -WebSession $session `
   -Headers @{ Authorization = "Bearer $access" }
 ```
@@ -377,14 +393,14 @@ Invoke-RestMethod -Method Post "http://localhost:8000/api/v1/auth/logout" `
 ### 4) Lockout (5 falhas → 429)
 ```powershell
 1..5 | ForEach-Object {
-  Invoke-WebRequest -Method Post "http://localhost:8000/api/v1/auth/login" `
+  Invoke-WebRequest -Method Post "http://localhost:8010/api/v1/auth/login" `
     -ContentType "application/json" `
     -Body '{"email": "maria@netocontabilidade.com.br", "password": "ERRADA"}' `
     -SkipHttpErrorCheck | Select-Object StatusCode
 }
 
 # 6ª tentativa bloqueada
-Invoke-WebRequest -Method Post "http://localhost:8000/api/v1/auth/login" `
+Invoke-WebRequest -Method Post "http://localhost:8010/api/v1/auth/login" `
   -ContentType "application/json" `
   -Body '{"email": "maria@netocontabilidade.com.br", "password": "ERRADA"}' `
   -SkipHttpErrorCheck | Select-Object StatusCode
@@ -393,12 +409,12 @@ Invoke-WebRequest -Method Post "http://localhost:8000/api/v1/auth/login" `
 ### 5) RBAC (VIEW 403 em /admin/users, 200 em /certificados)
 ```powershell
 # VIEW tentando acessar admin/users → 403
-Invoke-WebRequest "http://localhost:8000/api/v1/admin/users" `
+Invoke-WebRequest "http://localhost:8010/api/v1/admin/users" `
   -Headers @{ Authorization = "Bearer <JWT_VIEW>" } `
   -SkipHttpErrorCheck | Select-Object StatusCode
 
 # VIEW listando certificados → 200
-Invoke-WebRequest "http://localhost:8000/api/v1/certificados" `
+Invoke-WebRequest "http://localhost:8010/api/v1/certificados" `
   -Headers @{ Authorization = "Bearer <JWT_VIEW>" } `
   -SkipHttpErrorCheck | Select-Object StatusCode
 ```
@@ -408,7 +424,7 @@ Invoke-WebRequest "http://localhost:8000/api/v1/certificados" `
 Endpoint DEV-only para ingestão rápida dos `.pfx/.p12` da pasta configurada em `CERTS_ROOT_PATH`:
 
 ```bash
-curl -X POST "http://localhost:8000/api/v1/admin/certificates/ingest-from-fs" \
+curl -X POST "http://localhost:8010/api/v1/admin/certificates/ingest-from-fs" \
   -H "Content-Type: application/json" \
   -H "X-User-Id: <UUID_DO_DEV>" -H "X-Org-Id: 1" \
   -d '{"dry_run": true, "limit": 5}'
@@ -430,7 +446,7 @@ curl -X POST "http://localhost:8000/api/v1/admin/certificates/ingest-from-fs" \
 Endpoint ADMIN para atualizar um usuário existente (mesmo `org_id`) e permitir auto-approve em jobs de instalação:
 
 ```bash
-curl -X PATCH "http://localhost:8000/api/v1/admin/users/<ID_DO_USUARIO>" \
+curl -X PATCH "http://localhost:8010/api/v1/admin/users/<ID_DO_USUARIO>" \
   -H "Content-Type: application/json" \
   -H "X-User-Id: <UUID_DEV_OU_ADMIN>" -H "X-Org-Id: 1" \
   -d '{"auto_approve_install_jobs": true}'
