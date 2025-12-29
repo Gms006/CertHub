@@ -24,10 +24,10 @@ public sealed class PairForm : Form
         _deviceTokenTextBox.UseSystemPasswordChar = true;
         _pollingIdleIntervalInput.Minimum = 5;
         _pollingIdleIntervalInput.Maximum = 3600;
-        _pollingIdleIntervalInput.Value = config?.PollingIntervalSecondsIdle ?? 30;
+        _pollingIdleIntervalInput.Value = config?.PollingIntervalSecondsIdle ?? AgentConfig.DefaultPollingIntervalSecondsIdle;
         _pollingActiveIntervalInput.Minimum = 2;
         _pollingActiveIntervalInput.Maximum = 3600;
-        _pollingActiveIntervalInput.Value = config?.PollingIntervalSecondsActive ?? 5;
+        _pollingActiveIntervalInput.Value = config?.PollingIntervalSecondsActive ?? AgentConfig.DefaultPollingIntervalSecondsActive;
         _startWithWindows.Text = "Iniciar com Windows";
         _startWithWindows.Checked = startWithWindows;
 
