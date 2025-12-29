@@ -2,11 +2,14 @@ namespace Certhub.Agent.Models;
 
 public sealed class AgentConfig
 {
+    public const int DefaultPollingIntervalSecondsIdle = 30;
+    public const int DefaultPollingIntervalSecondsActive = 5;
+
     public string ApiBaseUrl { get; set; } = string.Empty;
     public string DeviceId { get; set; } = string.Empty;
     public string? PortalUrl { get; set; }
-    public int PollingIntervalSecondsIdle { get; set; } = 30;
-    public int PollingIntervalSecondsActive { get; set; } = 5;
+    public int PollingIntervalSecondsIdle { get; set; } = DefaultPollingIntervalSecondsIdle;
+    public int PollingIntervalSecondsActive { get; set; } = DefaultPollingIntervalSecondsActive;
 
     public bool IsValid() =>
         !string.IsNullOrWhiteSpace(ApiBaseUrl)

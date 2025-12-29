@@ -177,3 +177,5 @@ certhub/
 
 - `agent/windows/Certhub.Agent`: aplicativo WinForms tray com polling/claim/payload/result e DPAPI local.
 - `backend/app/watchers` + `backend/app/workers`: watcher/worker RQ com Redis e jobs de ingest/delete.
+- Evidências S4: fluxo no portal **request → PENDING → DONE** e validação em `certmgr.msc`
+  (**Current User > Personal**).

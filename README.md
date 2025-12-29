@@ -80,7 +80,15 @@ $device.id
 ```powershell
 Set-Location agent\windows\Certhub.Agent
 dotnet restore
-dotnet publish -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true /p:IncludeNativeLibrariesForSelfExtract=true
+dotnet publish -c Release -r win-x64 --self-contained true `
+  /p:PublishSingleFile=true /p:IncludeNativeLibrariesForSelfExtract=true `
+  -o C:\Temp\CerthubAgent\publish
+```
+
+Alternativa com script (PowerShell):
+
+```powershell
+.\scripts\windows\publish_agent.ps1 -PublishDir C:\Temp\CerthubAgent\publish
 ```
 
 ## Agent Windows – Build/Publish
@@ -89,17 +97,20 @@ dotnet publish -c Release -r win-x64 --self-contained true /p:PublishSingleFile=
 Set-Location agent\windows\Certhub.Agent
 dotnet restore
 dotnet build -c Release
-dotnet publish -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true /p:IncludeNativeLibrariesForSelfExtract=true
+dotnet publish -c Release -r win-x64 --self-contained true `
+  /p:PublishSingleFile=true /p:IncludeNativeLibrariesForSelfExtract=true `
+  -o C:\Temp\CerthubAgent\publish
 ```
 
 O executável fica em:
-`agent\windows\Certhub.Agent\Certhub.Agent\bin\Release\net8.0-windows\win-x64\publish\Certhub.Agent.exe`.
+`C:\Temp\CerthubAgent\publish\Certhub.Agent.exe`.
 
 3) Executar o `Certhub.Agent.exe` (tray app). No menu do tray:
 
 - **Pair device**: informe `API Base URL` (ex.: `http://localhost:8010/api/v1`), `Device ID` e `Device Token`.
 - **Iniciar com Windows** fica habilitado por padrão (HKCU Run).
-- **Polling idle/ativo**: padrão 30s (idle) / 5s (ativo) para reduzir o tempo de claim.
+- **Polling idle/ativo**: padrão 30s (idle) / 5s (ativo) para reduzir o tempo de claim
+  (defaults em `agent/windows/Certhub.Agent/Certhub.Agent/Models/AgentConfig.cs`).
 - (Opcional) configurar `Portal URL` para abrir o frontend.
 
 4) Teste rápido:
@@ -111,16 +122,25 @@ O executável fica em:
 ## Deploy do Agent em outras máquinas (piloto)
 
 1) Copiar o executável publicado para a máquina alvo (ex.):
-   - `C:\ProgramData\CertHubAgent\Certhub.Agent.exe`
+   - **Recomendado**: `C:\ProgramData\CertHubAgent\Certhub.Agent.exe` (evita UAC do Program Files).
+   - **Importante**: não execute o `.exe` diretamente de share/UNC; copie local primeiro
+     (pode aparecer “Windows não pode acessar o dispositivo, caminho ou arquivo…”).
+   - Exemplo de publish local: `dotnet publish ... -o C:\Temp\CerthubAgent\publish` e copiar depois para `C:\ProgramData\CertHubAgent`.
+   - Alternativa com script:
+
+     ```powershell
+     .\scripts\windows\deploy_agent.ps1 -SourceExe C:\Temp\CerthubAgent\publish\Certhub.Agent.exe -StartAgent
+     ```
+
 2) Executar **uma vez** para parear (tray → **Pair device**):
    - **API Base URL** (ex.: `https://<dominio>/api/v1`)
    - **Device ID** (um por máquina)
    - **Device Token** (gerado no portal / API)
 3) Habilitar auto-start:
    - Marcar **Iniciar com Windows** (cria entry em HKCU Run).
-   - Confirmar que o ícone do agent está em **Ícones ocultos** do tray.
+   - Confirmar que o ícone do agent está em **Ícones ocultos** do tray (menu `^`).
 4) Validar no portal/DB:
-   - `last_heartbeat_at` atualizado (timestamps no DB são **UTC +00**).
+   - `last_heartbeat_at` atualizado (timestamps no DB são **UTC +00**, UI pode mostrar horário local).
    - Job vai de `PENDING` → `DONE` e grava thumbprint.
 
 **Troubleshooting rápido**
@@ -129,6 +149,8 @@ O executável fica em:
 - “API Base: Not configured” na tela de status → executar **Pair device** novamente.
 - “Auth failed” → Device ID/token inválido ou expirado.
 - Job demora para claim → confira o polling atual no **CertHub Agent Status**.
+- Erro 500 em login/agent auth com stacktrace de `psycopg2` → verifique se o Postgres está rodando
+  (ex.: `127.0.0.1:5433`) e se `DATABASE_URL` aponta para o host/porta corretos.
 
 ## Variáveis de ambiente (.env)
 
