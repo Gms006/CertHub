@@ -33,3 +33,12 @@ class AgentPayloadResponse(BaseModel):
     password: str
     source_path: str
     generated_at: datetime
+
+
+class AgentCleanupEvent(BaseModel):
+    removed_count: int
+    failed_count: int
+    removed_thumbprints: list[str] | None = None
+    failed_thumbprints: list[str] | None = None
+    mode: Literal["scheduled", "fallback", "manual"]
+    ran_at_local: str | None = None

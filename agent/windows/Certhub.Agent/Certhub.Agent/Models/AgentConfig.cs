@@ -10,6 +10,7 @@ public sealed class AgentConfig
     public string? PortalUrl { get; set; }
     public int PollingIntervalSecondsIdle { get; set; } = DefaultPollingIntervalSecondsIdle;
     public int PollingIntervalSecondsActive { get; set; } = DefaultPollingIntervalSecondsActive;
+    public DateTime? LastCleanupLocalDate { get; set; }
 
     public bool IsValid() =>
         !string.IsNullOrWhiteSpace(ApiBaseUrl)

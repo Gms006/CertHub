@@ -8,6 +8,7 @@ public sealed class AgentLoop
     private readonly AgentConfigStore _configStore;
     private readonly DpapiStore _dpapiStore;
     private readonly InstalledThumbprintsStore _thumbprintsStore;
+    private readonly CertificateCleanupService _cleanupService;
     private readonly Logger _logger;
     private readonly AgentStatus _status = new();
     private CancellationTokenSource? _cts;
@@ -19,11 +20,13 @@ public sealed class AgentLoop
         AgentConfigStore configStore,
         DpapiStore dpapiStore,
         InstalledThumbprintsStore thumbprintsStore,
+        CertificateCleanupService cleanupService,
         Logger logger)
     {
         _configStore = configStore;
         _dpapiStore = dpapiStore;
         _thumbprintsStore = thumbprintsStore;
+        _cleanupService = cleanupService;
         _logger = logger;
     }
 
@@ -98,6 +101,7 @@ public sealed class AgentLoop
                 continue;
             }
 
+            await EnsureFallbackCleanupAsync(config, cancellationToken);
             await RunPollingLoopAsync(config, deviceToken, cancellationToken);
         }
     }
@@ -160,6 +164,61 @@ public sealed class AgentLoop
 
             UpdateStatus(pollingIntervalSeconds: (int)pollInterval.TotalSeconds, pollingMode: pollingMode);
             await Task.Delay(pollInterval, cancellationToken);
+        }
+    }
+
+    private async Task EnsureFallbackCleanupAsync(AgentConfig config, CancellationToken cancellationToken)
+    {
+        var nowLocal = DateTime.Now;
+        if (nowLocal.TimeOfDay < TimeSpan.FromHours(18))
+        {
+            return;
+        }
+
+        if (config.LastCleanupLocalDate?.Date == nowLocal.Date)
+        {
+            return;
+        }
+
+        _logger.Info("Fallback cleanup triggered (after 18:00 and not run today).");
+        var result = _cleanupService.Run(CleanupMode.Fallback);
+        if (result.Success)
+        {
+            config.LastCleanupLocalDate = nowLocal.Date;
+            _configStore.Save(config);
+        }
+
+        await ReportCleanupAsync(result, cancellationToken);
+    }
+
+    private async Task ReportCleanupAsync(CleanupResult result, CancellationToken cancellationToken)
+    {
+        if (_client is null)
+        {
+            _logger.Warn("Cleanup audit skipped: client not initialized.");
+            return;
+        }
+
+        try
+        {
+            var response = await _client.PostCleanupAsync(new AgentClient.CleanupEvent
+            {
+                RemovedCount = result.RemovedCount,
+                FailedCount = result.FailedCount,
+                RemovedThumbprints = result.RemovedThumbprints.ToList(),
+                FailedThumbprints = result.FailedThumbprints.ToList(),
+                Mode = result.Mode.ToString().ToLowerInvariant(),
+                RanAtLocal = result.RanAtLocal.ToString("o"),
+            }, cancellationToken);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.Warn($"Cleanup audit failed: {(int)response.StatusCode} {response.ReasonPhrase}");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.Error("Cleanup audit failed with exception.", ex);
         }
     }
 

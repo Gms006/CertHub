@@ -105,6 +105,42 @@ dotnet publish -c Release -r win-x64 --self-contained true `
 O executável fica em:
 `C:\Temp\CerthubAgent\publish\Certhub.Agent.exe`.
 
+## S5 Cleanup 18h (Regra das 18h)
+
+- **Rodar cleanup manual** (headless):
+
+```powershell
+C:\Temp\CerthubAgent\publish\Certhub.Agent.exe --cleanup --cleanup-mode=manual
+```
+
+- **Validar a Scheduled Task** (criada automaticamente no startup do agent):
+
+```powershell
+Get-ScheduledTask -TaskName "CertHub Agent Cleanup 18h"
+Get-ScheduledTaskInfo -TaskName "CertHub Agent Cleanup 18h"
+Start-ScheduledTask -TaskName "CertHub Agent Cleanup 18h"
+```
+
+- **Validar auditoria no DB** (Postgres):
+
+```sql
+select action, meta_json, timestamp
+from audit_log
+where action = 'CERT_REMOVED_18H'
+order by timestamp desc
+limit 5;
+```
+
+**Rollback S5**
+
+```powershell
+Unregister-ScheduledTask -TaskName "CertHub Agent Cleanup 18h" -Confirm:$false
+```
+
+```bash
+git revert <commit_sha>
+```
+
 3) Executar o `Certhub.Agent.exe` (tray app). No menu do tray:
 
 - **Pair device**: informe `API Base URL` (ex.: `http://localhost:8010/api/v1`), `Device ID` e `Device Token`.

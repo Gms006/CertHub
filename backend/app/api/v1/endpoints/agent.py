@@ -25,6 +25,7 @@ from app.models import (
 from app.schemas.agent import (
     AgentAuthRequest,
     AgentAuthResponse,
+    AgentCleanupEvent,
     AgentHeartbeatRequest,
     AgentJobStatusUpdate,
     AgentPayloadResponse,
@@ -64,6 +65,32 @@ def agent_heartbeat(
         device.agent_version = payload.agent_version
     device.last_seen_at = now
     device.last_heartbeat_at = now
+    db.commit()
+    return {"status": "ok"}
+
+
+@router.post("/cleanup")
+def agent_cleanup_event(
+    payload: AgentCleanupEvent,
+    db: Session = Depends(get_db),
+    device: Device = Depends(require_device),
+) -> dict[str, str]:
+    log_audit(
+        db=db,
+        org_id=device.org_id,
+        action="CERT_REMOVED_18H",
+        entity_type="cert_cleanup",
+        actor_device_id=device.id,
+        meta={
+            "device_id": str(device.id),
+            "removed_count": payload.removed_count,
+            "failed_count": payload.failed_count,
+            "removed_thumbprints": payload.removed_thumbprints,
+            "failed_thumbprints": payload.failed_thumbprints,
+            "mode": payload.mode,
+            "ran_at_local": payload.ran_at_local,
+        },
+    )
     db.commit()
     return {"status": "ok"}
 

@@ -123,6 +123,14 @@ public sealed class AgentClient
         }
     }
 
+    public async Task<HttpResponseMessage> PostCleanupAsync(CleanupEvent payload, CancellationToken cancellationToken)
+    {
+        return await PostWithAuthRetryAsync(
+            "agent/cleanup",
+            new StringContent(JsonSerializer.Serialize(payload, JsonOptions), Encoding.UTF8, "application/json"),
+            cancellationToken);
+    }
+
     private async Task<HttpResponseMessage> PostWithAuthRetryAsync(string path, HttpContent content, CancellationToken cancellationToken)
     {
         return await SendWithAuthRetryAsync(() => new HttpRequestMessage(HttpMethod.Post, path) { Content = content }, cancellationToken);
@@ -196,5 +204,26 @@ public sealed class AgentClient
 
         [JsonPropertyName("error_message")]
         public string? ErrorMessage { get; set; }
+    }
+
+    public sealed class CleanupEvent
+    {
+        [JsonPropertyName("removed_count")]
+        public int RemovedCount { get; set; }
+
+        [JsonPropertyName("failed_count")]
+        public int FailedCount { get; set; }
+
+        [JsonPropertyName("removed_thumbprints")]
+        public List<string>? RemovedThumbprints { get; set; }
+
+        [JsonPropertyName("failed_thumbprints")]
+        public List<string>? FailedThumbprints { get; set; }
+
+        [JsonPropertyName("mode")]
+        public string Mode { get; set; } = string.Empty;
+
+        [JsonPropertyName("ran_at_local")]
+        public string? RanAtLocal { get; set; }
     }
 }
