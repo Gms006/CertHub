@@ -166,6 +166,7 @@ certhub/
 │
 ├─ .env.example
 ├─ .gitignore
+├─ global.json
 ├─ ESTRUTURA_REPO.md
 ├─ PLANO_DESENVOLVIMENTO.md
 ├─ README.md
