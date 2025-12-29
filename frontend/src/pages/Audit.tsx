@@ -16,6 +16,19 @@ type AuditLogRead = {
   meta_json?: Record<string, unknown> | null;
 };
 
+const getJobId = (audit: AuditLogRead) => {
+  const metaJobId = audit.meta_json?.job_id;
+  if (typeof metaJobId === "string") {
+    return metaJobId;
+  }
+  if (audit.entity_type.toLowerCase() === "install_job") {
+    return audit.entity_id ?? undefined;
+  }
+  return undefined;
+};
+
+const formatShortId = (value: string) => value.slice(0, 8);
+
 const AuditPage = () => {
   const { apiFetch } = useAuth();
   const { toast, notify } = useToast();
@@ -105,39 +118,57 @@ const AuditPage = () => {
                 <th className="px-4 py-3">Quando</th>
                 <th className="px-4 py-3">Ator</th>
                 <th className="px-4 py-3">Ação</th>
+                <th className="px-4 py-3">Job</th>
                 <th className="px-4 py-3">Entidade</th>
                 <th className="px-4 py-3">Detalhes</th>
               </tr>
             </thead>
             <tbody>
-              {filteredAudits.map((audit) => (
-                <tr key={audit.id} className="border-t border-slate-100">
-                  <td className="px-4 py-4 text-slate-500">
-                    {formatDate(audit.timestamp)}
-                  </td>
-                  <td className="px-4 py-4 text-slate-700">
-                    {audit.actor_label ?? "-"}
-                  </td>
-                  <td className="px-4 py-4">
-                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                      {audit.action}
-                    </span>
-                  </td>
-                  <td className="px-4 py-4 text-slate-600">
-                    <div className="space-y-1">
-                      <p className="text-sm font-medium text-slate-700">
-                        {audit.entity_type}
-                      </p>
-                      <p className="text-xs text-slate-400">
-                        {audit.entity_id ?? "-"}
-                      </p>
-                    </div>
-                  </td>
-                  <td className="px-4 py-4 text-xs text-slate-500">
-                    {audit.meta_json ? JSON.stringify(audit.meta_json) : "-"}
-                  </td>
-                </tr>
-              ))}
+              {filteredAudits.map((audit) => {
+                const jobId = getJobId(audit);
+                return (
+                  <tr key={audit.id} className="border-t border-slate-100">
+                    <td className="px-4 py-4 text-slate-500">
+                      {formatDate(audit.timestamp)}
+                    </td>
+                    <td className="px-4 py-4 text-slate-700">
+                      {audit.actor_label ?? "-"}
+                    </td>
+                    <td className="px-4 py-4">
+                      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                        {audit.action}
+                      </span>
+                    </td>
+                    <td className="px-4 py-4 text-slate-600">
+                      {jobId ? (
+                        <div className="space-y-1">
+                          <span className="inline-flex rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
+                            {formatShortId(jobId)}
+                          </span>
+                          <p className="text-[11px] text-slate-400">
+                            job_id: {jobId}
+                          </p>
+                        </div>
+                      ) : (
+                        "-"
+                      )}
+                    </td>
+                    <td className="px-4 py-4 text-slate-600">
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium text-slate-700">
+                          {audit.entity_type}
+                        </p>
+                        <p className="text-xs text-slate-400">
+                          {audit.entity_id ?? "-"}
+                        </p>
+                      </div>
+                    </td>
+                    <td className="px-4 py-4 text-xs text-slate-500">
+                      {audit.meta_json ? JSON.stringify(audit.meta_json) : "-"}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

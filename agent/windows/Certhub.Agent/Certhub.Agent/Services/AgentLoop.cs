@@ -104,7 +104,16 @@ public sealed class AgentLoop
 
     private async Task RunPollingLoopAsync(AgentConfig config, string deviceToken, CancellationToken cancellationToken)
     {
-        var pollInterval = TimeSpan.FromSeconds(config.PollingIntervalSeconds);
+        var idleSeconds = Math.Max(config.PollingIntervalSecondsIdle, 1);
+        var activeSeconds = Math.Max(config.PollingIntervalSecondsActive, 1);
+        if (idleSeconds < activeSeconds)
+        {
+            idleSeconds = activeSeconds;
+        }
+
+        var pollInterval = TimeSpan.FromSeconds(activeSeconds);
+        var pollingMode = "active";
+        UpdateStatus(pollingIntervalSeconds: (int)pollInterval.TotalSeconds, pollingMode: pollingMode);
         var nextHeartbeat = DateTimeOffset.UtcNow;
 
         while (!cancellationToken.IsCancellationRequested)
@@ -117,9 +126,13 @@ public sealed class AgentLoop
                     : TimeSpan.FromSeconds(30));
             }
 
+            var hasActiveJob = false;
             try
             {
                 var jobs = await _client!.GetJobsAsync(cancellationToken);
+                hasActiveJob = jobs.Any(j => string.Equals(j.Status, "PENDING", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(j.Status, "REQUESTED", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(j.Status, "IN_PROGRESS", StringComparison.OrdinalIgnoreCase));
                 var job = jobs.FirstOrDefault(j => string.Equals(j.Status, "PENDING", StringComparison.OrdinalIgnoreCase)
                     || string.Equals(j.Status, "REQUESTED", StringComparison.OrdinalIgnoreCase));
                 if (job is not null)
@@ -133,6 +146,19 @@ public sealed class AgentLoop
                 UpdateStatus(error: "Polling failed");
             }
 
+            if (hasActiveJob)
+            {
+                pollInterval = TimeSpan.FromSeconds(activeSeconds);
+                pollingMode = "active";
+            }
+            else
+            {
+                var nextSeconds = Math.Min(idleSeconds, Math.Max(activeSeconds, (int)Math.Ceiling(pollInterval.TotalSeconds * 1.5)));
+                pollInterval = TimeSpan.FromSeconds(nextSeconds);
+                pollingMode = "idle";
+            }
+
+            UpdateStatus(pollingIntervalSeconds: (int)pollInterval.TotalSeconds, pollingMode: pollingMode);
             await Task.Delay(pollInterval, cancellationToken);
         }
     }
@@ -226,6 +252,7 @@ public sealed class AgentLoop
         {
             stored.Add(normalized);
             _thumbprintsStore.Save(_configStore.InstalledThumbprintsPath, stored);
+            _logger.Info($"Installed thumbprint persisted via DPAPI: {normalized}");
         }
 
         return normalized;
@@ -245,7 +272,9 @@ public sealed class AgentLoop
         DateTimeOffset? lastHeartbeatAt = null,
         string? lastJobId = null,
         string? lastJobStatus = null,
-        string? error = null)
+        string? error = null,
+        int? pollingIntervalSeconds = null,
+        string? pollingMode = null)
     {
         if (lastHeartbeatAt.HasValue)
         {
@@ -260,6 +289,16 @@ public sealed class AgentLoop
         if (!string.IsNullOrWhiteSpace(lastJobStatus))
         {
             _status.LastJobStatus = lastJobStatus;
+        }
+
+        if (pollingIntervalSeconds.HasValue)
+        {
+            _status.PollingIntervalSeconds = pollingIntervalSeconds;
+        }
+
+        if (!string.IsNullOrWhiteSpace(pollingMode))
+        {
+            _status.PollingMode = pollingMode;
         }
 
         _status.LastError = error;

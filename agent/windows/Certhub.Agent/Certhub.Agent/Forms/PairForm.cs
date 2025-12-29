@@ -8,7 +8,8 @@ public sealed class PairForm : Form
     private readonly TextBox _deviceIdTextBox = new();
     private readonly TextBox _deviceTokenTextBox = new();
     private readonly TextBox _portalUrlTextBox = new();
-    private readonly NumericUpDown _pollingIntervalInput = new();
+    private readonly NumericUpDown _pollingIdleIntervalInput = new();
+    private readonly NumericUpDown _pollingActiveIntervalInput = new();
     private readonly CheckBox _startWithWindows = new();
 
     public PairForm(AgentConfig? config, string? currentToken, bool startWithWindows)
@@ -18,12 +19,15 @@ public sealed class PairForm : Form
         MaximizeBox = false;
         MinimizeBox = false;
         Width = 560;
-        Height = 360;
+        Height = 390;
 
         _deviceTokenTextBox.UseSystemPasswordChar = true;
-        _pollingIntervalInput.Minimum = 5;
-        _pollingIntervalInput.Maximum = 3600;
-        _pollingIntervalInput.Value = config?.PollingIntervalSeconds ?? 30;
+        _pollingIdleIntervalInput.Minimum = 5;
+        _pollingIdleIntervalInput.Maximum = 3600;
+        _pollingIdleIntervalInput.Value = config?.PollingIntervalSecondsIdle ?? 30;
+        _pollingActiveIntervalInput.Minimum = 2;
+        _pollingActiveIntervalInput.Maximum = 3600;
+        _pollingActiveIntervalInput.Value = config?.PollingIntervalSecondsActive ?? 5;
         _startWithWindows.Text = "Iniciar com Windows";
         _startWithWindows.Checked = startWithWindows;
 
@@ -36,7 +40,7 @@ public sealed class PairForm : Form
         {
             Dock = DockStyle.Fill,
             ColumnCount = 2,
-            RowCount = 6,
+            RowCount = 7,
             Padding = new Padding(12)
         };
 
@@ -47,9 +51,10 @@ public sealed class PairForm : Form
         AddRow(layout, 1, "Device ID", _deviceIdTextBox);
         AddRow(layout, 2, "Device Token", _deviceTokenTextBox);
         AddRow(layout, 3, "Portal URL (opcional)", _portalUrlTextBox);
-        AddRow(layout, 4, "Polling interval (segundos)", _pollingIntervalInput);
+        AddRow(layout, 4, "Polling idle (segundos)", _pollingIdleIntervalInput);
+        AddRow(layout, 5, "Polling ativo (segundos)", _pollingActiveIntervalInput);
 
-        layout.Controls.Add(_startWithWindows, 1, 5);
+        layout.Controls.Add(_startWithWindows, 1, 6);
 
         var buttonPanel = new FlowLayoutPanel
         {
@@ -90,7 +95,8 @@ public sealed class PairForm : Form
             PortalUrl = string.IsNullOrWhiteSpace(_portalUrlTextBox.Text)
                 ? null
                 : _portalUrlTextBox.Text.Trim(),
-            PollingIntervalSeconds = (int)_pollingIntervalInput.Value
+            PollingIntervalSecondsIdle = (int)_pollingIdleIntervalInput.Value,
+            PollingIntervalSecondsActive = (int)_pollingActiveIntervalInput.Value
         };
         ResultDeviceToken = _deviceTokenTextBox.Text.Trim();
     }
