@@ -8,6 +8,7 @@ public sealed class StatusForm : Form
     private readonly Label _deviceLabel = new();
     private readonly Label _heartbeatLabel = new();
     private readonly Label _jobLabel = new();
+    private readonly Label _pollingLabel = new();
     private readonly Label _errorLabel = new();
 
     public StatusForm()
@@ -17,13 +18,13 @@ public sealed class StatusForm : Form
         MaximizeBox = false;
         MinimizeBox = false;
         Width = 520;
-        Height = 260;
+        Height = 290;
 
         var table = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
             ColumnCount = 2,
-            RowCount = 5,
+            RowCount = 6,
             Padding = new Padding(12),
             AutoSize = true
         };
@@ -35,7 +36,8 @@ public sealed class StatusForm : Form
         AddRow(table, 1, "Device ID:", _deviceLabel);
         AddRow(table, 2, "Last Heartbeat:", _heartbeatLabel);
         AddRow(table, 3, "Last Job:", _jobLabel);
-        AddRow(table, 4, "Last Error:", _errorLabel);
+        AddRow(table, 4, "Polling:", _pollingLabel);
+        AddRow(table, 5, "Last Error:", _errorLabel);
 
         Controls.Add(table);
     }
@@ -48,6 +50,9 @@ public sealed class StatusForm : Form
         _jobLabel.Text = string.IsNullOrWhiteSpace(status.LastJobId)
             ? "-"
             : $"{status.LastJobStatus} ({status.LastJobId})";
+        _pollingLabel.Text = status.PollingIntervalSeconds is null
+            ? "-"
+            : $"{status.PollingIntervalSeconds}s ({status.PollingMode ?? "idle"})";
         _errorLabel.Text = status.LastError ?? "-";
     }
 

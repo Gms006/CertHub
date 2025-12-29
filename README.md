@@ -99,6 +99,7 @@ O executável fica em:
 
 - **Pair device**: informe `API Base URL` (ex.: `http://localhost:8010/api/v1`), `Device ID` e `Device Token`.
 - **Iniciar com Windows** fica habilitado por padrão (HKCU Run).
+- **Polling idle/ativo**: padrão 30s (idle) / 5s (ativo) para reduzir o tempo de claim.
 - (Opcional) configurar `Portal URL` para abrir o frontend.
 
 4) Teste rápido:
@@ -106,6 +107,28 @@ O executável fica em:
 - No portal, crie um job de instalação para o device.
 - O agent deve fazer claim, baixar payload e instalar no `Current User > Personal` (`certmgr.msc`).
 - O job passa para DONE com thumbprint.
+
+## Deploy do Agent em outras máquinas (piloto)
+
+1) Copiar o executável publicado para a máquina alvo (ex.):
+   - `C:\ProgramData\CertHubAgent\Certhub.Agent.exe`
+2) Executar **uma vez** para parear (tray → **Pair device**):
+   - **API Base URL** (ex.: `https://<dominio>/api/v1`)
+   - **Device ID** (um por máquina)
+   - **Device Token** (gerado no portal / API)
+3) Habilitar auto-start:
+   - Marcar **Iniciar com Windows** (cria entry em HKCU Run).
+   - Confirmar que o ícone do agent está em **Ícones ocultos** do tray.
+4) Validar no portal/DB:
+   - `last_heartbeat_at` atualizado (timestamps no DB são **UTC +00**).
+   - Job vai de `PENDING` → `DONE` e grava thumbprint.
+
+**Troubleshooting rápido**
+
+- Tray não aparece → verifique **Ícones ocultos** do tray.
+- “API Base: Not configured” na tela de status → executar **Pair device** novamente.
+- “Auth failed” → Device ID/token inválido ou expirado.
+- Job demora para claim → confira o polling atual no **CertHub Agent Status**.
 
 ## Variáveis de ambiente (.env)
 
@@ -332,13 +355,13 @@ Invoke-RestMethod -Method Post "http://localhost:8010/api/v1/agent/jobs/<JOB_ID>
 
 - [ ] Agent abre no tray e persiste config.
 - [ ] Auto-start registry (HKCU Run) criado.
-- [ ] Heartbeat atualiza `last_heartbeat_at` no DB.
-- [ ] Polling encontra job PENDING.
-- [ ] Claim muda status para IN_PROGRESS e preenche `started_at/claimed_at`.
-- [ ] Payload baixa PFX + senha.
-- [ ] Certificado aparece no certmgr.msc (Current User > Personal).
-- [ ] Result marca DONE e grava thumbprint no DB.
-- [ ] `installed_thumbprints` (DPAPI) atualizado.
+- [x] Heartbeat atualiza `last_heartbeat_at` no DB.
+- [x] Polling encontra job PENDING.
+- [x] Claim muda status para IN_PROGRESS e preenche `started_at/claimed_at`.
+- [x] Payload baixa PFX + senha.
+- [x] Certificado aparece no certmgr.msc (Current User > Personal).
+- [x] Result marca DONE e grava thumbprint no DB.
+- [x] `installed_thumbprints` (DPAPI) atualizado.
 
 ## S2 — Auth + RBAC (roteiro PowerShell)
 
