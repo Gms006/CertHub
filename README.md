@@ -11,7 +11,7 @@ Objetivo: substituir o diretório público de `.pfx` por um fluxo controlado via
 ## Arquitetura (alto nível)
 - **Backend/API**: mantém catálogo (ingest), cria jobs e registra auditoria
 - **Frontend/Portal**: UI SaaS (tema azul escuro) com abas Certificados/Jobs/Dispositivos/Auditoria
-- **Agent Windows** (planejado): registra device, faz polling de jobs, instala no store do usuário e remove às 18h
+- **Agent Windows**: registra device, faz polling de jobs, instala no store do usuário e remove às 18h (S5)
 
 ## Estrutura do repo
 - `backend/`: FastAPI + Alembic + Postgres
@@ -22,7 +22,7 @@ Objetivo: substituir o diretório público de `.pfx` por um fluxo controlado via
 - Python 3.10+
 - Node 18+
 - Docker (recomendado para Postgres)
-- (Agent futuro) .NET 8 SDK
+- (Agent Windows) .NET 8 SDK
 
 > Nota: o backend fixa `passlib[bcrypt]==1.7.4` com `bcrypt==3.2.2` para evitar o erro
 > "password cannot be longer than 72 bytes" introduzido em bcrypt 4+ (o passlib 1.7.4
@@ -57,6 +57,40 @@ npm install
 npm run dev
 ```
 
+## Quickstart Agent Windows (S4)
+
+1) Provisionar device e token (ADMIN/DEV) no portal ou via API:
+
+```powershell
+$device = Invoke-RestMethod -Method Post "http://localhost:8000/api/v1/admin/devices" `
+  -Headers @{ Authorization = "Bearer <JWT_ADMIN>" } `
+  -ContentType "application/json" `
+  -Body '{"hostname":"PC-01","domain":"NETOCMS","os_version":"Windows 11","agent_version":"1.0.0"}'
+
+$device.device_token
+$device.id
+```
+
+2) Build/publish do agent:
+
+```powershell
+Set-Location agent\windows\Certhub.Agent
+dotnet restore
+dotnet publish -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true /p:IncludeNativeLibrariesForSelfExtract=true
+```
+
+3) Executar o `Certhub.Agent.exe` (tray app). No menu do tray:
+
+- **Pair device**: informe `API Base URL` (ex.: `http://localhost:8000/api/v1`), `Device ID` e `Device Token`.
+- **Iniciar com Windows** fica habilitado por padrão (HKCU Run).
+- (Opcional) configurar `Portal URL` para abrir o frontend.
+
+4) Teste rápido:
+
+- No portal, crie um job de instalação para o device.
+- O agent deve fazer claim, baixar payload e instalar no `Current User > Personal` (`certmgr.msc`).
+- O job passa para DONE com thumbprint.
+
 ## Variáveis de ambiente (.env)
 
 Veja `.env.example`.
@@ -71,7 +105,7 @@ Veja `.env.example`.
 
 ## Watcher (S4.1)
 
-> Planejado para rodar em paralelo ao backend, com Redis + RQ.
+> Rodar em paralelo ao backend, com Redis + RQ.
 
 **Rodar em dev (PowerShell, terminais separados):**
 
@@ -138,6 +172,50 @@ psql "$env:DATABASE_URL" -c "select id, source_path from certificates where sour
 # Após deletar o arquivo monitorado:
 psql "$env:DATABASE_URL" -c "select id from certificates where source_path = 'C:\\certs\\teste.pfx';"
 ```
+
+### Validação S4.1 Watcher (checklist rápido)
+
+```powershell
+# Infra
+docker compose -f infra/docker-compose.yml up -d
+
+# Worker
+Set-Location backend
+$env:REDIS_URL="redis://localhost:6380/0"
+$env:RQ_QUEUE_NAME="certs"
+python -m app.workers.rq_worker
+```
+
+Em outro terminal:
+
+```powershell
+Set-Location backend
+$env:ORG_ID="1"
+$env:CERTIFICADOS_ROOT="C:\\certs"
+$env:WATCHER_DEBOUNCE_SECONDS="2"
+$env:WATCHER_MAX_EVENTS_PER_MINUTE="60"
+$env:REDIS_URL="redis://localhost:6380/0"
+$env:RQ_QUEUE_NAME="certs"
+python -m app.watchers.pfx_directory
+```
+
+```powershell
+# Created/modified (raiz)
+Copy-Item "C:\\origem\\teste.pfx" "C:\\certs\\teste.pfx"
+psql "$env:DATABASE_URL" -c "select id, source_path from certificates where source_path = 'C:\\certs\\teste.pfx';"
+
+# Deleted (raiz)
+Remove-Item "C:\\certs\\teste.pfx"
+psql "$env:DATABASE_URL" -c "select id from certificates where source_path = 'C:\\certs\\teste.pfx';"
+
+# Move para fora da raiz (delete)
+Move-Item "C:\\certs\\teste.pfx" "C:\\origem\\teste.pfx"
+
+# Move para dentro da raiz (ingest)
+Move-Item "C:\\origem\\teste.pfx" "C:\\certs\\teste.pfx"
+```
+
+> Subpastas devem ser ignoradas (`C:\\certs\\sub\\teste.pfx` não entra no watcher).
 
 **Rollback (S4.1)**
 
@@ -220,6 +298,31 @@ Invoke-RestMethod -Method Post "http://localhost:8000/api/v1/agent/jobs/<JOB_ID>
    cd backend && alembic downgrade -1
    ```
 2. Reverter o commit do S4.
+
+## Checklist de aceite (S4/S4.1)
+
+### S4.1
+
+- [ ] Redis rodando.
+- [ ] Worker rodando.
+- [ ] Watcher rodando.
+- [ ] Adicionar `.pfx` na raiz ⇒ certificado no DB.
+- [ ] Remover `.pfx` ⇒ delete no DB.
+- [ ] Subpasta ignorada.
+- [ ] Move para fora da raiz ⇒ delete no DB.
+- [ ] Move para dentro da raiz ⇒ ingest no DB.
+
+### S4 Agent
+
+- [ ] Agent abre no tray e persiste config.
+- [ ] Auto-start registry (HKCU Run) criado.
+- [ ] Heartbeat atualiza `last_heartbeat_at` no DB.
+- [ ] Polling encontra job PENDING.
+- [ ] Claim muda status para IN_PROGRESS e preenche `started_at/claimed_at`.
+- [ ] Payload baixa PFX + senha.
+- [ ] Certificado aparece no certmgr.msc (Current User > Personal).
+- [ ] Result marca DONE e grava thumbprint no DB.
+- [ ] `installed_thumbprints` (DPAPI) atualizado.
 
 ## S2 — Auth + RBAC (roteiro PowerShell)
 

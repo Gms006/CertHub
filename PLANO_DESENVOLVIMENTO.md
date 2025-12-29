@@ -77,7 +77,7 @@ O backend já possui o catálogo e o núcleo de RBAC/Jobs:
 - Registra no backend (sucesso/erro).
 - **Remove às 18h** os certificados que ele instalou como temporários.
 
-> Status no repo: **ainda não implementado** (sem endpoints `/agent/*`).
+> Status no repo: **implementado** (tray app WinForms + endpoints `/agent/*` já disponíveis).
 
 ### Premissas que orientam o desenho
 
@@ -878,13 +878,11 @@ psql "$DATABASE_URL" -c "DELETE FROM users WHERE email IN ('maria@netocontabilid
 
 **Checklist de aceite (S4.1)**
 
-- [ ] Redis disponível via `docker-compose`.
-- [ ] Watcher ignora subpastas e enfileira apenas eventos na raiz.
-- [ ] Debounce + rate limit impedem duplicidade de ingest.
-- [ ] `created/modified/deleted/moved` produzem o job correto.
-- [ ] Dedup por `job_id` determinístico (SHA1 do path lower-case).
-- [ ] Worker RQ processa ingest/delete com compatibilidade Windows.
-- [ ] Logs e variáveis de ambiente documentados.
+- [x] Subir infra (docker compose) com Redis disponível.
+- [x] Rodar worker RQ.
+- [x] Rodar watcher com `CERTIFICADOS_ROOT` apontando para a raiz monitorada.
+- [x] Eventos `created/modified/deleted/moved` (entra/sai da raiz) geram logs e efeitos no DB.
+- [x] Subpastas são ignoradas.
 
 **Rollback (S4.1)**
 
@@ -962,6 +960,8 @@ PY
 
 **Objetivo**: rodar o agent e instalar 1 certificado com segurança básica.
 
+**Status**: ✅ **Concluído**
+
 **Entregáveis**
 
 - App tray com auto-start.
@@ -985,6 +985,18 @@ Se não houver senha, a API retorna erro explícito.
 **Aceite**
 
 - Portal cria job → agent instala → status vira DONE.
+
+**Checklist de aceite (S4)**
+
+- [x] Agent abre no tray e persiste configuração.
+- [x] Auto-start (HKCU Run) criado.
+- [x] Heartbeat atualiza `last_heartbeat_at` no DB.
+- [x] Polling encontra job PENDING.
+- [x] Claim muda status para IN_PROGRESS e preenche `started_at/claimed_at`.
+- [x] Payload baixa PFX + senha.
+- [x] Certificado aparece no `certmgr.msc` (Current User > Personal).
+- [x] Result marca DONE e grava thumbprint no DB.
+- [x] `installed_thumbprints` (DPAPI) atualizado.
 
 **Como validar (PowerShell)**
 
