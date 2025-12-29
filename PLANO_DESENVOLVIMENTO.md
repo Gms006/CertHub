@@ -1075,6 +1075,36 @@ Invoke-RestMethod -Method Post "http://localhost:8010/api/v1/agent/jobs/<JOB_ID>
 - Instala 10:00 → 18:00 remove.
 - Certificados pré-existentes não são removidos.
 
+**Validação (S5)**
+
+```powershell
+# Rodar cleanup manual (headless)
+C:\Temp\CerthubAgent\publish\Certhub.Agent.exe --cleanup --cleanup-mode=manual
+
+# Verificar Scheduled Task
+Get-ScheduledTask -TaskName "CertHub Agent Cleanup 18h"
+Get-ScheduledTaskInfo -TaskName "CertHub Agent Cleanup 18h"
+Start-ScheduledTask -TaskName "CertHub Agent Cleanup 18h"
+```
+
+```sql
+select action, meta_json, timestamp
+from audit_log
+where action = 'CERT_REMOVED_18H'
+order by timestamp desc
+limit 5;
+```
+
+**Rollback (S5)**
+
+```powershell
+Unregister-ScheduledTask -TaskName "CertHub Agent Cleanup 18h" -Confirm:$false
+```
+
+```bash
+git revert <commit_sha>
+```
+
 ---
 
 ## S6 — Hardening (segurança de payload + device binding)
@@ -1158,7 +1188,7 @@ Invoke-RestMethod -Method Post "http://localhost:8010/api/v1/agent/jobs/<JOB_ID>
 - [ ] Jobs: token one-time + expiração curta + rate limit.
 - [ ] Device binding: device registrado e is_allowed.
 - [ ] Auditoria: INSTALL_REQUESTED / INSTALL_APPROVED / INSTALL_DENIED / CLAIM / DONE / FAILED / REMOVED_18H.
-- [ ] Limpeza 18h garantida (Scheduled Task + fallback no startup).
+- [x] Limpeza 18h garantida (Scheduled Task + fallback no startup).
 - [ ] TLS interno (mesmo self-signed) com certificado confiável nas máquinas.
 - [ ] Backup do DB + logs + diretório de certificados.
 

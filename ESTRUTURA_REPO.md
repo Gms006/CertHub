@@ -107,11 +107,13 @@ certhub/
 │           │  ├─ AgentClient.cs
 │           │  ├─ AgentConfigStore.cs
 │           │  ├─ AgentLoop.cs
+│           │  ├─ CertificateCleanupService.cs
 │           │  ├─ DpapiStore.cs
 │           │  ├─ InstalledThumbprintsStore.cs
 │           │  ├─ Logger.cs
 │           │  ├─ PortalUrlHelper.cs
-│           │  └─ RegistryAutoStart.cs
+│           │  ├─ RegistryAutoStart.cs
+│           │  └─ ScheduledCleanupTaskService.cs
 │           └─ Tray/
 │              └─ TrayAppContext.cs
 │
