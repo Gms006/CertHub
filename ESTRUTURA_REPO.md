@@ -22,6 +22,7 @@ certhub/
 │  │  │  ├─ __init__.py
 │  │  │  ├─ audit.py
 │  │  │  ├─ config.py
+│  │  │  ├─ rate_limit.py
 │  │  │  └─ security.py
 │  │  ├─ db/
 │  │  │  ├─ __init__.py
@@ -71,13 +72,15 @@ certhub/
 │  │     ├─ 0005_user_updated_at.py
 │  │     ├─ 0006_remove_user_emp_perm.py
 │  │     ├─ 0007_auth_tokens_sessions.py
-│  │     └─ 0008_device_assigned_user.py
+│  │     ├─ 0008_device_assigned_user.py
+│  │     └─ 0009_job_payload_tokens.py
 │  ├─ tests/
 │  │  ├─ __init__.py
 │  │  ├─ conftest.py
 │  │  ├─ helpers.py
 │  │  ├─ test_admin_devices_assignment.py
 │  │  ├─ test_admin_users_update.py
+│  │  ├─ test_agent_payload_hardening.py
 │  │  ├─ test_certificate_ingest.py
 │  │  ├─ test_workers_queue.py
 │  │  └─ test_rbac_jobs.py

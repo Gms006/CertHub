@@ -4,6 +4,8 @@ from typing import Literal
 
 from pydantic import BaseModel
 
+from app.schemas.install_job import InstallJobRead
+
 
 class AgentAuthRequest(BaseModel):
     device_id: uuid.UUID
@@ -42,3 +44,7 @@ class AgentCleanupEvent(BaseModel):
     failed_thumbprints: list[str] | None = None
     mode: Literal["scheduled", "fallback", "manual"]
     ran_at_local: str | None = None
+
+
+class AgentJobClaimResponse(InstallJobRead):
+    payload_token: str
