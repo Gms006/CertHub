@@ -122,6 +122,14 @@ def test_payload_token_single_use(test_client_and_session, tmp_path):
         headers=_auth_headers_for_device(device),
     )
     assert reuse.status_code == status.HTTP_409_CONFLICT
+    audit = (
+        db.query(models.AuditLog)
+        .filter_by(action="PAYLOAD_DENIED")
+        .order_by(models.AuditLog.timestamp.desc())
+        .first()
+    )
+    assert audit
+    assert audit.meta_json["reason"] == "token_used"
 
 
 def test_payload_token_expired(test_client_and_session, tmp_path):
@@ -146,6 +154,14 @@ def test_payload_token_expired(test_client_and_session, tmp_path):
         headers=_auth_headers_for_device(device),
     )
     assert response.status_code == status.HTTP_410_GONE
+    audit = (
+        db.query(models.AuditLog)
+        .filter_by(action="PAYLOAD_DENIED")
+        .order_by(models.AuditLog.timestamp.desc())
+        .first()
+    )
+    assert audit
+    assert audit.meta_json["reason"] == "token_expired"
 
 
 def test_payload_device_mismatch(test_client_and_session, tmp_path):
@@ -169,6 +185,44 @@ def test_payload_device_mismatch(test_client_and_session, tmp_path):
     )
 
     assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+def test_payload_token_ttl_and_mismatch(test_client_and_session, tmp_path):
+    client, sessionmaker = test_client_and_session
+    db = sessionmaker()
+
+    device, _ = _create_device(db)
+    _, _, job = _create_job(db, device, tmp_path, models.JOB_STATUS_PENDING)
+
+    before = datetime.now(timezone.utc)
+    claim_response = client.post(
+        f"/api/v1/agent/jobs/{job.id}/claim",
+        headers=_auth_headers_for_device(device),
+        json={},
+    )
+    assert claim_response.status_code == status.HTTP_200_OK
+
+    db.refresh(job)
+    expires_at = job.payload_token_expires_at
+    assert expires_at is not None
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    delta = (expires_at - before).total_seconds()
+    assert 115 <= delta <= 125
+
+    response = client.get(
+        f"/api/v1/agent/jobs/{job.id}/payload?token=wrong-token",
+        headers=_auth_headers_for_device(device),
+    )
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+    audit = (
+        db.query(models.AuditLog)
+        .filter_by(action="PAYLOAD_DENIED")
+        .order_by(models.AuditLog.timestamp.desc())
+        .first()
+    )
+    assert audit
+    assert audit.meta_json["reason"] == "token_mismatch"
 
 
 def test_payload_rate_limit(test_client_and_session, tmp_path, monkeypatch):

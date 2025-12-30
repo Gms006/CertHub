@@ -454,6 +454,22 @@ def job_result(
         .returning(CertInstallJob)
     ).scalar_one_or_none()
     if result is None:
+        db.refresh(job)
+        action = "RESULT_DUPLICATE" if job.status in {JOB_STATUS_DONE, JOB_STATUS_FAILED} else "RESULT_DENIED"
+        log_audit(
+            db=db,
+            org_id=device.org_id,
+            action=action,
+            entity_type="cert_install_job",
+            entity_id=job_id,
+            actor_device_id=device.id,
+            meta={
+                "job_id": str(job_id),
+                "device_id": str(device.id),
+                "status": job.status,
+            },
+        )
+        db.commit()
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="job not updatable")
 
     log_audit(
