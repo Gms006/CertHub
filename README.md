@@ -629,6 +629,48 @@ alembic downgrade -1
 git revert <commit_sha>
 ```
 
+### Validação rápida (S6)
+
+```powershell
+# Auth do agent (device_id + device_token)
+$auth = Invoke-RestMethod -Method Post "http://localhost:8010/api/v1/agent/auth" `
+  -ContentType "application/json" `
+  -Body (@{ device_id = "<DEVICE_ID>"; device_token = "<DEVICE_TOKEN>" } | ConvertTo-Json)
+$agentJwt = $auth.access_token
+
+# Claim retorna payload_token
+$claim = Invoke-RestMethod -Method Post "http://localhost:8010/api/v1/agent/jobs/<JOB_ID>/claim" `
+  -Headers @{ Authorization = "Bearer $agentJwt" } `
+  -ContentType "application/json" `
+  -Body "{}"
+$claim.payload_token
+
+# Payload exige token one-time via query string
+Invoke-RestMethod "http://localhost:8010/api/v1/agent/jobs/<JOB_ID>/payload?token=$($claim.payload_token)" `
+  -Headers @{ Authorization = "Bearer $agentJwt" }
+
+# Reuso do token (esperado: 409)
+Invoke-WebRequest "http://localhost:8010/api/v1/agent/jobs/<JOB_ID>/payload?token=$($claim.payload_token)" `
+  -Headers @{ Authorization = "Bearer $agentJwt" } `
+  -SkipHttpErrorCheck | Select-Object StatusCode
+```
+
+Auditoria:
+```sql
+select action, meta_json, timestamp
+from audit_log
+where action in ('PAYLOAD_ISSUED', 'PAYLOAD_DENIED', 'PAYLOAD_RATE_LIMITED')
+order by timestamp desc
+limit 10;
+```
+
+Rollback S6:
+```bash
+cd backend
+alembic downgrade -1
+git revert <commit_sha>
+```
+
 ### Exemplo: habilitar auto-approve para um usuário VIEW
 
 Endpoint ADMIN para atualizar um usuário existente (mesmo `org_id`) e permitir auto-approve em jobs de instalação:
