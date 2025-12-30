@@ -1,3 +1,4 @@
+using System.Net;
 using System.Security.Cryptography.X509Certificates;
 using Certhub.Agent.Models;
 
@@ -5,6 +6,7 @@ namespace Certhub.Agent.Services;
 
 public sealed class AgentLoop
 {
+    private static readonly TimeSpan MaxRateLimitDelay = TimeSpan.FromSeconds(30);
     private readonly AgentConfigStore _configStore;
     private readonly DpapiStore _dpapiStore;
     private readonly InstalledThumbprintsStore _thumbprintsStore;
@@ -265,16 +267,64 @@ public sealed class AgentLoop
 
     private async Task FetchAndInstallAsync(Guid jobId, string payloadToken, CancellationToken cancellationToken)
     {
-        AgentClient.PayloadResponse payload;
+        AgentClient.PayloadResponse? payload = null;
+        var currentToken = payloadToken;
+        var attempt = 0;
+        var maxAttempts = 5;
+        var rateLimitDelay = TimeSpan.FromSeconds(1);
+
         try
         {
-            payload = await _client!.GetPayloadAsync(jobId, payloadToken, cancellationToken);
+            while (attempt < maxAttempts)
+            {
+                try
+                {
+                    payload = await _client!.GetPayloadAsync(jobId, currentToken, cancellationToken);
+                    break;
+                }
+                catch (AgentClient.ApiRequestException ex) when (ex.StatusCode == HttpStatusCode.TooManyRequests)
+                {
+                    var delay = GetJitteredDelay(rateLimitDelay);
+                    _logger.Warn($"Payload rate limited for job {jobId}. Retrying in {delay.TotalSeconds:F1}s.");
+                    await Task.Delay(delay, cancellationToken);
+                    rateLimitDelay = TimeSpan.FromSeconds(Math.Min(rateLimitDelay.TotalSeconds * 2, MaxRateLimitDelay.TotalSeconds));
+                    attempt++;
+                }
+                catch (AgentClient.ApiRequestException ex) when (ex.StatusCode == HttpStatusCode.Gone
+                    || ex.StatusCode == HttpStatusCode.Conflict
+                    || ex.StatusCode == HttpStatusCode.Forbidden)
+                {
+                    _logger.Warn($"Payload token rejected ({(int)ex.StatusCode}) for job {jobId}. Re-claiming.");
+                    await Task.Delay(GetJitteredDelay(TimeSpan.FromSeconds(1)), cancellationToken);
+                    try
+                    {
+                        currentToken = await _client!.ClaimJobAsync(jobId, cancellationToken);
+                        UpdateStatus(lastJobStatus: "PAYLOAD_TOKEN_REFRESHED", error: null);
+                    }
+                    catch (Exception claimEx)
+                    {
+                        _logger.Warn($"Re-claim failed for job {jobId}: {claimEx.Message}");
+                        break;
+                    }
+
+                    attempt++;
+                }
+                catch (AgentClient.ApiRequestException ex)
+                {
+                    _logger.Error($"Payload fetch failed for job {jobId}: {(int)ex.StatusCode} {ex.Message}");
+                    break;
+                }
+            }
         }
         catch (Exception ex)
         {
             _logger.Error($"Payload fetch failed for job {jobId}", ex);
+        }
+
+        if (payload is null)
+        {
             await ReportFailureAsync(jobId, "PAYLOAD_FAILED", "Failed to fetch payload", cancellationToken);
-            UpdateStatus(lastJobStatus: "PAYLOAD_FAILED", error: ex.Message);
+            UpdateStatus(lastJobStatus: "PAYLOAD_FAILED", error: "Failed to fetch payload");
             return;
         }
 
@@ -368,5 +418,13 @@ public sealed class AgentLoop
 
         _status.LastError = error;
         StatusChanged?.Invoke();
+    }
+
+    private static TimeSpan GetJitteredDelay(TimeSpan baseDelay)
+    {
+        var jitterSeconds = baseDelay.TotalSeconds * 0.2;
+        var jitter = (Random.Shared.NextDouble() * 2 - 1) * jitterSeconds;
+        var totalSeconds = Math.Max(0, baseDelay.TotalSeconds + jitter);
+        return TimeSpan.FromSeconds(totalSeconds);
     }
 }

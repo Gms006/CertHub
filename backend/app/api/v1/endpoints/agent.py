@@ -226,7 +226,7 @@ def job_payload(
             entity_id=job_id,
             actor_device_id=device.id,
             meta={
-                "reason": "job_device_mismatch",
+                "reason": "device_mismatch",
                 "job_id": str(job_id),
                 "ip": request.client.host if request.client else None,
             },
@@ -242,7 +242,7 @@ def job_payload(
             entity_id=job_id,
             actor_device_id=device.id,
             meta={
-                "reason": "job_not_in_progress",
+                "reason": "token_used",
                 "job_id": str(job_id),
                 "ip": request.client.host if request.client else None,
             },
@@ -258,7 +258,7 @@ def job_payload(
             entity_id=job_id,
             actor_device_id=device.id,
             meta={
-                "reason": "claim_device_mismatch",
+                "reason": "device_mismatch",
                 "job_id": str(job_id),
                 "ip": request.client.host if request.client else None,
             },
@@ -315,7 +315,7 @@ def job_payload(
             entity_id=job_id,
             actor_device_id=device.id,
             meta={
-                "reason": "token_device_mismatch",
+                "reason": "device_mismatch",
                 "job_id": str(job_id),
                 "ip": request.client.host if request.client else None,
             },
@@ -331,7 +331,7 @@ def job_payload(
             entity_id=job_id,
             actor_device_id=device.id,
             meta={
-                "reason": "token_missing",
+                "reason": "missing_token",
                 "job_id": str(job_id),
                 "ip": request.client.host if request.client else None,
             },

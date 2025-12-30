@@ -110,7 +110,9 @@ public sealed class AgentClient
         var body = await response.Content.ReadAsStringAsync(cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
-            throw new InvalidOperationException($"Payload request failed: {(int)response.StatusCode} {response.ReasonPhrase}");
+            throw new ApiRequestException(
+                $"Payload request failed: {(int)response.StatusCode} {response.ReasonPhrase}",
+                response.StatusCode);
         }
 
         var payload = JsonSerializer.Deserialize<PayloadResponse>(body, JsonOptions);
@@ -128,6 +130,11 @@ public sealed class AgentClient
             $"agent/jobs/{jobId}/result",
             new StringContent(JsonSerializer.Serialize(update, JsonOptions), Encoding.UTF8, "application/json"),
             cancellationToken);
+        if (response.StatusCode == HttpStatusCode.Conflict)
+        {
+            _logger.Warn("Result update rejected: job not updatable.");
+            return;
+        }
         if (!response.IsSuccessStatusCode)
         {
             _logger.Warn($"Result update failed: {(int)response.StatusCode} {response.ReasonPhrase}");
@@ -242,5 +249,15 @@ public sealed class AgentClient
 
         [JsonPropertyName("ran_at_local")]
         public string? RanAtLocal { get; set; }
+    }
+
+    public sealed class ApiRequestException : Exception
+    {
+        public ApiRequestException(string message, HttpStatusCode statusCode) : base(message)
+        {
+            StatusCode = statusCode;
+        }
+
+        public HttpStatusCode StatusCode { get; }
     }
 }
