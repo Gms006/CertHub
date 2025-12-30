@@ -1127,6 +1127,35 @@ git revert <commit_sha>
 **Aceite**
 
 - Requisição de payload sem credencial do agent falha.
+- Token payload é single-use, expira em 120s e é validado por device.
+- /result é idempotente (replay retorna 409 com audit de duplicidade).
+- Reaper de jobs presos em IN_PROGRESS funciona e registra JOB_REAPED.
+- Audit logs registram PAYLOAD_DENIED e PAYLOAD_RATE_LIMITED com meta consistente.
+
+**Validação (S6)**
+
+```bash
+# Backend
+cd backend
+alembic upgrade head
+pytest
+python -m pytest -q ./tests/test_agent_payload_hardening.py ./tests/test_agent_job_controls.py
+```
+
+```bash
+# Reaper (ADMIN/DEV)
+curl -X POST "http://localhost:8010/api/v1/admin/jobs/reap?threshold_minutes=60" \
+  -H "Authorization: Bearer <JWT_ADMIN>"
+```
+
+```sql
+-- Auditorias chave
+select action, meta_json, timestamp
+from audit_log
+where action in ('PAYLOAD_DENIED', 'PAYLOAD_RATE_LIMITED', 'RESULT_DUPLICATE', 'JOB_REAPED')
+order by timestamp desc
+limit 20;
+```
 
 ---
 

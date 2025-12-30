@@ -281,7 +281,7 @@ def list_devices(
     payload: list[DeviceRead] = []
     for device, last_job_created_at in results:
         response = DeviceRead.model_validate(device, from_attributes=True)
-        response = response.model_copy(update={"last_seen_at": last_job_created_at})
+        response = response.model_copy(update={"last_job_at": last_job_created_at})
         payload.append(response)
     return payload
 
