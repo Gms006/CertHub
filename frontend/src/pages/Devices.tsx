@@ -205,7 +205,7 @@ const DevicesPage = () => {
               </div>
               <div className="mt-4 flex flex-wrap gap-2">
                 <button
-                  className="inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600"
+                  className="inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600"
                   onClick={() => {
                     setSelectedDevice(device);
                     setModalOpen(true);
@@ -215,7 +215,7 @@ const DevicesPage = () => {
                   Gerenciar
                 </button>
                 <button
-                  className="inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-full bg-[#0e2659] px-3 text-xs font-semibold text-white"
+                  className="inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-2xl bg-[#0e2659] px-3 text-xs font-semibold text-white"
                   onClick={() => handleToggle(device.id, !device.is_allowed)}
                 >
                   {device.is_allowed ? (

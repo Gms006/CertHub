@@ -262,7 +262,7 @@ const CertCard = ({
           <div className="flex shrink-0 flex-col gap-2">
             <button
               onClick={onInstall}
-              className="inline-flex h-9 w-[120px] items-center justify-center gap-2 rounded-lg bg-slate-900 px-3 text-xs font-semibold text-white hover:bg-slate-800"
+              className="inline-flex h-9 w-[120px] items-center justify-center gap-2 rounded-2xl bg-slate-900 px-3 text-xs font-semibold text-white hover:bg-slate-800"
             >
               <Key className="h-4 w-4" />
               Instalar
@@ -270,7 +270,7 @@ const CertCard = ({
 
             <button
               onClick={onDetails}
-              className="inline-flex h-9 w-[120px] items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+              className="inline-flex h-9 w-[120px] items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50"
             >
               <InfoIcon className="h-4 w-4" />
               Detalhes
@@ -721,9 +721,10 @@ const CertificatesPage = () => {
             Exportar
           </button>
           <button
-            className="h-11 rounded-2xl bg-[#0e2659] px-4 text-sm font-semibold text-white"
+            className="inline-flex h-11 items-center gap-2 rounded-2xl bg-[#0e2659] px-4 text-sm font-semibold text-white whitespace-nowrap"
             onClick={() => handleOpenInstall()}
           >
+            <Key className="h-4 w-4" />
             Instalar via Agent
           </button>
         </div>
