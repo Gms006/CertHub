@@ -43,7 +43,12 @@ const DevicesPage = () => {
         return;
       }
       const data = (await response.json()) as DeviceRead[];
-      setDevices(data);
+      setDevices(
+        data.map((device) => ({
+          ...device,
+          auto_approve: Boolean((device as { auto_approve?: boolean }).auto_approve),
+        })),
+      );
     } catch {
       notify("Erro ao carregar devices.", "error");
     } finally {
