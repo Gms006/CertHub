@@ -14,6 +14,7 @@ class DeviceBase(BaseModel):
     last_seen_at: datetime | None = None
     last_heartbeat_at: datetime | None = None
     is_allowed: bool = True
+    auto_approve: bool = False
     assigned_user_id: uuid.UUID | None = None
 
 
@@ -23,6 +24,7 @@ class DeviceCreate(DeviceBase):
 
 class DeviceUpdate(BaseModel):
     is_allowed: bool | None = None
+    auto_approve: bool | None = None
     assigned_user_id: uuid.UUID | None = None
 
 

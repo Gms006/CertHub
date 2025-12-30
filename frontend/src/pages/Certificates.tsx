@@ -6,7 +6,13 @@ import SectionTabs from "../components/SectionTabs";
 import Toast from "../components/Toast";
 import { useAuth } from "../hooks/useAuth";
 import { useToast } from "../hooks/useToast";
-import { daysUntil, extractDigits, formatCnpjCpf, formatDate } from "../lib/formatters";
+import {
+  daysUntil,
+  extractDigits,
+  formatCnpjCpf,
+  formatDate,
+  sanitizeSensitiveLabel,
+} from "../lib/formatters";
 
 type CertificateRead = {
   id: string;
@@ -318,11 +324,11 @@ const CertCard = ({
 
             <div className="mt-1 text-[11px] text-slate-600">
               <span className="font-semibold text-slate-700">Serial:</span>{" "}
-              <span className="truncate">{serial || "-"}</span>
+              <span className="break-words">{serial || "-"}</span>
             </div>
             <div className="mt-1 text-[11px] text-slate-600">
               <span className="font-semibold text-slate-700">SHA1:</span>{" "}
-              <span className="truncate">{sha1 || "-"}</span>
+              <span className="break-words">{sha1 || "-"}</span>
             </div>
           </div>
         </div>
@@ -386,6 +392,7 @@ const CertificatesPage = () => {
   const [selectedCertificate, setSelectedCertificate] = useState<CertificateRead | null>(null);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
   const pageSize = 9;
+  const isAdmin = user?.role_global === "ADMIN" || user?.role_global === "DEV";
   const isView = user?.role_global === "VIEW";
 
   const loadCertificates = async () => {
@@ -406,6 +413,9 @@ const CertificatesPage = () => {
   };
 
   const loadDevices = async () => {
+    if (!isAdmin) {
+      return;
+    }
     try {
       const response = await apiFetch("/admin/devices");
       if (!response.ok) {
@@ -436,7 +446,7 @@ const CertificatesPage = () => {
   useEffect(() => {
     loadCertificates();
     loadDevices();
-  }, []);
+  }, [isAdmin]);
 
   useEffect(() => {
     loadJobs();
@@ -449,6 +459,7 @@ const CertificatesPage = () => {
   const filteredCertificates = useMemo(() => {
     const term = search.trim().toLowerCase();
     const filtered = certificates.filter((cert) => {
+      const safeName = sanitizeSensitiveLabel(cert.name);
       const status = getStatusInfo(cert.not_after).key;
       if (statusFilter !== "Todos") {
         const map: Record<string, StatusKey> = {
@@ -462,11 +473,11 @@ const CertificatesPage = () => {
         }
       }
       if (!term) return true;
-      const { name: titularName, document } = parseTitularInfo(cert.subject ?? cert.name);
-      const taxId = extractDigits(document ?? cert.subject ?? cert.name);
+      const { name: titularName, document } = parseTitularInfo(cert.subject ?? safeName);
+      const taxId = extractDigits(document ?? cert.subject ?? safeName);
       const haystack = [
         titularName,
-        cert.name,
+        safeName,
         cert.serial_number,
         cert.sha1_fingerprint,
         taxId,
@@ -479,8 +490,8 @@ const CertificatesPage = () => {
 
     const sorted = [...filtered].sort((a, b) => {
       if (orderBy === "empresa") {
-        const aName = parseTitularInfo(a.subject ?? a.name).name;
-        const bName = parseTitularInfo(b.subject ?? b.name).name;
+        const aName = parseTitularInfo(a.subject ?? sanitizeSensitiveLabel(a.name)).name;
+        const bName = parseTitularInfo(b.subject ?? sanitizeSensitiveLabel(b.name)).name;
         return aName.localeCompare(bName);
       }
       const aTime = a.not_after ? new Date(a.not_after).getTime() : Number.MAX_SAFE_INTEGER;
@@ -559,11 +570,12 @@ const CertificatesPage = () => {
   const handleExport = () => {
     const rows = filteredCertificates.map((cert) => {
       const status = getStatusInfo(cert.not_after);
-      const titularInfo = parseTitularInfo(cert.subject ?? cert.name);
+      const safeName = sanitizeSensitiveLabel(cert.name);
+      const titularInfo = parseTitularInfo(cert.subject ?? safeName);
       return {
-        Empresa: titularInfo.name || cert.name,
-        Documento: extractTaxId(cert.subject ?? cert.name),
-        Titular: titularInfo.name || cert.name,
+        Empresa: titularInfo.name || safeName,
+        Documento: extractTaxId(cert.subject ?? safeName),
+        Titular: titularInfo.name || safeName,
         Serial: cert.serial_number ?? "-",
         SHA1: cert.sha1_fingerprint ?? "-",
         Validade: formatDate(cert.not_after),
@@ -709,9 +721,10 @@ const CertificatesPage = () => {
           {pagedCertificates.map((cert) => {
             const statusInfo = getStatusInfo(cert.not_after);
             const certStatus = mapStatusToCert(statusInfo.key);
-            const titularInfo = parseTitularInfo(cert.subject ?? cert.name);
-            const empresaName = titularInfo.name || cert.name;
-            const documentValue = titularInfo.document ?? cert.subject ?? cert.name;
+            const safeName = sanitizeSensitiveLabel(cert.name);
+            const titularInfo = parseTitularInfo(cert.subject ?? safeName);
+            const empresaName = titularInfo.name || safeName;
+            const documentValue = titularInfo.document ?? cert.subject ?? safeName;
             return (
               <CertCard
                 key={cert.id}
@@ -794,12 +807,12 @@ const CertificatesPage = () => {
             >
               <option value="">Selecione um certificado</option>
               {certificates.map((cert) => (
-                <option key={cert.id} value={cert.id}>
-                  {cert.name}
-                </option>
-              ))}
-            </select>
-          </label>
+              <option key={cert.id} value={cert.id}>
+                  {sanitizeSensitiveLabel(cert.name)}
+              </option>
+            ))}
+          </select>
+        </label>
         )}
         <label className="block text-xs font-semibold text-slate-500">
           Dispositivo
@@ -832,17 +845,31 @@ const CertificatesPage = () => {
             <div className="rounded-2xl bg-slate-50 p-4">
               <p className="text-xs text-slate-400">Empresa</p>
               <p className="mt-2 text-sm font-semibold text-slate-900">
-                {parseTitularInfo(selectedCertificate.subject ?? selectedCertificate.name).name}
+                {
+                  parseTitularInfo(
+                    selectedCertificate.subject ??
+                      sanitizeSensitiveLabel(selectedCertificate.name),
+                  ).name
+                }
               </p>
               <p className="mt-1 text-xs text-slate-500">
-                Documento: {extractTaxId(selectedCertificate.subject ?? selectedCertificate.name)}
+                Documento:{" "}
+                {extractTaxId(
+                  selectedCertificate.subject ??
+                    sanitizeSensitiveLabel(selectedCertificate.name),
+                )}
               </p>
             </div>
             <div className="grid gap-3 md:grid-cols-2">
               <div className="rounded-2xl bg-slate-50 p-4">
                 <p className="text-xs text-slate-400">Titular</p>
                 <p className="mt-2 text-sm text-slate-700">
-                  {parseTitularInfo(selectedCertificate.subject ?? selectedCertificate.name).name}
+                  {
+                    parseTitularInfo(
+                      selectedCertificate.subject ??
+                        sanitizeSensitiveLabel(selectedCertificate.name),
+                    ).name
+                  }
                 </p>
               </div>
               <div className="rounded-2xl bg-slate-50 p-4">
@@ -855,13 +882,13 @@ const CertificatesPage = () => {
             <div className="grid gap-3 md:grid-cols-2">
               <div className="rounded-2xl bg-slate-50 p-4">
                 <p className="text-xs text-slate-400">Serial</p>
-                <p className="mt-2 text-sm text-slate-700">
+                <p className="mt-2 break-words text-sm text-slate-700">
                   {selectedCertificate.serial_number ?? "-"}
                 </p>
               </div>
               <div className="rounded-2xl bg-slate-50 p-4">
                 <p className="text-xs text-slate-400">SHA1</p>
-                <p className="mt-2 text-sm text-slate-700">
+                <p className="mt-2 break-words text-sm text-slate-700">
                   {selectedCertificate.sha1_fingerprint ?? "-"}
                 </p>
               </div>

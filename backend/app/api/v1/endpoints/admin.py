@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.core.audit import log_audit
 from app.core.config import settings
-from app.core.security import require_admin_or_dev, require_dev, require_view_or_higher
+from app.core.security import require_admin_or_dev, require_dev
 from app.db.session import get_db
 from app.core.security import AUTH_TOKEN_PURPOSE_SET_PASSWORD, generate_token, hash_token
 from app.models import (
@@ -259,7 +259,7 @@ def rotate_device_token(
 
 @router.get("/devices", response_model=list[DeviceRead])
 def list_devices(
-    db: Session = Depends(get_db), current_user=Depends(require_view_or_higher)
+    db: Session = Depends(get_db), current_user=Depends(require_admin_or_dev)
 ) -> list[Device]:
     last_job_subquery = (
         select(
@@ -354,6 +354,10 @@ def update_device(
             changes[field] = [old_value, value]
 
     apply_change("is_allowed", payload.is_allowed)
+    if payload.auto_approve is not None:
+        if current_user.role_global != "DEV":
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
+        apply_change("auto_approve", payload.auto_approve)
     if "assigned_user_id" in payload.model_fields_set:
         assigned_user_id = payload.assigned_user_id
         assigned_user = resolve_assigned_user(db, current_user.org_id, assigned_user_id)

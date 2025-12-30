@@ -8,6 +8,7 @@ assert helpers_spec and helpers_spec.loader
 helpers_spec.loader.exec_module(helpers)
 
 create_user = helpers.create_user
+create_device = helpers.create_device
 headers = helpers.headers
 
 
@@ -39,3 +40,35 @@ def test_admin_assigns_and_clears_device_user(test_client_and_session):
     assert response.status_code == 200
     payload = response.json()
     assert payload["assigned_user_id"] is None
+
+
+def test_dev_can_toggle_device_auto_approve(test_client_and_session):
+    client, SessionLocal = test_client_and_session
+    with SessionLocal() as db:
+        dev = create_user(db, role="DEV")
+        device = create_device(db)
+
+    response = client.patch(
+        f"/api/v1/admin/devices/{device.id}",
+        json={"auto_approve": True},
+        headers=headers(dev),
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["auto_approve"] is True
+
+
+def test_admin_cannot_toggle_device_auto_approve(test_client_and_session):
+    client, SessionLocal = test_client_and_session
+    with SessionLocal() as db:
+        admin = create_user(db, role="ADMIN")
+        device = create_device(db)
+
+    response = client.patch(
+        f"/api/v1/admin/devices/{device.id}",
+        json={"auto_approve": True},
+        headers=headers(admin),
+    )
+
+    assert response.status_code == 403

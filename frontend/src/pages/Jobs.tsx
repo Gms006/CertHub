@@ -4,7 +4,7 @@ import SectionTabs from "../components/SectionTabs";
 import Toast from "../components/Toast";
 import { useAuth } from "../hooks/useAuth";
 import { useToast } from "../hooks/useToast";
-import { formatDate } from "../lib/formatters";
+import { formatDate, sanitizeSensitiveLabel } from "../lib/formatters";
 
 type InstallJobRead = {
   id: string;
@@ -53,6 +53,7 @@ const JobsPage = () => {
   const [certificates, setCertificates] = useState<CertificateRead[]>([]);
   const [devices, setDevices] = useState<DeviceRead[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deviceFilter, setDeviceFilter] = useState("Todos");
 
   const isAdmin = user?.role_global === "ADMIN" || user?.role_global === "DEV";
   const isView = user?.role_global === "VIEW";
@@ -81,14 +82,12 @@ const JobsPage = () => {
 
   const loadReferences = async () => {
     try {
-      const [certResponse, deviceResponse] = await Promise.all([
-        apiFetch("/certificados"),
-        apiFetch("/admin/devices"),
-      ]);
+      const certResponse = await apiFetch("/certificados");
+      const deviceResponse = isAdmin ? await apiFetch("/admin/devices") : null;
       if (certResponse.ok) {
         setCertificates((await certResponse.json()) as CertificateRead[]);
       }
-      if (deviceResponse.ok) {
+      if (deviceResponse?.ok) {
         setDevices((await deviceResponse.json()) as DeviceRead[]);
       }
     } catch {
@@ -102,13 +101,23 @@ const JobsPage = () => {
   }, [user?.role_global]);
 
   const certMap = useMemo(
-    () => new Map(certificates.map((cert) => [cert.id, cert.name])),
+    () =>
+      new Map(
+        certificates.map((cert) => [cert.id, sanitizeSensitiveLabel(cert.name)]),
+      ),
     [certificates],
   );
   const deviceMap = useMemo(
     () => new Map(devices.map((device) => [device.id, device.hostname])),
     [devices],
   );
+
+  const filteredJobs = useMemo(() => {
+    if (!isAdmin || deviceFilter === "Todos") {
+      return jobs;
+    }
+    return jobs.filter((job) => job.device_id === deviceFilter);
+  }, [deviceFilter, isAdmin, jobs]);
 
   const handleApprove = async (jobId: string, approve: boolean) => {
     try {
@@ -145,19 +154,35 @@ const JobsPage = () => {
 
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-slate-200 bg-white p-4">
         <p className="text-sm text-slate-500">
-          {jobs.length} jobs encontrados
+          {filteredJobs.length} jobs encontrados
         </p>
-        <button
-          className="h-10 rounded-2xl border border-slate-200 px-4 text-sm text-slate-600"
-          onClick={loadJobs}
-        >
-          Atualizar
-        </button>
+        <div className="flex flex-wrap items-center gap-3">
+          {isAdmin ? (
+            <select
+              className="h-10 rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-600"
+              value={deviceFilter}
+              onChange={(event) => setDeviceFilter(event.target.value)}
+            >
+              <option value="Todos">Todos os devices</option>
+              {devices.map((device) => (
+                <option key={device.id} value={device.id}>
+                  {device.hostname}
+                </option>
+              ))}
+            </select>
+          ) : null}
+          <button
+            className="h-10 rounded-2xl border border-slate-200 px-4 text-sm text-slate-600"
+            onClick={loadJobs}
+          >
+            Atualizar
+          </button>
+        </div>
       </div>
 
       {loading ? (
         <div className="h-56 rounded-3xl border border-dashed border-slate-200 bg-white/70" />
-      ) : jobs.length === 0 ? (
+      ) : filteredJobs.length === 0 ? (
         <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-10 text-center text-sm text-slate-500">
           Nenhum job encontrado.
         </div>
@@ -174,16 +199,28 @@ const JobsPage = () => {
               </tr>
             </thead>
             <tbody>
-              {jobs.map((job) => (
+              {filteredJobs.map((job) => (
                 <tr key={job.id} className="border-t border-slate-100">
                   <td className="px-4 py-4">
-                    <p className="font-medium text-slate-800">
+                    <p
+                      className="max-w-[180px] truncate font-medium text-slate-800"
+                      title={certMap.get(job.cert_id) ?? job.cert_id.slice(0, 8)}
+                    >
                       {certMap.get(job.cert_id) ?? job.cert_id.slice(0, 8)}
                     </p>
-                    <p className="text-xs text-slate-400">{job.requested_by_user_id}</p>
+                    <p className="text-xs text-slate-400">
+                      <span className="block max-w-[180px] truncate" title={job.requested_by_user_id}>
+                        {job.requested_by_user_id}
+                      </span>
+                    </p>
                   </td>
                   <td className="px-4 py-4 text-slate-600">
-                    {deviceMap.get(job.device_id) ?? job.device_id.slice(0, 8)}
+                    <span
+                      className="block max-w-[160px] truncate"
+                      title={deviceMap.get(job.device_id) ?? job.device_id.slice(0, 8)}
+                    >
+                      {deviceMap.get(job.device_id) ?? job.device_id.slice(0, 8)}
+                    </span>
                   </td>
                   <td className="px-4 py-4">
                     <span
@@ -191,7 +228,12 @@ const JobsPage = () => {
                         statusStyles[job.status] ?? "bg-slate-100 text-slate-600"
                       }`}
                     >
-                      {statusLabels[job.status] ?? job.status}
+                      <span
+                        className="block max-w-[120px] truncate"
+                        title={statusLabels[job.status] ?? job.status}
+                      >
+                        {statusLabels[job.status] ?? job.status}
+                      </span>
                     </span>
                   </td>
                   <td className="px-4 py-4 text-slate-500">

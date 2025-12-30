@@ -4,7 +4,7 @@ import SectionTabs from "../components/SectionTabs";
 import Toast from "../components/Toast";
 import { useAuth } from "../hooks/useAuth";
 import { useToast } from "../hooks/useToast";
-import { formatDate } from "../lib/formatters";
+import { formatDateTime } from "../lib/formatters";
 
 type AuditLogRead = {
   id: string;
@@ -129,14 +129,18 @@ const AuditPage = () => {
                 return (
                   <tr key={audit.id} className="border-t border-slate-100">
                     <td className="px-4 py-4 text-slate-500">
-                      {formatDate(audit.timestamp)}
+                      {formatDateTime(audit.timestamp)}
                     </td>
                     <td className="px-4 py-4 text-slate-700">
-                      {audit.actor_label ?? "-"}
+                      <span className="block max-w-[180px] truncate" title={audit.actor_label ?? "-"}>
+                        {audit.actor_label ?? "-"}
+                      </span>
                     </td>
                     <td className="px-4 py-4">
                       <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                        {audit.action}
+                        <span className="block max-w-[140px] truncate" title={audit.action}>
+                          {audit.action}
+                        </span>
                       </span>
                     </td>
                     <td className="px-4 py-4 text-slate-600">
@@ -155,16 +159,28 @@ const AuditPage = () => {
                     </td>
                     <td className="px-4 py-4 text-slate-600">
                       <div className="space-y-1">
-                        <p className="text-sm font-medium text-slate-700">
-                          {audit.entity_type}
+                        <p
+                          className="text-sm font-medium text-slate-700"
+                          title={audit.entity_type}
+                        >
+                          <span className="block max-w-[140px] truncate">
+                            {audit.entity_type}
+                          </span>
                         </p>
-                        <p className="text-xs text-slate-400">
-                          {audit.entity_id ?? "-"}
+                        <p
+                          className="text-xs text-slate-400"
+                          title={audit.entity_id ?? "-"}
+                        >
+                          <span className="block max-w-[160px] truncate">
+                            {audit.entity_id ?? "-"}
+                          </span>
                         </p>
                       </div>
                     </td>
                     <td className="px-4 py-4 text-xs text-slate-500">
-                      {audit.meta_json ? JSON.stringify(audit.meta_json) : "-"}
+                      <span className="block max-w-[240px] break-words">
+                        {audit.meta_json ? JSON.stringify(audit.meta_json) : "-"}
+                      </span>
                     </td>
                   </tr>
                 );
