@@ -26,9 +26,11 @@ router = APIRouter(prefix="/install-jobs", tags=["install-jobs"])
 async def list_install_jobs(
     mine: bool = Query(default=False),
     db: Session = Depends(get_db),
-    current_user=Depends(require_admin_or_dev),
+    current_user=Depends(require_view_or_higher),
 ) -> list[CertInstallJob]:
     if not mine:
+        if current_user.role_global not in {"ADMIN", "DEV"}:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
         statement = select(CertInstallJob).where(CertInstallJob.org_id == current_user.org_id)
     else:
         statement = select(CertInstallJob).where(

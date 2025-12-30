@@ -578,11 +578,56 @@ curl -X POST "http://localhost:8010/api/v1/admin/certificates/ingest-from-fs" \
 * Metadados extraídos via OpenSSL (`subject`, `issuer`, `serial`, `notBefore`, `notAfter`, `sha1`).
 * Deduplicação por `sha1` (preferencial) ou `serial` por `org_id`; falhas de parse são registradas em `parse_error`.
 
-## Segurança (MVP)
+## Segurança (S6)
 
-* payload de instalação entregue somente ao Agent (pendente no repo; evolui no S6: token one-time + expiração + device binding)
-* auditoria: INSTALL_REQUESTED / CLAIM / DONE / FAILED / REMOVED_18H
+* payload entregue somente ao Agent (JWT role=DEVICE + binding ao device)
+* token one-time com TTL **120s** (retornado no claim)
+* rate limit por device (auth **10/min**, payload **5/min**)
+* auditoria: INSTALL_REQUESTED / INSTALL_CLAIMED / PAYLOAD_ISSUED / PAYLOAD_DENIED / PAYLOAD_RATE_LIMITED / INSTALL_DONE / INSTALL_FAILED / REMOVED_18H
 * visibilidade de certificados é global por `org_id` (sem carteiras/permissões por certificado)
+* se o payload falhar/expirar, o agent pode chamar `claim` novamente no mesmo job **IN_PROGRESS** para receber um novo `payload_token`
+
+### Validação rápida (S6)
+
+```powershell
+# Auth do agent (device_id + device_token)
+$auth = Invoke-RestMethod -Method Post "http://localhost:8010/api/v1/agent/auth" `
+  -ContentType "application/json" `
+  -Body (@{ device_id = "<DEVICE_ID>"; device_token = "<DEVICE_TOKEN>" } | ConvertTo-Json)
+$agentJwt = $auth.access_token
+
+# Claim retorna payload_token
+$claim = Invoke-RestMethod -Method Post "http://localhost:8010/api/v1/agent/jobs/<JOB_ID>/claim" `
+  -Headers @{ Authorization = "Bearer $agentJwt" } `
+  -ContentType "application/json" `
+  -Body "{}"
+$claim.payload_token
+
+# Payload exige token one-time via query string
+Invoke-RestMethod "http://localhost:8010/api/v1/agent/jobs/<JOB_ID>/payload?token=$($claim.payload_token)" `
+  -Headers @{ Authorization = "Bearer $agentJwt" }
+
+# Reuso do token (esperado: 409)
+Invoke-WebRequest "http://localhost:8010/api/v1/agent/jobs/<JOB_ID>/payload?token=$($claim.payload_token)" `
+  -Headers @{ Authorization = "Bearer $agentJwt" } `
+  -SkipHttpErrorCheck | Select-Object StatusCode
+```
+
+Auditoria:
+```sql
+select action, meta_json, timestamp
+from audit_log
+where action in ('PAYLOAD_ISSUED', 'PAYLOAD_DENIED', 'PAYLOAD_RATE_LIMITED')
+order by timestamp desc
+limit 10;
+```
+
+Rollback S6:
+```bash
+cd backend
+alembic downgrade -1
+git revert <commit_sha>
+```
 
 ### Exemplo: habilitar auto-approve para um usuário VIEW
 
