@@ -209,14 +209,17 @@ const JobsPage = () => {
                       {certMap.get(job.cert_id) ?? job.cert_id.slice(0, 8)}
                     </p>
                     <p className="text-xs text-slate-400">
-                      <span className="block max-w-[180px] truncate" title={job.requested_by_user_id}>
+                      <span
+                        className="inline-block max-w-[180px] truncate"
+                        title={job.requested_by_user_id}
+                      >
                         {job.requested_by_user_id}
                       </span>
                     </p>
                   </td>
                   <td className="px-4 py-4 text-slate-600">
                     <span
-                      className="block max-w-[160px] truncate"
+                      className="inline-block max-w-[160px] truncate"
                       title={deviceMap.get(job.device_id) ?? job.device_id.slice(0, 8)}
                     >
                       {deviceMap.get(job.device_id) ?? job.device_id.slice(0, 8)}
@@ -224,16 +227,12 @@ const JobsPage = () => {
                   </td>
                   <td className="px-4 py-4">
                     <span
-                      className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                      className={`inline-flex max-w-[160px] items-center truncate rounded-full px-3 py-1 text-xs font-semibold ${
                         statusStyles[job.status] ?? "bg-slate-100 text-slate-600"
                       }`}
+                      title={statusLabels[job.status] ?? job.status}
                     >
-                      <span
-                        className="block max-w-[120px] truncate"
-                        title={statusLabels[job.status] ?? job.status}
-                      >
-                        {statusLabels[job.status] ?? job.status}
-                      </span>
+                      {statusLabels[job.status] ?? job.status}
                     </span>
                   </td>
                   <td className="px-4 py-4 text-slate-500">
