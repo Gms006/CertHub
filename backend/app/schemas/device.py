@@ -31,6 +31,7 @@ class DeviceRead(DeviceBase):
     org_id: int
     created_at: datetime
     assigned_user: UserRead | None = None
+    last_job_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
