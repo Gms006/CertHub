@@ -31,6 +31,23 @@ export const formatDateTime = (value?: string | null) => {
   return `${datePart} ${timePart}`;
 };
 
+export const formatRelativeTime = (value?: string | null) => {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  const diffMs = Date.now() - date.getTime();
+  const minutes = Math.floor(diffMs / 60000);
+
+  if (minutes < 1) return "agora";
+  if (minutes < 60) return `há ${minutes} min`;
+
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `há ${hours} h`;
+
+  const days = Math.floor(hours / 24);
+  return `há ${days} dias`;
+};
+
 export const daysUntil = (value?: string | null) => {
   if (!value) return null;
   const date = new Date(value);

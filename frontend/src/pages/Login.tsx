@@ -1,8 +1,25 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 
 import { useAuth } from "../hooks/useAuth";
+import { API_BASE } from "../lib/apiClient";
+import { formatRelativeTime } from "../lib/formatters";
+
+type DeviceInfo = {
+  hostname: string;
+  domain?: string | null;
+  agent_version?: string | null;
+  last_seen_at?: string | null;
+};
+
+const getCookieValue = (name: string) => {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie
+    .split("; ")
+    .find((item) => item.startsWith(`${name}=`));
+  return match ? decodeURIComponent(match.split("=")[1]) : null;
+};
 
 const Login = () => {
   const { login, loading, message, accessToken } = useAuth();
@@ -10,6 +27,7 @@ const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [deviceInfo, setDeviceInfo] = useState<DeviceInfo | null>(null);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -24,6 +42,60 @@ const Login = () => {
       navigate("/certificados", { replace: true });
     }
   }, [accessToken, navigate]);
+
+  useEffect(() => {
+    const loadDeviceInfo = async () => {
+      const deviceId =
+        localStorage.getItem("certhub_device_id") ||
+        sessionStorage.getItem("certhub_device_id") ||
+        getCookieValue("certhub_device_id");
+      const deviceToken =
+        localStorage.getItem("certhub_device_token") ||
+        sessionStorage.getItem("certhub_device_token") ||
+        getCookieValue("certhub_device_token");
+      if (!deviceId || !deviceToken) {
+        return;
+      }
+      try {
+        const authResponse = await fetch(`${API_BASE}/agent/auth`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ device_id: deviceId, device_token: deviceToken }),
+        });
+        if (!authResponse.ok) {
+          return;
+        }
+        const authData = (await authResponse.json()) as { access_token: string };
+        const meResponse = await fetch(`${API_BASE}/agent/me`, {
+          headers: { Authorization: `Bearer ${authData.access_token}` },
+        });
+        if (!meResponse.ok) {
+          return;
+        }
+        const device = (await meResponse.json()) as DeviceInfo;
+        setDeviceInfo(device);
+      } catch {
+        // silencioso
+      }
+    };
+
+    loadDeviceInfo();
+  }, []);
+
+  const deviceLabel = useMemo(() => {
+    if (!deviceInfo) return "Device não identificado";
+    if (deviceInfo.domain) {
+      return `${deviceInfo.domain}\\${deviceInfo.hostname}`;
+    }
+    return deviceInfo.hostname;
+  }, [deviceInfo]);
+
+  const deviceMeta = useMemo(() => {
+    if (!deviceInfo) return "Agent indisponível";
+    const version = deviceInfo.agent_version ?? "-";
+    const lastSeen = formatRelativeTime(deviceInfo.last_seen_at);
+    return `Agent ${version} • ${lastSeen}`;
+  }, [deviceInfo]);
 
   return (
     <div className="relative min-h-screen bg-slate-100">
@@ -224,10 +296,10 @@ const Login = () => {
                   <div className="rounded-2xl bg-white/10 p-4 text-xs text-white/70">
                     <p className="text-white">Device</p>
                     <p className="mt-2 text-sm text-white">
-                      NETOCMS\\NCTON-05
+                      {deviceLabel}
                     </p>
                     <p className="mt-1 text-[11px] text-white/60">
-                      Agent v0.1.0 • há 2 min
+                      {deviceMeta}
                     </p>
                   </div>
                   <div className="rounded-2xl bg-white/10 p-4 text-xs text-white/70">

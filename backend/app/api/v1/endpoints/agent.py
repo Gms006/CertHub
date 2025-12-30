@@ -24,14 +24,15 @@ from app.models import (
     JOB_STATUS_PENDING,
 )
 from app.schemas.agent import (
-    AgentAuthRequest,
-    AgentAuthResponse,
-    AgentCleanupEvent,
-    AgentJobClaimResponse,
-    AgentHeartbeatRequest,
-    AgentJobStatusUpdate,
-    AgentPayloadResponse,
+  AgentAuthRequest,
+  AgentAuthResponse,
+  AgentCleanupEvent,
+  AgentJobClaimResponse,
+  AgentHeartbeatRequest,
+  AgentJobStatusUpdate,
+  AgentPayloadResponse,
 )
+from app.schemas.device import DeviceRead
 from app.schemas.install_job import InstallJobRead
 from app.services.certificate_ingest import guess_password_from_path
 
@@ -66,6 +67,11 @@ def agent_auth(payload: AgentAuthRequest, db: Session = Depends(get_db)) -> Agen
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid credentials")
     access_token = create_device_access_token(device)
     return AgentAuthResponse(access_token=access_token)
+
+
+@router.get("/me", response_model=DeviceRead)
+def agent_me(device: Device = Depends(require_device)) -> Device:
+    return device
 
 
 @router.post("/heartbeat")
