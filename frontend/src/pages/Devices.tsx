@@ -115,8 +115,15 @@ const DevicesPage = () => {
         return;
       }
       notify(nextValue ? "Auto approve ativado." : "Auto approve desativado.");
+      setDevices((prev) =>
+        prev.map((device) =>
+          device.id === deviceId ? { ...device, auto_approve: nextValue } : device,
+        ),
+      );
+      setSelectedDevice((prev) =>
+        prev && prev.id === deviceId ? { ...prev, auto_approve: nextValue } : prev,
+      );
       loadDevices();
-      setModalOpen(false);
     } catch {
       notify("Erro ao atualizar auto approve.", "error");
     }
