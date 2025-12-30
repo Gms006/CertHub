@@ -242,7 +242,8 @@ def job_payload(
             entity_id=job_id,
             actor_device_id=device.id,
             meta={
-                "reason": "token_used",
+                "reason": "job_not_in_progress",
+                "job_status": job.status,
                 "job_id": str(job_id),
                 "ip": request.client.host if request.client else None,
             },

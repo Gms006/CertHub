@@ -173,7 +173,7 @@ schtasks /Query /TN "$taskName" /V /FO LIST |
 $taskName = "CertHub Cleanup 18h"
 schtasks /Run /TN "$taskName"
 Start-Sleep -Seconds 2
-Get-Content "$env:LOCALAPPDATA\\CertHubAgent\\logs\\agent.log" -Tail 60
+Get-Content $log.FullName -Tail 200 -Wait | Select-String -Pattern "cleanup|Scheduled|CERT_REMOVED_18H|Starting"
 ```
 
 Aceite aqui: aparecer `Starting cleanup (Scheduled)`.
