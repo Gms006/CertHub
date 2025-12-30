@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
@@ -13,7 +13,15 @@ from app.core.config import settings
 from app.core.security import require_admin_or_dev, require_dev, require_view_or_higher
 from app.db.session import get_db
 from app.core.security import AUTH_TOKEN_PURPOSE_SET_PASSWORD, generate_token, hash_token
-from app.models import AuthToken, CertInstallJob, Device, User, UserDevice
+from app.models import (
+    AuthToken,
+    CertInstallJob,
+    Device,
+    JOB_STATUS_FAILED,
+    JOB_STATUS_IN_PROGRESS,
+    User,
+    UserDevice,
+)
 from app.schemas.cert_ingest import CertIngestRequest, CertIngestResponse
 from app.schemas.device import (
     DeviceCreate,
@@ -276,6 +284,52 @@ def list_devices(
         response = response.model_copy(update={"last_seen_at": last_job_created_at})
         payload.append(response)
     return payload
+
+
+@router.post("/jobs/reap")
+def reap_stale_jobs(
+    threshold_minutes: int = Query(default=60, ge=1, le=10080),
+    db: Session = Depends(get_db),
+    current_user=Depends(require_admin_or_dev),
+) -> dict[str, int]:
+    cutoff = datetime.now(timezone.utc) - timedelta(minutes=threshold_minutes)
+    statement = (
+        select(CertInstallJob)
+        .where(
+            CertInstallJob.org_id == current_user.org_id,
+            CertInstallJob.status == JOB_STATUS_IN_PROGRESS,
+            CertInstallJob.started_at.is_not(None),
+            CertInstallJob.started_at <= cutoff,
+        )
+        .order_by(CertInstallJob.started_at)
+    )
+    stale_jobs = db.execute(statement).scalars().all()
+    if not stale_jobs:
+        return {"reaped": 0}
+
+    now = datetime.now(timezone.utc)
+    for job in stale_jobs:
+        job.status = JOB_STATUS_FAILED
+        job.finished_at = now
+        job.error_code = "TIMEOUT"
+        job.error_message = f"Job timed out after {threshold_minutes} minutes"
+        job.updated_at = now
+        log_audit(
+            db=db,
+            org_id=current_user.org_id,
+            action="JOB_REAPED",
+            entity_type="cert_install_job",
+            entity_id=job.id,
+            actor_user_id=current_user.id,
+            meta={
+                "job_id": str(job.id),
+                "status": job.status,
+                "started_at": job.started_at.isoformat() if job.started_at else None,
+                "threshold_minutes": threshold_minutes,
+            },
+        )
+    db.commit()
+    return {"reaped": len(stale_jobs)}
 
 
 @router.patch("/devices/{device_id}", response_model=DeviceRead)
