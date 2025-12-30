@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   Activity,
   CalendarClock,
-  Key,
   KeyRound,
   MonitorCheck,
   ShieldAlert,
@@ -264,7 +263,7 @@ const CertCard = ({
               onClick={onInstall}
               className="inline-flex h-9 w-[120px] items-center justify-center gap-2 rounded-2xl bg-slate-900 px-3 text-xs font-semibold text-white hover:bg-slate-800"
             >
-              <Key className="h-4 w-4" />
+              <KeyRound className="h-4 w-4" />
               Instalar
             </button>
 
@@ -377,6 +376,7 @@ const CertificatesPage = () => {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("Todos");
   const [orderBy, setOrderBy] = useState("validade");
+  const [hideExpired, setHideExpired] = useState(true);
   const [page, setPage] = useState(1);
   const [installModalOpen, setInstallModalOpen] = useState(false);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
@@ -446,13 +446,16 @@ const CertificatesPage = () => {
 
   useEffect(() => {
     setPage(1);
-  }, [search, statusFilter, orderBy]);
+  }, [search, statusFilter, orderBy, hideExpired]);
 
   const filteredCertificates = useMemo(() => {
     const term = search.trim().toLowerCase();
     const filtered = certificates.filter((cert) => {
       const safeName = sanitizeSensitiveLabel(cert.name);
       const status = getStatusInfo(cert.not_after).key;
+      if (hideExpired && status === "expired") {
+        return false;
+      }
       if (statusFilter !== "Todos") {
         const map: Record<string, StatusKey> = {
           "Válido": "valid",
@@ -492,7 +495,7 @@ const CertificatesPage = () => {
     });
 
     return sorted;
-  }, [certificates, orderBy, search, statusFilter]);
+  }, [certificates, hideExpired, orderBy, search, statusFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filteredCertificates.length / pageSize));
   const pagedCertificates = filteredCertificates.slice(
@@ -698,6 +701,15 @@ const CertificatesPage = () => {
             <option value="validade">Ordenar por validade</option>
             <option value="empresa">Ordenar por empresa</option>
           </select>
+          <label className="inline-flex h-11 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-600">
+            <input
+              type="checkbox"
+              className="h-4 w-4 rounded border-slate-300"
+              checked={hideExpired}
+              onChange={(event) => setHideExpired(event.target.checked)}
+            />
+            Ocultar vencidos
+          </label>
         </div>
         <div className="flex flex-wrap gap-3">
           <button
@@ -724,7 +736,7 @@ const CertificatesPage = () => {
             className="inline-flex h-11 items-center gap-2 rounded-2xl bg-[#0e2659] px-4 text-sm font-semibold text-white whitespace-nowrap"
             onClick={() => handleOpenInstall()}
           >
-            <Key className="h-4 w-4" />
+            <KeyRound className="h-4 w-4" />
             Instalar via Agent
           </button>
         </div>
