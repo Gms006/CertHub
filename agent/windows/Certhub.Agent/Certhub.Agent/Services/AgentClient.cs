@@ -80,7 +80,7 @@ public sealed class AgentClient
         return jobs ?? new List<InstallJob>();
     }
 
-    public async Task ClaimJobAsync(Guid jobId, CancellationToken cancellationToken)
+    public async Task<string> ClaimJobAsync(Guid jobId, CancellationToken cancellationToken)
     {
         var response = await PostWithAuthRetryAsync($"agent/jobs/{jobId}/claim", new StringContent("{}", Encoding.UTF8, "application/json"), cancellationToken);
         if (response.StatusCode == HttpStatusCode.Conflict)
@@ -91,11 +91,22 @@ public sealed class AgentClient
         {
             throw new InvalidOperationException($"Claim failed: {(int)response.StatusCode} {response.ReasonPhrase}");
         }
+
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        var claim = JsonSerializer.Deserialize<ClaimResponse>(body, JsonOptions);
+        if (claim?.PayloadToken is null)
+        {
+            throw new InvalidOperationException("Claim response missing payload token");
+        }
+
+        return claim.PayloadToken;
     }
 
-    public async Task<PayloadResponse> GetPayloadAsync(Guid jobId, CancellationToken cancellationToken)
+    public async Task<PayloadResponse> GetPayloadAsync(Guid jobId, string payloadToken, CancellationToken cancellationToken)
     {
-        var response = await SendWithAuthRetryAsync(() => new HttpRequestMessage(HttpMethod.Get, $"agent/jobs/{jobId}/payload"), cancellationToken);
+        var response = await SendWithAuthRetryAsync(
+            () => new HttpRequestMessage(HttpMethod.Get, $"agent/jobs/{jobId}/payload?token={Uri.EscapeDataString(payloadToken)}"),
+            cancellationToken);
         var body = await response.Content.ReadAsStringAsync(cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
@@ -159,6 +170,12 @@ public sealed class AgentClient
     {
         [JsonPropertyName("access_token")]
         public string? AccessToken { get; set; }
+    }
+
+    private sealed class ClaimResponse
+    {
+        [JsonPropertyName("payload_token")]
+        public string? PayloadToken { get; set; }
     }
 
     public sealed class InstallJob

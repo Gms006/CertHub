@@ -250,7 +250,10 @@ public sealed class AgentLoop
 
         try
         {
-            await _client!.ClaimJobAsync(jobId, cancellationToken);
+            var payloadToken = await _client!.ClaimJobAsync(jobId, cancellationToken);
+            UpdateStatus(lastJobStatus: "PAYLOAD_TOKEN_READY", error: null);
+            await FetchAndInstallAsync(jobId, payloadToken, cancellationToken);
+            return;
         }
         catch (Exception ex)
         {
@@ -258,11 +261,14 @@ public sealed class AgentLoop
             UpdateStatus(lastJobStatus: "CLAIM_FAILED", error: ex.Message);
             return;
         }
+    }
 
+    private async Task FetchAndInstallAsync(Guid jobId, string payloadToken, CancellationToken cancellationToken)
+    {
         AgentClient.PayloadResponse payload;
         try
         {
-            payload = await _client!.GetPayloadAsync(jobId, cancellationToken);
+            payload = await _client!.GetPayloadAsync(jobId, payloadToken, cancellationToken);
         }
         catch (Exception ex)
         {

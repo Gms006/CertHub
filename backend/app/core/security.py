@@ -93,7 +93,7 @@ def decode_access_token(token: str) -> dict:
 def decode_device_token(token: str) -> dict:
     payload = decode_access_token(token)
     if payload.get("role") != DEVICE_ROLE:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid device token")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="invalid device token")
     return payload
 
 

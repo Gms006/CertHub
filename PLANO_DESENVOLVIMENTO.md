@@ -1114,12 +1114,15 @@ git revert <commit_sha>
 
 **Objetivo**: impedir que alguém “use o navegador” para baixar PFX/senha.
 
+**Status**: ✅ **Concluído**
+
 **Entregáveis**
 
 - Payload somente para agent (client credential do device).
-- Token one-time + expiração curta.
-- (Opcional forte) criptografia por `public_key` do device.
-- Rate limit e bloqueio por device não autorizado.
+- Token one-time + expiração curta (**TTL 120s**).
+- Rate limit por device (auth **10/min**, payload **5/min**).
+- Bloqueio por device não autorizado.
+- (Opcional forte) criptografia por `public_key` do device **fora deste patch**.
 
 **Aceite**
 
