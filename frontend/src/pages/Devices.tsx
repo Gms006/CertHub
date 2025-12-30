@@ -14,6 +14,7 @@ type DeviceRead = {
   agent_version?: string | null;
   last_seen_at?: string | null;
   is_allowed: boolean;
+  auto_approve?: boolean;
   assigned_user?: {
     ad_username: string;
     email?: string | null;
@@ -30,6 +31,7 @@ const DevicesPage = () => {
   const [modalOpen, setModalOpen] = useState(false);
 
   const isAdmin = user?.role_global === "ADMIN" || user?.role_global === "DEV";
+  const isDev = user?.role_global === "DEV";
 
   const loadDevices = async () => {
     setLoading(true);
@@ -86,6 +88,26 @@ const DevicesPage = () => {
     }
   };
 
+  const handleAutoApproveToggle = async (deviceId: string, nextValue: boolean) => {
+    try {
+      const response = await apiFetch(`/admin/devices/${deviceId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ auto_approve: nextValue }),
+      });
+      if (!response.ok) {
+        const data = (await response.json()) as { detail?: string };
+        notify(data?.detail ?? "Não foi possível atualizar auto approve.", "error");
+        return;
+      }
+      notify(nextValue ? "Auto approve ativado." : "Auto approve desativado.");
+      loadDevices();
+      setModalOpen(false);
+    } catch {
+      notify("Erro ao atualizar auto approve.", "error");
+    }
+  };
+
   if (!isAdmin) {
     return (
       <div className="space-y-6">
@@ -133,7 +155,10 @@ const DevicesPage = () => {
             >
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-sm font-semibold text-slate-900">
+                  <p
+                    className="max-w-[200px] truncate text-sm font-semibold text-slate-900"
+                    title={device.hostname}
+                  >
                     {device.hostname}
                   </p>
                   <p className="text-xs text-slate-400">
@@ -224,6 +249,34 @@ const DevicesPage = () => {
                 </p>
               </div>
             </div>
+            {isDev ? (
+              <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">
+                      Auto approve
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      Aprovar automaticamente instalações para este device.
+                    </p>
+                  </div>
+                  <label className="inline-flex cursor-pointer items-center gap-2 text-xs text-slate-600">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 rounded border-slate-300"
+                      checked={Boolean(selectedDevice.auto_approve)}
+                      onChange={(event) =>
+                        handleAutoApproveToggle(
+                          selectedDevice.id,
+                          event.target.checked,
+                        )
+                      }
+                    />
+                    {selectedDevice.auto_approve ? "Ativo" : "Inativo"}
+                  </label>
+                </div>
+              </div>
+            ) : null}
           </div>
         )}
       </Modal>

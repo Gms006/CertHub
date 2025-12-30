@@ -199,6 +199,55 @@ limit 10;"
 Unregister-ScheduledTask -TaskName "CertHub Cleanup 18h" -Confirm:$false
 ```
 
+## Validação S7 (UX + RBAC)
+
+### API (curl)
+
+```bash
+# VIEW: não pode listar devices admin
+curl -i "http://localhost:8010/api/v1/admin/devices" \
+  -H "Authorization: Bearer <JWT_VIEW>"
+
+# VIEW: /install-jobs retorna 403
+curl -i "http://localhost:8010/api/v1/install-jobs" \
+  -H "Authorization: Bearer <JWT_VIEW>"
+
+# VIEW: /install-jobs/my-device retorna 200
+curl -i "http://localhost:8010/api/v1/install-jobs/my-device" \
+  -H "Authorization: Bearer <JWT_VIEW>"
+
+# DEV: pode ativar auto_approve no device
+curl -i -X PATCH "http://localhost:8010/api/v1/admin/devices/<DEVICE_ID>" \
+  -H "Authorization: Bearer <JWT_DEV>" \
+  -H "Content-Type: application/json" \
+  -d "{\"auto_approve\": true}"
+
+# ADMIN: não pode ativar auto_approve
+curl -i -X PATCH "http://localhost:8010/api/v1/admin/devices/<DEVICE_ID>" \
+  -H "Authorization: Bearer <JWT_ADMIN>" \
+  -H "Content-Type: application/json" \
+  -d "{\"auto_approve\": true}"
+```
+
+### SQL (psql)
+
+```sql
+-- Ver jobs do device permitido para VIEW
+select id, device_id, requested_by_user_id, status, created_at
+from cert_install_jobs
+order by created_at desc
+limit 10;
+```
+
+### Checklist UI
+
+- [ ] VIEW só enxerga abas **Certificados** e **Jobs**.
+- [ ] VIEW em Jobs usa apenas resultados do device vinculado.
+- [ ] Filtro por device aparece apenas para ADMIN/DEV.
+- [ ] Auto approve aparece apenas no modal de Devices para DEV.
+- [ ] Auditoria exibe data e hora (dd/mm/aaaa HH:MM).
+- [ ] Nenhum texto com "senha" aparece em Certificados/Jobs/exports.
+
 ## S6 Job Control / Agent Hardening
 
 ### Fluxo completo (REQUESTED/PENDING → CLAIM → PAYLOAD → RESULT)

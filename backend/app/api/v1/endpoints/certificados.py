@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import uuid
 from datetime import datetime, timezone
 
@@ -21,6 +22,21 @@ from app.schemas.certificate import CertificateCreate, CertificateRead
 from app.schemas.install_job import InstallJobCreate, InstallJobRead
 
 router = APIRouter(prefix="/certificados", tags=["certificados"])
+
+def sanitize_certificate_name(value: str) -> str:
+    sanitized = value
+    patterns = [
+        r"senha\s*[:=]?\s*[^\s]+",
+        r"senha[_-]?[^\s]+",
+        r"\bsenha\b",
+    ]
+    for pattern in patterns:
+        sanitized = re.sub(pattern, "", sanitized, flags=re.IGNORECASE)
+    sanitized = re.sub(r"[_-]{2,}", "-", sanitized)
+    sanitized = re.sub(r"\s{2,}", " ", sanitized)
+    sanitized = re.sub(r"[-_ ]+$", "", sanitized)
+    sanitized = re.sub(r"^[-_ ]+", "", sanitized)
+    return sanitized.strip()
 
 
 @router.post("", response_model=CertificateRead, status_code=status.HTTP_201_CREATED)
@@ -54,7 +70,14 @@ async def list_certificates(
         .where(Certificate.org_id == current_user.org_id)
         .order_by(Certificate.created_at)
     )
-    return db.execute(statement).scalars().all()
+    certificates = db.execute(statement).scalars().all()
+    payload: list[CertificateRead] = []
+    for cert in certificates:
+        response = CertificateRead.model_validate(cert, from_attributes=True)
+        payload.append(
+            response.model_copy(update={"name": sanitize_certificate_name(response.name)})
+        )
+    return payload
 
 
 @router.post(
@@ -86,6 +109,10 @@ async def create_install_job(
         initial_status = JOB_STATUS_PENDING
         auto_approved = True
         auto_reason = "flag"
+    elif device.auto_approve:
+        initial_status = JOB_STATUS_PENDING
+        auto_approved = True
+        auto_reason = "device"
     else:
         initial_status = JOB_STATUS_REQUESTED
 

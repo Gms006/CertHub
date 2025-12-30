@@ -1163,25 +1163,30 @@ limit 20;
 
 **Objetivo**: transformar o protótipo em produto operacional: fácil pro time e auditável para você/TI.
 
+**Status**: 🚧 **Em andamento (parcial)**
+
 **Entregáveis (Front)**
 
 - **Certificados**
-  - Busca/filtros/ordenação (como no protótipo).
-  - Cards consistentes com CNPJ/CPF mascarado, badges e datas.
-  - Tela “Detalhes” opcional (serial, SHA1, issuer, subject, vínculo empresa, último uso).
+  - [x] Busca/filtros/ordenação (como no protótipo).
+  - [x] Cards consistentes com CNPJ/CPF mascarado, badges e datas.
+  - [x] Tela “Detalhes” opcional (serial, SHA1, issuer, subject, vínculo empresa, último uso).
 - **Jobs**
-  - Filtros por status e por device.
-  - Atalho “Repetir instalação” (cria novo job) e “Cancelar job” (se PENDING).
+  - [x] Filtro por device (ADMIN/DEV).
+  - [ ] Filtros por status.
+  - [ ] Atalho “Repetir instalação” (cria novo job) e “Cancelar job” (se PENDING).
 - **Dispositivos**
-  - Aprovar/bloquear device (perfil admin).
-  - Exibir last seen e versão do agent com destaque para desatualizados.
+  - [x] Aprovar/bloquear device (perfil admin).
+  - [x] Exibir last seen e versão do agent.
+  - [ ] Destaque para agents desatualizados.
 - **Auditoria**
-  - Filtros por usuário, empresa, ação e período.
+  - [x] Filtro por ação/ator (texto).
+  - [ ] Filtros por usuário, empresa e período.
 
 **Entregáveis (Backend/Operação)**
 
-- Endpoints para listagem/admin de devices e auditoria.
-- Alertas básicos (ex.: tentativa em device bloqueado, agent desatualizado, job falhando repetidamente).
+- [x] Endpoints para listagem/admin de devices e auditoria.
+- [ ] Alertas básicos (ex.: tentativa em device bloqueado, agent desatualizado, job falhando repetidamente).
 
 **Aceite**
 
