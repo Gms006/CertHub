@@ -5,7 +5,7 @@ import SectionTabs from "../components/SectionTabs";
 import Toast from "../components/Toast";
 import { useAuth } from "../hooks/useAuth";
 import { useToast } from "../hooks/useToast";
-import { formatDate } from "../lib/formatters";
+import { formatDate, formatRelativeTime } from "../lib/formatters";
 
 type DeviceRead = {
   id: string;
@@ -42,7 +42,12 @@ const DevicesPage = () => {
         return;
       }
       const data = (await response.json()) as DeviceRead[];
-      setDevices(data);
+      setDevices(
+        data.map((device) => ({
+          ...device,
+          auto_approve: Boolean((device as { auto_approve?: boolean }).auto_approve),
+        })),
+      );
     } catch {
       notify("Erro ao carregar devices.", "error");
     } finally {
@@ -55,6 +60,14 @@ const DevicesPage = () => {
       loadDevices();
     }
   }, [isAdmin]);
+
+  useEffect(() => {
+    if (!modalOpen || !selectedDevice) return;
+    const fresh = devices.find((device) => device.id === selectedDevice.id);
+    if (fresh) {
+      setSelectedDevice(fresh);
+    }
+  }, [devices, modalOpen, selectedDevice?.id]);
 
   const formatUserLabel = (device: DeviceRead | null) => {
     if (!device?.assigned_user) {
@@ -153,20 +166,20 @@ const DevicesPage = () => {
               key={device.id}
               className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm"
             >
-              <div className="flex items-start justify-between">
-                <div>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
                   <p
-                    className="max-w-[200px] truncate text-sm font-semibold text-slate-900"
+                    className="truncate text-sm font-semibold text-slate-900"
                     title={device.hostname}
                   >
                     {device.hostname}
                   </p>
-                  <p className="text-xs text-slate-400">
-                    Usuário: {formatUserLabel(device)}
+                  <p className="mt-1 text-xs text-slate-400">
+                    {formatUserLabel(device)}
                   </p>
                 </div>
                 <span
-                  className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                  className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${
                     device.is_allowed
                       ? "bg-emerald-50 text-emerald-700"
                       : "bg-rose-50 text-rose-700"
@@ -175,25 +188,37 @@ const DevicesPage = () => {
                   {device.is_allowed ? "Autorizado" : "Bloqueado"}
                 </span>
               </div>
-              <div className="mt-4 grid gap-3 text-xs text-slate-500">
-                <div className="flex items-center justify-between">
-                  <span>Agent</span>
-                  <span className="text-slate-700">{device.agent_version ?? "-"}</span>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <div className="rounded-2xl bg-slate-50 p-3 text-xs text-slate-500">
+                  <p className="font-semibold text-slate-500">Agent</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-700">
+                    {device.agent_version ?? "-"}
+                  </p>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span>Último contato</span>
-                  <span className="text-slate-700">{formatDate(device.last_seen_at)}</span>
+                <div className="rounded-2xl bg-slate-50 p-3 text-xs text-slate-500">
+                  <p className="font-semibold text-slate-500">Último sinal</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-700">
+                    {formatRelativeTime(device.last_seen_at)}
+                  </p>
                 </div>
               </div>
-              <button
-                className="mt-4 h-10 w-full rounded-2xl border border-slate-200 text-sm text-slate-600"
-                onClick={() => {
-                  setSelectedDevice(device);
-                  setModalOpen(true);
-                }}
-              >
-                Gerenciar
-              </button>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  className="h-10 flex-1 rounded-2xl border border-slate-200 text-sm text-slate-600"
+                  onClick={() => {
+                    setSelectedDevice(device);
+                    setModalOpen(true);
+                  }}
+                >
+                  Gerenciar
+                </button>
+                <button
+                  className="h-10 flex-1 rounded-2xl bg-[#0e2659] text-sm font-semibold text-white"
+                  onClick={() => handleToggle(device.id, !device.is_allowed)}
+                >
+                  {device.is_allowed ? "Bloquear" : "Autorizar"}
+                </button>
+              </div>
             </div>
           ))}
         </div>
@@ -276,7 +301,14 @@ const DevicesPage = () => {
                   </label>
                 </div>
               </div>
-            ) : null}
+            ) : (
+              <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                <p className="text-sm font-semibold text-slate-900">Auto approve</p>
+                <p className="mt-1 text-xs text-slate-500">
+                  {selectedDevice.auto_approve ? "Ativo" : "Inativo"}
+                </p>
+              </div>
+            )}
           </div>
         )}
       </Modal>
