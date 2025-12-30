@@ -142,6 +142,17 @@ def claim_job(
     payload_token = secrets.token_urlsafe(32)
     payload_token_hash = hash_token(payload_token)
     expires_at = now + timedelta(seconds=PAYLOAD_TOKEN_TTL_SECONDS)
+    if job.status == JOB_STATUS_IN_PROGRESS and job.claimed_by_device_id == device.id:
+        job.payload_token_hash = payload_token_hash
+        job.payload_token_expires_at = expires_at
+        job.payload_token_used_at = None
+        job.payload_token_device_id = device.id
+        job.updated_at = now
+        db.commit()
+        job_data = InstallJobRead.model_validate(job, from_attributes=True).model_dump()
+        return AgentJobClaimResponse(**job_data, payload_token=payload_token)
+    if job.status == JOB_STATUS_IN_PROGRESS:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="job not claimable")
     result = db.execute(
         update(CertInstallJob)
         .where(
@@ -198,8 +209,7 @@ def job_payload(
             action="PAYLOAD_RATE_LIMITED",
             entity_type="cert_install_job",
             actor_device_id=device.id,
-            ip=request.client.host if request.client else None,
-            meta={"device_id": str(device.id)},
+            meta={"device_id": str(device.id), "ip": request.client.host if request.client else None},
         )
         db.commit()
         raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="rate limit")
@@ -215,8 +225,11 @@ def job_payload(
             entity_type="cert_install_job",
             entity_id=job_id,
             actor_device_id=device.id,
-            ip=request.client.host if request.client else None,
-            meta={"reason": "job_device_mismatch", "job_id": str(job_id)},
+            meta={
+                "reason": "job_device_mismatch",
+                "job_id": str(job_id),
+                "ip": request.client.host if request.client else None,
+            },
         )
         db.commit()
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="job not assigned")
@@ -228,8 +241,11 @@ def job_payload(
             entity_type="cert_install_job",
             entity_id=job_id,
             actor_device_id=device.id,
-            ip=request.client.host if request.client else None,
-            meta={"reason": "job_not_in_progress", "job_id": str(job_id)},
+            meta={
+                "reason": "job_not_in_progress",
+                "job_id": str(job_id),
+                "ip": request.client.host if request.client else None,
+            },
         )
         db.commit()
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="job not in progress")
@@ -241,8 +257,11 @@ def job_payload(
             entity_type="cert_install_job",
             entity_id=job_id,
             actor_device_id=device.id,
-            ip=request.client.host if request.client else None,
-            meta={"reason": "claim_device_mismatch", "job_id": str(job_id)},
+            meta={
+                "reason": "claim_device_mismatch",
+                "job_id": str(job_id),
+                "ip": request.client.host if request.client else None,
+            },
         )
         db.commit()
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="job not claimed by device")
@@ -255,8 +274,11 @@ def job_payload(
             entity_type="cert_install_job",
             entity_id=job_id,
             actor_device_id=device.id,
-            ip=request.client.host if request.client else None,
-            meta={"reason": "missing_token", "job_id": str(job_id)},
+            meta={
+                "reason": "missing_token",
+                "job_id": str(job_id),
+                "ip": request.client.host if request.client else None,
+            },
         )
         db.commit()
         raise HTTPException(status_code=status.HTTP_428_PRECONDITION_REQUIRED, detail="missing token")
@@ -276,8 +298,11 @@ def job_payload(
             entity_type="cert_install_job",
             entity_id=job_id,
             actor_device_id=device.id,
-            ip=request.client.host if request.client else None,
-            meta={"reason": "token_used", "job_id": str(job_id)},
+            meta={
+                "reason": "token_used",
+                "job_id": str(job_id),
+                "ip": request.client.host if request.client else None,
+            },
         )
         db.commit()
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="token already used")
@@ -289,8 +314,11 @@ def job_payload(
             entity_type="cert_install_job",
             entity_id=job_id,
             actor_device_id=device.id,
-            ip=request.client.host if request.client else None,
-            meta={"reason": "token_device_mismatch", "job_id": str(job_id)},
+            meta={
+                "reason": "token_device_mismatch",
+                "job_id": str(job_id),
+                "ip": request.client.host if request.client else None,
+            },
         )
         db.commit()
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="token device mismatch")
@@ -302,12 +330,18 @@ def job_payload(
             entity_type="cert_install_job",
             entity_id=job_id,
             actor_device_id=device.id,
-            ip=request.client.host if request.client else None,
-            meta={"reason": "token_missing", "job_id": str(job_id)},
+            meta={
+                "reason": "token_missing",
+                "job_id": str(job_id),
+                "ip": request.client.host if request.client else None,
+            },
         )
         db.commit()
         raise HTTPException(status_code=status.HTTP_428_PRECONDITION_REQUIRED, detail="missing token")
-    if datetime.now(timezone.utc) > locked_job.payload_token_expires_at:
+    expires_at = locked_job.payload_token_expires_at
+    if expires_at and expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if expires_at is None or datetime.now(timezone.utc) > expires_at:
         log_audit(
             db=db,
             org_id=device.org_id,
@@ -315,8 +349,11 @@ def job_payload(
             entity_type="cert_install_job",
             entity_id=job_id,
             actor_device_id=device.id,
-            ip=request.client.host if request.client else None,
-            meta={"reason": "token_expired", "job_id": str(job_id)},
+            meta={
+                "reason": "token_expired",
+                "job_id": str(job_id),
+                "ip": request.client.host if request.client else None,
+            },
         )
         db.commit()
         raise HTTPException(status_code=status.HTTP_410_GONE, detail="token expired")
@@ -328,8 +365,11 @@ def job_payload(
             entity_type="cert_install_job",
             entity_id=job_id,
             actor_device_id=device.id,
-            ip=request.client.host if request.client else None,
-            meta={"reason": "token_mismatch", "job_id": str(job_id)},
+            meta={
+                "reason": "token_mismatch",
+                "job_id": str(job_id),
+                "ip": request.client.host if request.client else None,
+            },
         )
         db.commit()
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="token mismatch")
@@ -360,8 +400,11 @@ def job_payload(
         entity_type="cert_install_job",
         entity_id=locked_job.id,
         actor_device_id=device.id,
-        ip=request.client.host if request.client else None,
-        meta={"job_id": str(locked_job.id), "device_id": str(device.id)},
+        meta={
+            "job_id": str(locked_job.id),
+            "device_id": str(device.id),
+            "ip": request.client.host if request.client else None,
+        },
     )
     db.commit()
     return AgentPayloadResponse(

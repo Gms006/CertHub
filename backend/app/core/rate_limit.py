@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from functools import lru_cache
 from typing import Tuple
 
 import redis
@@ -8,6 +9,7 @@ import redis
 DEFAULT_REDIS_URL = "redis://localhost:6379/0"
 
 
+@lru_cache(maxsize=1)
 def _get_redis() -> redis.Redis:
     redis_url = os.getenv("REDIS_URL", DEFAULT_REDIS_URL)
     return redis.Redis.from_url(redis_url)

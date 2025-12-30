@@ -8,6 +8,7 @@ from sqlalchemy import (
     Index,
     Integer,
     String,
+    Text,
     func,
     text,
 )
@@ -50,7 +51,7 @@ class CertInstallJob(Base):
     error_code: Mapped[str | None] = mapped_column(String, nullable=True)
     error_message: Mapped[str | None] = mapped_column(String, nullable=True)
     thumbprint: Mapped[str | None] = mapped_column(String, nullable=True)
-    payload_token_hash: Mapped[str | None] = mapped_column(String, nullable=True)
+    payload_token_hash: Mapped[str | None] = mapped_column(Text, nullable=True)
     payload_token_expires_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )

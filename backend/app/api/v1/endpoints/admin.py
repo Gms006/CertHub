@@ -106,7 +106,7 @@ def update_user(
     user_id: uuid.UUID,
     user_in: UserUpdate,
     db: Session = Depends(get_db),
-    current_user=Depends(require_dev),
+    current_user=Depends(require_admin_or_dev),
 ) -> User:
     user = db.get(User, user_id)
     if user is None or user.org_id != current_user.org_id:

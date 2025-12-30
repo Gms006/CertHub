@@ -9,6 +9,8 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 os.environ.setdefault("DATABASE_URL", "sqlite+pysqlite:///:memory:")
+os.environ.setdefault("JWT_SECRET", "test-secret")
+os.environ.setdefault("ALLOW_LEGACY_HEADERS", "true")
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 sys.path.append(str(Path(__file__).resolve().parent))
 

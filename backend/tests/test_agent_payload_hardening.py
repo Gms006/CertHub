@@ -192,3 +192,40 @@ def test_payload_rate_limit(test_client_and_session, tmp_path, monkeypatch):
 
     audit = db.query(models.AuditLog).filter_by(action="PAYLOAD_RATE_LIMITED").all()
     assert audit
+
+
+def test_claim_refreshes_token_for_in_progress_job(test_client_and_session, tmp_path):
+    client, sessionmaker = test_client_and_session
+    db = sessionmaker()
+
+    device, _ = _create_device(db)
+    _, _, job = _create_job(db, device, tmp_path, models.JOB_STATUS_PENDING)
+
+    first_claim = client.post(
+        f"/api/v1/agent/jobs/{job.id}/claim",
+        headers=_auth_headers_for_device(device),
+        json={},
+    )
+    assert first_claim.status_code == status.HTTP_200_OK
+    token_one = first_claim.json()["payload_token"]
+
+    second_claim = client.post(
+        f"/api/v1/agent/jobs/{job.id}/claim",
+        headers=_auth_headers_for_device(device),
+        json={},
+    )
+    assert second_claim.status_code == status.HTTP_200_OK
+    token_two = second_claim.json()["payload_token"]
+    assert token_two != token_one
+
+    old_token_response = client.get(
+        f"/api/v1/agent/jobs/{job.id}/payload?token={token_one}",
+        headers=_auth_headers_for_device(device),
+    )
+    assert old_token_response.status_code == status.HTTP_403_FORBIDDEN
+
+    response = client.get(
+        f"/api/v1/agent/jobs/{job.id}/payload?token={token_two}",
+        headers=_auth_headers_for_device(device),
+    )
+    assert response.status_code == status.HTTP_200_OK
