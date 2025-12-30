@@ -1,5 +1,12 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Key } from "lucide-react";
+import {
+  Activity,
+  CalendarClock,
+  Key,
+  KeyRound,
+  MonitorCheck,
+  ShieldAlert,
+} from "lucide-react";
 
 import Modal from "../components/Modal";
 import SectionTabs from "../components/SectionTabs";
@@ -154,21 +161,6 @@ const FileBadge2Icon = ({ className }: { className?: string }) => (
   </svg>
 );
 
-const KeyRoundIcon = ({ className }: { className?: string }) => (
-  <svg
-    className={className}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <circle cx="7.5" cy="15.5" r="5.5" />
-    <path d="M11 15.5h9l2-2-2-2h-2l-2-2" />
-  </svg>
-);
-
 const InfoIcon = ({ className }: { className?: string }) => (
   <svg
     className={className}
@@ -270,7 +262,7 @@ const CertCard = ({
           <div className="flex shrink-0 flex-col gap-2">
             <button
               onClick={onInstall}
-              className="inline-flex h-9 w-[120px] items-center justify-center gap-2 rounded-lg bg-slate-900 px-3 text-xs font-semibold text-white hover:bg-slate-800"
+              className="inline-flex h-9 w-[120px] items-center justify-center gap-2 rounded-2xl bg-slate-900 px-3 text-xs font-semibold text-white hover:bg-slate-800"
             >
               <Key className="h-4 w-4" />
               Instalar
@@ -278,7 +270,7 @@ const CertCard = ({
 
             <button
               onClick={onDetails}
-              className="inline-flex h-9 w-[120px] items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+              className="inline-flex h-9 w-[120px] items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50"
             >
               <InfoIcon className="h-4 w-4" />
               Detalhes
@@ -513,11 +505,36 @@ const CertificatesPage = () => {
     const expiredCount = statusBuckets.filter((status) => status === "expired").length;
     const expiring7Count = statusBuckets.filter((status) => status === "expiring7").length;
     return [
-      { label: "Certificados", value: `${certificates.length}`, meta: "catalogados no DB" },
-      { label: "Vencidos", value: `${expiredCount}`, meta: "exigem ação" },
-      { label: "Vence em 7d", value: `${expiring7Count}`, meta: "prioridade" },
-      { label: "Jobs ativos", value: `${jobs.length}`, meta: "pendente/progresso" },
-      { label: "Devices OK", value: `${devices.filter((d) => d.is_allowed).length}`, meta: "autorizados" },
+      {
+        label: "Certificados",
+        value: `${certificates.length}`,
+        meta: "catalogados no DB",
+        icon: KeyRound,
+      },
+      {
+        label: "Vencidos",
+        value: `${expiredCount}`,
+        meta: "exigem ação",
+        icon: ShieldAlert,
+      },
+      {
+        label: "Vence em 7d",
+        value: `${expiring7Count}`,
+        meta: "prioridade",
+        icon: CalendarClock,
+      },
+      {
+        label: "Jobs ativos",
+        value: `${jobs.length}`,
+        meta: "pendente/progresso",
+        icon: Activity,
+      },
+      {
+        label: "Devices OK",
+        value: `${devices.filter((d) => d.is_allowed).length}`,
+        meta: "autorizados",
+        icon: MonitorCheck,
+      },
     ];
   }, [certificates, devices, jobs]);
 
@@ -601,6 +618,10 @@ const CertificatesPage = () => {
     URL.revokeObjectURL(url);
   };
 
+  const selectedCert = installCertificateId
+    ? certificates.find((cert) => cert.id === installCertificateId) ?? null
+    : selectedCertificate;
+
   return (
     <div className="space-y-6">
       <div>
@@ -617,7 +638,12 @@ const CertificatesPage = () => {
             key={kpi.label}
             className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm"
           >
-            <p className="text-xs text-slate-500">{kpi.label}</p>
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-xs text-slate-500">{kpi.label}</p>
+              <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-50 text-slate-600">
+                <kpi.icon className="h-4 w-4" />
+              </span>
+            </div>
             <p className="mt-2 text-2xl font-semibold text-slate-900">
               {kpi.value}
             </p>
@@ -695,9 +721,10 @@ const CertificatesPage = () => {
             Exportar
           </button>
           <button
-            className="h-11 rounded-2xl bg-[#0e2659] px-4 text-sm font-semibold text-white"
+            className="inline-flex h-11 items-center gap-2 rounded-2xl bg-[#0e2659] px-4 text-sm font-semibold text-white whitespace-nowrap"
             onClick={() => handleOpenInstall()}
           >
+            <Key className="h-4 w-4" />
             Instalar via Agent
           </button>
         </div>
@@ -794,44 +821,101 @@ const CertificatesPage = () => {
           </>
         }
       >
-        {!installCertificateId && (
+        <div className="space-y-4">
+          <p className="text-xs text-slate-500">
+            O arquivo e a senha não serão expostos no navegador. O Agent fará a
+            importação em CurrentUser. A remoção automática ocorrerá às 18:00.
+          </p>
+
+          {selectedCert ? (
+            <div className="rounded-2xl border border-slate-200 bg-white p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-slate-900">
+                    {sanitizeSensitiveLabel(selectedCert.name)}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    CNPJ:{" "}
+                    {extractTaxId(
+                      selectedCert.subject ?? sanitizeSensitiveLabel(selectedCert.name),
+                    )}
+                  </p>
+                </div>
+
+                {(() => {
+                  const info = getStatusInfo(selectedCert.not_after);
+                  const badge =
+                    info.key === "expired"
+                      ? "bg-rose-50 text-rose-700"
+                      : info.key === "expiring7"
+                        ? "bg-amber-50 text-amber-700"
+                        : "bg-emerald-50 text-emerald-700";
+                  return (
+                    <span
+                      className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${badge}`}
+                    >
+                      {info.label}
+                    </span>
+                  );
+                })()}
+              </div>
+
+              <p className="mt-3 text-xs text-slate-600">
+                <span className="font-semibold text-slate-700">Validade:</span>{" "}
+                {formatDate(selectedCert.not_after)}
+              </p>
+            </div>
+          ) : null}
+
+          {!installCertificateId && (
+            <label className="block text-xs font-semibold text-slate-500">
+              Certificado
+              <select
+                className="mt-2 h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-600"
+                value={selectedCertificate?.id ?? ""}
+                onChange={(event) => {
+                  const cert =
+                    certificates.find((item) => item.id === event.target.value) ||
+                    null;
+                  setSelectedCertificate(cert);
+                }}
+              >
+                <option value="">Selecione um certificado</option>
+                {certificates.map((cert) => (
+                  <option key={cert.id} value={cert.id}>
+                    {sanitizeSensitiveLabel(cert.name)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+
           <label className="block text-xs font-semibold text-slate-500">
-            Certificado
+            Selecione o dispositivo
             <select
               className="mt-2 h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-600"
-              value={selectedCertificate?.id ?? ""}
-              onChange={(event) => {
-                const cert = certificates.find((item) => item.id === event.target.value) || null;
-                setSelectedCertificate(cert);
-              }}
+              value={selectedDeviceId ?? ""}
+              onChange={(event) => setSelectedDeviceId(event.target.value)}
             >
-              <option value="">Selecione um certificado</option>
-              {certificates.map((cert) => (
-              <option key={cert.id} value={cert.id}>
-                  {sanitizeSensitiveLabel(cert.name)}
-              </option>
-            ))}
-          </select>
-        </label>
-        )}
-        <label className="block text-xs font-semibold text-slate-500">
-          Dispositivo
-          <select
-            className="mt-2 h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-600"
-            value={selectedDeviceId ?? ""}
-            onChange={(event) => setSelectedDeviceId(event.target.value)}
-          >
-            <option value="">Selecione o device</option>
-            {availableDevices.map((device) => (
-              <option key={device.id} value={device.id}>
-                {device.hostname} {device.domain ? `(${device.domain})` : ""}
-              </option>
-            ))}
-          </select>
-        </label>
-        <div className="rounded-2xl bg-slate-50 p-4 text-xs text-slate-500">
-          O Agent instalará o certificado no perfil do usuário selecionado. Jobs aprovados
-          automaticamente por ADMIN/DEV ficam em "Pendente".
+              <option value="">Selecione o device</option>
+              {availableDevices.map((device) => {
+                const userLabel =
+                  device.assigned_user?.ad_username ||
+                  device.assigned_user?.email ||
+                  "";
+                return (
+                  <option key={device.id} value={device.id}>
+                    {device.hostname}
+                    {userLabel ? ` • ${userLabel}` : ""}
+                  </option>
+                );
+              })}
+            </select>
+          </label>
+
+          <p className="text-[11px] text-slate-500">
+            Dica: dispositivos “bloqueados” não receberão payload do job.
+          </p>
         </div>
       </Modal>
 
