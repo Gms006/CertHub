@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Settings, ShieldCheck, ShieldX } from "lucide-react";
 
 import Modal from "../components/Modal";
 import SectionTabs from "../components/SectionTabs";
@@ -204,19 +205,30 @@ const DevicesPage = () => {
               </div>
               <div className="mt-4 flex flex-wrap gap-2">
                 <button
-                  className="h-10 flex-1 rounded-2xl border border-slate-200 text-sm text-slate-600"
+                  className="inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600"
                   onClick={() => {
                     setSelectedDevice(device);
                     setModalOpen(true);
                   }}
                 >
+                  <Settings className="h-3.5 w-3.5" />
                   Gerenciar
                 </button>
                 <button
-                  className="h-10 flex-1 rounded-2xl bg-[#0e2659] text-sm font-semibold text-white"
+                  className="inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-full bg-[#0e2659] px-3 text-xs font-semibold text-white"
                   onClick={() => handleToggle(device.id, !device.is_allowed)}
                 >
-                  {device.is_allowed ? "Bloquear" : "Autorizar"}
+                  {device.is_allowed ? (
+                    <>
+                      <ShieldX className="h-3.5 w-3.5" />
+                      Bloquear
+                    </>
+                  ) : (
+                    <>
+                      <ShieldCheck className="h-3.5 w-3.5" />
+                      Autorizar
+                    </>
+                  )}
                 </button>
               </div>
             </div>
