@@ -91,6 +91,23 @@ Alternativa com script (PowerShell):
 .\scripts\windows\publish_agent.ps1 -PublishDir C:\Temp\CerthubAgent\publish
 ```
 
+## Instalação oficial do Agent (ProgramData + Task 18h)
+
+Publica (ou reutiliza um diretório já publicado) e instala em:
+`C:\ProgramData\CertHubAgent\publish\Certhub.Agent.exe`
+
+```powershell
+Set-Location agent\windows\Certhub.Agent
+.\INSTALL.ps1
+```
+
+Caso já tenha o publish pronto:
+
+```powershell
+Set-Location agent\windows\Certhub.Agent
+.\INSTALL.ps1 -PublishDir C:\Temp\CerthubAgent\publish
+```
+
 ## Agent Windows – Build/Publish
 
 ```powershell
@@ -102,23 +119,27 @@ dotnet publish -c Release -r win-x64 --self-contained true `
   -o C:\Temp\CerthubAgent\publish
 ```
 
-O executável fica em:
-`C:\Temp\CerthubAgent\publish\Certhub.Agent.exe`.
+O executável publicado pode ser usado para instalar no ProgramData via `INSTALL.ps1`.
 
 ## S5 Cleanup 18h (Regra das 18h)
 
 - **Rodar cleanup manual** (headless):
 
 ```powershell
-C:\Temp\CerthubAgent\publish\Certhub.Agent.exe --cleanup --cleanup-mode=manual
+C:\ProgramData\CertHubAgent\publish\Certhub.Agent.exe --cleanup --mode manual
 ```
 
-- **Validar a Scheduled Task** (criada automaticamente no startup do agent):
+- **Validar a Scheduled Task** (instalada via `INSTALL.ps1`):
 
 ```powershell
-Get-ScheduledTask -TaskName "CertHub Agent Cleanup 18h"
-Get-ScheduledTaskInfo -TaskName "CertHub Agent Cleanup 18h"
-Start-ScheduledTask -TaskName "CertHub Agent Cleanup 18h"
+schtasks /Query /TN "CertHub Cleanup 18h" /V /FO LIST
+schtasks /Run /TN "CertHub Cleanup 18h"
+```
+
+- **Validar log do agent**:
+
+```powershell
+Get-Content "$env:LOCALAPPDATA\CertHubAgent\logs\agent.log" -Tail 60
 ```
 
 - **Validar auditoria no DB** (Postgres):
@@ -131,10 +152,51 @@ order by timestamp desc
 limit 5;
 ```
 
+### HealthCheck S5 (ProgramData + Task 18h)
+
+**Critérios de aceite**
+- Task “CertHub Cleanup 18h” existe e o **Task To Run** aponta para `C:\ProgramData\CertHubAgent\publish\Certhub.Agent.exe`.
+- `schtasks /Run` executa e o `agent.log` registra **“Starting cleanup (Scheduled)”**.
+- O banco registra `audit_log` com action `CERT_REMOVED_18H`.
+
+1) Confirmar “Task To Run” está em ProgramData
+
+```powershell
+$taskName = "CertHub Cleanup 18h"
+schtasks /Query /TN "$taskName" /V /FO LIST |
+  Select-String "Tarefa a ser executada|Task To Run|Modo de Logon|Executar como Usuário"
+```
+
+2) Executar a task agora e checar log
+
+```powershell
+$taskName = "CertHub Cleanup 18h"
+schtasks /Run /TN "$taskName"
+Start-Sleep -Seconds 2
+Get-Content "$env:LOCALAPPDATA\\CertHubAgent\\logs\\agent.log" -Tail 60
+```
+
+Aceite aqui: aparecer `Starting cleanup (Scheduled)`.
+
+3) Validar auditoria no Postgres (psql)
+
+```powershell
+$psqlUrl = $env:DATABASE_URL `
+  -replace '^postgresql\\+psycopg2', 'postgresql' `
+  -replace '\\?.*$', ''
+
+psql $psqlUrl -c "
+select action, actor_device_id, timestamp, meta_json
+from audit_log
+where action = 'CERT_REMOVED_18H'
+order by timestamp desc
+limit 10;"
+```
+
 **Rollback S5**
 
 ```powershell
-Unregister-ScheduledTask -TaskName "CertHub Agent Cleanup 18h" -Confirm:$false
+Unregister-ScheduledTask -TaskName "CertHub Cleanup 18h" -Confirm:$false
 ```
 
 ```bash
@@ -158,10 +220,10 @@ git revert <commit_sha>
 ## Deploy do Agent em outras máquinas (piloto)
 
 1) Copiar o executável publicado para a máquina alvo (ex.):
-   - **Recomendado**: `C:\ProgramData\CertHubAgent\Certhub.Agent.exe` (evita UAC do Program Files).
+   - **Recomendado**: `C:\ProgramData\CertHubAgent\publish\Certhub.Agent.exe` (evita UAC do Program Files).
    - **Importante**: não execute o `.exe` diretamente de share/UNC; copie local primeiro
      (pode aparecer “Windows não pode acessar o dispositivo, caminho ou arquivo…”).
-   - Exemplo de publish local: `dotnet publish ... -o C:\Temp\CerthubAgent\publish` e copiar depois para `C:\ProgramData\CertHubAgent`.
+   - Exemplo de publish local: `dotnet publish ... -o C:\Temp\CerthubAgent\publish` e copiar depois para `C:\ProgramData\CertHubAgent\publish`.
    - Alternativa com script:
 
      ```powershell

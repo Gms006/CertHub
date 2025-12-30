@@ -2,7 +2,7 @@ namespace Certhub.Agent.Services;
 
 public sealed class ScheduledCleanupTaskService
 {
-    private const string TaskName = "CertHub Agent Cleanup 18h";
+    private const string TaskName = "CertHub Cleanup 18h";
     private const string TaskDescription = "Remove temporary CertHub certificates daily at 18:00";
 
     private readonly Logger _logger;
@@ -51,7 +51,7 @@ public sealed class ScheduledCleanupTaskService
 
             dynamic action = taskDefinition.Actions.Create(0); // TASK_ACTION_EXEC
             action.Path = normalizedPath;
-            action.Arguments = "--cleanup";
+            action.Arguments = "--cleanup --mode scheduled";
             action.WorkingDirectory = Path.GetDirectoryName(normalizedPath) ?? string.Empty;
 
             rootFolder.RegisterTaskDefinition(

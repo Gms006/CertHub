@@ -104,7 +104,9 @@ internal static class Program
 
     private static CleanupMode ParseCleanupMode(string[] args)
     {
-        var modeArg = args.FirstOrDefault(arg => arg.StartsWith("--cleanup-mode", StringComparison.OrdinalIgnoreCase));
+        var modeArg = args.FirstOrDefault(arg =>
+            arg.StartsWith("--cleanup-mode", StringComparison.OrdinalIgnoreCase) ||
+            arg.StartsWith("--mode", StringComparison.OrdinalIgnoreCase));
         if (modeArg is null)
         {
             return CleanupMode.Scheduled;

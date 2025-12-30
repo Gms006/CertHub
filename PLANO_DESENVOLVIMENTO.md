@@ -1064,27 +1064,30 @@ Invoke-RestMethod -Method Post "http://localhost:8010/api/v1/agent/jobs/<JOB_ID>
 
 **Objetivo**: remover automaticamente às 18h tudo que o agent instalou como temporário.
 
+**Status**: ✅ Concluído
+
 **Entregáveis**
 
-- Scheduled Task diária 18:00.
-- Comando `--cleanup`.
+- Scheduled Task diária 18:00 (ProgramData).
+- Comando `--cleanup` (modo scheduled).
 - Auditoria: CERT\_REMOVED\_18H.
 
 **Aceite**
 
-- Instala 10:00 → 18:00 remove.
+- Task “CertHub Cleanup 18h” existe e Task To Run aponta para `C:\ProgramData\CertHubAgent\publish\Certhub.Agent.exe`.
+- `schtasks /Run` executa e o `agent.log` registra “Starting cleanup (Scheduled)”.
+- DB registra `audit_log` com action `CERT_REMOVED_18H`.
 - Certificados pré-existentes não são removidos.
 
 **Validação (S5)**
 
 ```powershell
 # Rodar cleanup manual (headless)
-C:\Temp\CerthubAgent\publish\Certhub.Agent.exe --cleanup --cleanup-mode=manual
+C:\ProgramData\CertHubAgent\publish\Certhub.Agent.exe --cleanup --mode manual
 
 # Verificar Scheduled Task
-Get-ScheduledTask -TaskName "CertHub Agent Cleanup 18h"
-Get-ScheduledTaskInfo -TaskName "CertHub Agent Cleanup 18h"
-Start-ScheduledTask -TaskName "CertHub Agent Cleanup 18h"
+schtasks /Query /TN "CertHub Cleanup 18h" /V /FO LIST
+schtasks /Run /TN "CertHub Cleanup 18h"
 ```
 
 ```sql
@@ -1098,7 +1101,7 @@ limit 5;
 **Rollback (S5)**
 
 ```powershell
-Unregister-ScheduledTask -TaskName "CertHub Agent Cleanup 18h" -Confirm:$false
+Unregister-ScheduledTask -TaskName "CertHub Cleanup 18h" -Confirm:$false
 ```
 
 ```bash
