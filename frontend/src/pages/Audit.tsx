@@ -137,10 +137,11 @@ const AuditPage = () => {
                       </span>
                     </td>
                     <td className="px-4 py-4">
-                      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                        <span className="block max-w-[140px] truncate" title={audit.action}>
-                          {audit.action}
-                        </span>
+                      <span
+                        className="inline-flex max-w-[220px] items-center truncate rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600"
+                        title={audit.action}
+                      >
+                        {audit.action}
                       </span>
                     </td>
                     <td className="px-4 py-4 text-slate-600">
