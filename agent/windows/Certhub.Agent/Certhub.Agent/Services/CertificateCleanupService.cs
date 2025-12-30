@@ -71,11 +71,11 @@ public sealed class CertificateCleanupService
             $"Cleanup finished. Total: {normalizedThumbprints.Count}, Removed: {removed.Count}, Failed: {failed.Count}.");
 
         return new CleanupResult(
-            Mode: mode,
-            RanAtLocal: DateTimeOffset.Now,
-            TotalThumbprints: normalizedThumbprints.Count,
-            RemovedThumbprints: removed,
-            FailedThumbprints: failed);
+            mode,
+            DateTimeOffset.Now,
+            normalizedThumbprints.Count,
+            removed,
+            failed);
     }
 }
 
