@@ -173,7 +173,7 @@ schtasks /Query /TN "$taskName" /V /FO LIST |
 $taskName = "CertHub Cleanup 18h"
 schtasks /Run /TN "$taskName"
 Start-Sleep -Seconds 2
-Get-Content "$env:LOCALAPPDATA\\CertHubAgent\\logs\\agent.log" -Tail 60
+Get-Content $log.FullName -Tail 200 -Wait | Select-String -Pattern "cleanup|Scheduled|CERT_REMOVED_18H|Starting"
 ```
 
 Aceite aqui: aparecer `Starting cleanup (Scheduled)`.
@@ -197,6 +197,100 @@ limit 10;"
 
 ```powershell
 Unregister-ScheduledTask -TaskName "CertHub Cleanup 18h" -Confirm:$false
+```
+
+## S6 Job Control / Agent Hardening
+
+### Fluxo completo (REQUESTED/PENDING → CLAIM → PAYLOAD → RESULT)
+1. **Portal cria o job** (`REQUESTED`/`PENDING`).
+2. **Agent faz CLAIM**: `POST /api/v1/agent/jobs/{job_id}/claim`.
+3. **Agent busca PAYLOAD**: `GET /api/v1/agent/jobs/{job_id}/payload?token=...`.
+4. **Agent envia RESULT**: `POST /api/v1/agent/jobs/{job_id}/result`.
+
+Estados esperados: `REQUESTED|PENDING → IN_PROGRESS → DONE|FAILED`.
+
+### Regras de segurança (Job Control)
+- **TTL do payload token**: 120s (single-use).
+- **Token single-use**: 2ª tentativa retorna 409 e registra `PAYLOAD_DENIED` (`token_used`).
+- **Rate limit** por device/IP no payload.
+- **/result idempotente**: replay retorna 409 com `RESULT_DUPLICATE` (ou `RESULT_DENIED`).
+
+### Validações (backend)
+```bash
+cd backend
+alembic upgrade head
+pytest
+python -m pytest -q ./tests/test_agent_payload_hardening.py ./tests/test_agent_job_controls.py
+```
+
+### Exemplos de chamadas (simulação de erros)
+
+**Token mismatch (403)**
+```bash
+curl -X GET "http://localhost:8010/api/v1/agent/jobs/<job_id>/payload?token=wrong" \
+  -H "Authorization: Bearer <DEVICE_JWT>"
+```
+
+**Token expired (410)** (após expirar o payload token no DB)
+```bash
+curl -X GET "http://localhost:8010/api/v1/agent/jobs/<job_id>/payload?token=<token>" \
+  -H "Authorization: Bearer <DEVICE_JWT>"
+```
+
+**Token already used (409)** (replay do mesmo token)
+```bash
+curl -X GET "http://localhost:8010/api/v1/agent/jobs/<job_id>/payload?token=<token>" \
+  -H "Authorization: Bearer <DEVICE_JWT>"
+```
+
+**Rate limit (429)**
+```bash
+for i in {1..10}; do
+  curl -s -o /dev/null -w "%{http_code}\n" \
+    -H "Authorization: Bearer <DEVICE_JWT>" \
+    "http://localhost:8010/api/v1/agent/jobs/<job_id>/payload?token=<token>"
+done
+```
+
+### Operação / diagnóstico
+
+**Reaper de jobs presos**
+```bash
+curl -X POST "http://localhost:8010/api/v1/admin/jobs/reap?threshold_minutes=60" \
+  -H "Authorization: Bearer <JWT_ADMIN>"
+```
+
+**Significados de status/error_code**
+- `DONE`: instalação concluída
+- `FAILED`: falha na instalação (`error_code`/`error_message`)
+- `TIMEOUT`: job reaped (stuck `IN_PROGRESS`)
+
+### Queries úteis (Postgres)
+
+**Jobs presos IN_PROGRESS há X minutos**
+```sql
+select id, device_id, started_at, status
+from cert_install_jobs
+where status = 'IN_PROGRESS'
+  and started_at <= now() - interval '60 minutes'
+order by started_at;
+```
+
+**Auditorias PAYLOAD_DENIED / RATE_LIMITED / RESULT_DUPLICATE**
+```sql
+select action, actor_device_id, meta_json, timestamp
+from audit_log
+where action in ('PAYLOAD_DENIED', 'PAYLOAD_RATE_LIMITED', 'RESULT_DUPLICATE')
+  and timestamp >= now() - interval '7 days'
+order by timestamp desc;
+```
+
+**Últimos jobs por device**
+```sql
+select device_id, max(created_at) as last_job_at
+from cert_install_jobs
+group by device_id
+order by last_job_at desc;
 ```
 
 ```bash
