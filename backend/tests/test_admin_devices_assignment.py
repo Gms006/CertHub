@@ -72,3 +72,29 @@ def test_admin_cannot_toggle_device_auto_approve(test_client_and_session):
     )
 
     assert response.status_code == 403
+
+
+def test_list_devices_returns_auto_approve_and_patch_updates(test_client_and_session):
+    client, SessionLocal = test_client_and_session
+    with SessionLocal() as db:
+        dev = create_user(db, role="DEV")
+        device = create_device(db, auto_approve=False)
+
+    list_response = client.get("/api/v1/admin/devices", headers=headers(dev))
+    assert list_response.status_code == 200
+    payload = list_response.json()
+    listed = next(item for item in payload if item["id"] == str(device.id))
+    assert listed["auto_approve"] is False
+
+    patch_response = client.patch(
+        f"/api/v1/admin/devices/{device.id}",
+        json={"auto_approve": True},
+        headers=headers(dev),
+    )
+    assert patch_response.status_code == 200
+    assert patch_response.json()["auto_approve"] is True
+
+    list_response = client.get("/api/v1/admin/devices", headers=headers(dev))
+    payload = list_response.json()
+    listed = next(item for item in payload if item["id"] == str(device.id))
+    assert listed["auto_approve"] is True

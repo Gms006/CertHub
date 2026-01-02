@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import SectionTabs from "../components/SectionTabs";
 import Toast from "../components/Toast";
 import { useAuth } from "../hooks/useAuth";
+import { usePreferences } from "../hooks/usePreferences";
 import { useToast } from "../hooks/useToast";
 import { formatDateTime } from "../lib/formatters";
 
@@ -27,10 +28,9 @@ const getJobId = (audit: AuditLogRead) => {
   return undefined;
 };
 
-const formatShortId = (value: string) => value.slice(0, 8);
-
 const AuditPage = () => {
   const { apiFetch } = useAuth();
+  const { preferences } = usePreferences();
   const { toast, notify } = useToast();
   const [audits, setAudits] = useState<AuditLogRead[]>([]);
   const [loading, setLoading] = useState(true);
@@ -58,6 +58,14 @@ const AuditPage = () => {
     loadAudit();
   }, []);
 
+  useEffect(() => {
+    if (!preferences.autoRefreshAudit) return;
+    const interval = window.setInterval(() => {
+      loadAudit();
+    }, 20000);
+    return () => window.clearInterval(interval);
+  }, [preferences.autoRefreshAudit]);
+
   const filteredAudits = useMemo(() => {
     const actionTerm = actionFilter.trim().toLowerCase();
     const actorTerm = actorFilter.trim().toLowerCase();
@@ -71,6 +79,9 @@ const AuditPage = () => {
       return actionOk && actorOk;
     });
   }, [actionFilter, actorFilter, audits]);
+
+  const formatShortId = (value: string) =>
+    preferences.hideLongIds ? value.slice(0, 8) : value;
 
   return (
     <div className="space-y-6">
@@ -132,13 +143,16 @@ const AuditPage = () => {
                       {formatDateTime(audit.timestamp)}
                     </td>
                     <td className="px-4 py-4 text-slate-700">
-                      <span className="block max-w-[180px] truncate" title={audit.actor_label ?? "-"}>
+                      <span
+                        className="block max-w-[180px] truncate"
+                        title={audit.actor_label ?? "-"}
+                      >
                         {audit.actor_label ?? "-"}
                       </span>
                     </td>
                     <td className="px-4 py-4">
                       <span
-                        className="inline-flex max-w-[220px] items-center truncate rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600"
+                        className="inline-flex max-w-[220px] items-center whitespace-nowrap truncate rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600"
                         title={audit.action}
                       >
                         {audit.action}
@@ -147,11 +161,16 @@ const AuditPage = () => {
                     <td className="px-4 py-4 text-slate-600">
                       {jobId ? (
                         <div className="space-y-1">
-                          <span className="inline-flex rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
+                          <span
+                            className="inline-flex rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700"
+                            title={jobId}
+                          >
                             {formatShortId(jobId)}
                           </span>
                           <p className="text-[11px] text-slate-400">
-                            job_id: {jobId}
+                            <span title={jobId}>
+                              job_id: {formatShortId(jobId)}
+                            </span>
                           </p>
                         </div>
                       ) : (
@@ -173,7 +192,7 @@ const AuditPage = () => {
                           title={audit.entity_id ?? "-"}
                         >
                           <span className="block max-w-[160px] truncate">
-                            {audit.entity_id ?? "-"}
+                            {audit.entity_id ? formatShortId(audit.entity_id) : "-"}
                           </span>
                         </p>
                       </div>

@@ -1,11 +1,61 @@
+import { useEffect, useState } from "react";
 import { Outlet } from "react-router-dom";
+import { Search, SlidersHorizontal } from "lucide-react";
 
+import Modal from "./Modal";
 import { useAuth } from "../hooks/useAuth";
+import { usePreferences } from "../hooks/usePreferences";
 
 const AppShell = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, apiFetch } = useAuth();
+  const { preferences, updatePreferences } = usePreferences();
   const displayName =
     user?.nome || user?.ad_username || user?.email || "Usuário";
+  const [preferencesOpen, setPreferencesOpen] = useState(false);
+  const [deviceOptions, setDeviceOptions] = useState<
+    { id: string; hostname: string; assigned_user?: { ad_username?: string } | null }[]
+  >([]);
+  const [devicesLoading, setDevicesLoading] = useState(false);
+  const hasDefaultDevice = deviceOptions.some(
+    (device) => device.id === preferences.defaultDeviceId,
+  );
+
+  useEffect(() => {
+    if (!preferencesOpen) return;
+    let mounted = true;
+    const loadDevices = async () => {
+      setDevicesLoading(true);
+      try {
+        const response = await apiFetch("/devices/mine");
+        if (!response.ok) {
+          if (mounted) {
+            setDeviceOptions([]);
+          }
+          return;
+        }
+        const data = (await response.json()) as {
+          id: string;
+          hostname: string;
+          assigned_user?: { ad_username?: string } | null;
+        }[];
+        if (mounted) {
+          setDeviceOptions(data);
+        }
+      } catch {
+        if (mounted) {
+          setDeviceOptions([]);
+        }
+      } finally {
+        if (mounted) {
+          setDevicesLoading(false);
+        }
+      }
+    };
+    loadDevices();
+    return () => {
+      mounted = false;
+    };
+  }, [apiFetch, preferencesOpen]);
 
   return (
     <div className="min-h-screen bg-slate-100">
@@ -25,39 +75,18 @@ const AppShell = () => {
           <div className="hidden w-full max-w-xl items-center gap-3 md:flex">
             <div className="relative flex-1">
               <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <circle cx="11" cy="11" r="8" />
-                  <path d="m21 21-4.3-4.3" />
-                </svg>
+                <Search className="h-4 w-4" />
               </span>
               <input
                 className="h-10 w-full rounded-2xl border border-slate-200 bg-white pl-9 text-sm text-slate-600 placeholder:text-slate-400"
                 placeholder="Buscar por empresa, CNPJ/CPF, titular..."
               />
             </div>
-            <button className="flex h-10 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-600">
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" />
-                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 5 15.5a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 8.5 5a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09A1.65 1.65 0 0 0 15.5 4.6a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19 8.5c0 .6.23 1.17.64 1.58.4.41.98.64 1.58.64H21a2 2 0 1 1 0 4h-.09A1.65 1.65 0 0 0 19.4 15Z" />
-              </svg>
+            <button
+              className="flex h-10 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-600"
+              onClick={() => setPreferencesOpen(true)}
+            >
+              <SlidersHorizontal className="h-4 w-4" />
               Preferências
             </button>
           </div>
@@ -120,6 +149,116 @@ const AppShell = () => {
           <Outlet />
         </main>
       </div>
+
+      <Modal
+        title="Preferências"
+        open={preferencesOpen}
+        onClose={() => setPreferencesOpen(false)}
+        footer={
+          <button
+            className="h-10 rounded-2xl border border-slate-200 px-4 text-sm text-slate-600"
+            onClick={() => setPreferencesOpen(false)}
+          >
+            Fechar
+          </button>
+        }
+      >
+        <div className="grid gap-4 md:grid-cols-2">
+          <label className="flex flex-col gap-2 text-xs font-semibold text-slate-500">
+            Tamanho da página
+            <select
+              className="h-10 rounded-2xl border border-slate-200 bg-white px-3 text-sm text-slate-600"
+              value={preferences.pageSize}
+              onChange={(event) =>
+                updatePreferences({ pageSize: Number(event.target.value) })
+              }
+            >
+              {[6, 9, 12, 18].map((size) => (
+                <option key={size} value={size}>
+                  {size} itens
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex flex-col gap-2 text-xs font-semibold text-slate-500">
+            Ordenação padrão
+            <select
+              className="h-10 rounded-2xl border border-slate-200 bg-white px-3 text-sm text-slate-600"
+              value={preferences.defaultOrder}
+              onChange={(event) =>
+                updatePreferences({
+                  defaultOrder: event.target.value as "validade" | "empresa",
+                })
+              }
+            >
+              <option value="validade">Validade</option>
+              <option value="empresa">Empresa</option>
+            </select>
+          </label>
+        </div>
+        <div className="grid gap-3 md:grid-cols-2">
+          <label className="flex items-center justify-between rounded-2xl border border-slate-200 p-3 text-xs font-semibold text-slate-600">
+            Auto-refresh Jobs
+            <input
+              type="checkbox"
+              className="h-4 w-4 rounded border-slate-300"
+              checked={preferences.autoRefreshJobs}
+              onChange={(event) =>
+                updatePreferences({ autoRefreshJobs: event.target.checked })
+              }
+            />
+          </label>
+          <label className="flex items-center justify-between rounded-2xl border border-slate-200 p-3 text-xs font-semibold text-slate-600">
+            Auto-refresh Auditoria
+            <input
+              type="checkbox"
+              className="h-4 w-4 rounded border-slate-300"
+              checked={preferences.autoRefreshAudit}
+              onChange={(event) =>
+                updatePreferences({ autoRefreshAudit: event.target.checked })
+              }
+            />
+          </label>
+        </div>
+        <label className="flex items-center justify-between rounded-2xl border border-slate-200 p-3 text-xs font-semibold text-slate-600">
+          Ocultar IDs longos
+          <input
+            type="checkbox"
+            className="h-4 w-4 rounded border-slate-300"
+            checked={preferences.hideLongIds}
+            onChange={(event) =>
+              updatePreferences({ hideLongIds: event.target.checked })
+            }
+          />
+        </label>
+        <label className="flex flex-col gap-2 text-xs font-semibold text-slate-500">
+          Device padrão (VIEW)
+          <select
+            className="h-10 rounded-2xl border border-slate-200 bg-white px-3 text-sm text-slate-600"
+            value={preferences.defaultDeviceId}
+            onChange={(event) =>
+              updatePreferences({ defaultDeviceId: event.target.value })
+            }
+          >
+            <option value="">
+              {devicesLoading ? "Carregando devices..." : "Selecione um device"}
+            </option>
+            {!hasDefaultDevice && preferences.defaultDeviceId ? (
+              <option value={preferences.defaultDeviceId}>
+                Device atual (não listado)
+              </option>
+            ) : null}
+            {deviceOptions.map((device) => (
+              <option key={device.id} value={device.id}>
+                {device.hostname}
+              </option>
+            ))}
+          </select>
+        </label>
+        <p className="text-[11px] text-slate-400">
+          Preferências ficam salvas localmente neste navegador.
+        </p>
+      </Modal>
     </div>
   );
 };
