@@ -50,6 +50,24 @@ Esperado: `{"status":"ok"}`
 
 ---
 
+## Smoke test (PowerShell)
+
+Execução direta:
+
+```powershell
+.\scripts\windows\s8_smoke.ps1
+```
+
+Execução garantida (Windows PowerShell):
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\windows\s8_smoke.ps1
+```
+
+> Nota: `pwsh` é PowerShell 7 (opcional). Se não estiver instalado, use `powershell`.
+
+---
+
 ## Provisionar device (ADMIN/DEV)
 
 ```powershell

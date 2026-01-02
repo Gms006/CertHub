@@ -35,6 +35,14 @@ Objetivo: substituir o diretório público de `.pfx` por um fluxo controlado via
 .\scripts\windows\s8_smoke.ps1
 ```
 
+Execução garantida (Windows PowerShell):
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\windows\s8_smoke.ps1
+```
+
+> Nota: `pwsh` é PowerShell 7 (opcional). Se não estiver instalado, use `powershell`.
+
 ### Notas operacionais
 
 - **Porta padrão do repo nos exemplos**: `8010` (ajuste via `uvicorn --port`).
