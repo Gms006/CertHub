@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.audit import log_audit
@@ -12,6 +12,7 @@ from app.core.security import require_admin_or_dev, require_view_or_higher
 from app.db.session import get_db
 from app.models import (
     CertInstallJob,
+    Device,
     JOB_STATUS_CANCELED,
     JOB_STATUS_PENDING,
     JOB_STATUS_REQUESTED,
@@ -59,13 +60,24 @@ async def list_my_device_jobs(
 ) -> list[CertInstallJob]:
     statement = (
         select(CertInstallJob)
-        .join(UserDevice, UserDevice.device_id == CertInstallJob.device_id)
+        .join(Device, Device.id == CertInstallJob.device_id)
+        .outerjoin(
+            UserDevice,
+            and_(
+                UserDevice.device_id == CertInstallJob.device_id,
+                UserDevice.user_id == current_user.id,
+            ),
+        )
         .where(
             CertInstallJob.org_id == current_user.org_id,
-            UserDevice.user_id == current_user.id,
-            UserDevice.is_allowed.is_(True),
+            or_(
+                CertInstallJob.requested_by_user_id == current_user.id,
+                Device.assigned_user_id == current_user.id,
+                UserDevice.is_allowed.is_(True),
+            ),
         )
         .order_by(CertInstallJob.created_at.desc())
+        .distinct()
     )
     return db.execute(statement).scalars().all()
 
