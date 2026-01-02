@@ -375,7 +375,11 @@ def update_device(
             entity_type="device",
             entity_id=device.id,
             actor_user_id=current_user.id,
-            meta={"changes": changes},
+            meta={
+                "device_id": str(device.id),
+                "hostname": device.hostname,
+                "changes": changes,
+            },
         )
         db.commit()
         db.refresh(device)
