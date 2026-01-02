@@ -100,6 +100,25 @@ async def create_install_job(
     if device is None or device.org_id != current_user.org_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="device not found")
 
+    # Bloqueio global do device (toggle ADMIN: device.is_allowed)
+    if not device.is_allowed:
+        log_audit(
+            db=db,
+            org_id=current_user.org_id,
+            action="INSTALL_DENIED",
+            entity_type="device",
+            entity_id=device.id,
+            actor_user_id=current_user.id,
+            meta={
+                "reason": "device_not_allowed",
+                "cert_id": str(certificate.id),
+                "device_id": str(device.id),
+                "requested_by_user_id": str(current_user.id),
+            },
+        )
+        db.commit()
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="device not allowed")
+
     if current_user.role_global == "VIEW":
         allowed_device = db.execute(
             select(UserDevice)
