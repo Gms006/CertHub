@@ -34,7 +34,7 @@ const statusStyles: Record<string, string> = {
   DONE: "bg-emerald-50 text-emerald-700",
   FAILED: "bg-rose-50 text-rose-700",
   EXPIRED: "bg-slate-100 text-slate-600",
-  CANCELED: "bg-slate-100 text-slate-600",
+  CANCELED: "bg-rose-50 text-rose-700",
 };
 
 const statusLabels: Record<string, string> = {
