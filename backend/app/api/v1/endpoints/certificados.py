@@ -17,6 +17,7 @@ from app.models import (
     Device,
     JOB_STATUS_PENDING,
     JOB_STATUS_REQUESTED,
+    UserDevice,
 )
 from app.schemas.certificate import CertificateCreate, CertificateRead
 from app.schemas.install_job import InstallJobCreate, InstallJobRead
@@ -98,6 +99,19 @@ async def create_install_job(
     device = db.get(Device, payload.device_id)
     if device is None or device.org_id != current_user.org_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="device not found")
+
+    if current_user.role_global == "VIEW":
+        allowed_device = db.execute(
+            select(UserDevice)
+            .where(
+                UserDevice.device_id == device.id,
+                UserDevice.user_id == current_user.id,
+                UserDevice.is_allowed.is_(True),
+            )
+            .limit(1)
+        ).scalar_one_or_none()
+        if device.assigned_user_id != current_user.id and allowed_device is None:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="device not allowed")
 
     auto_approved = False
     auto_reason = None

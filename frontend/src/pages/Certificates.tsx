@@ -11,6 +11,7 @@ import Modal from "../components/Modal";
 import SectionTabs from "../components/SectionTabs";
 import Toast from "../components/Toast";
 import { useAuth } from "../hooks/useAuth";
+import { usePreferences } from "../hooks/usePreferences";
 import { useToast } from "../hooks/useToast";
 import {
   daysUntil,
@@ -368,6 +369,7 @@ const extractTaxId = (value?: string | null) => {
 
 const CertificatesPage = () => {
   const { apiFetch, user } = useAuth();
+  const { preferences } = usePreferences();
   const { toast, notify } = useToast();
   const [certificates, setCertificates] = useState<CertificateRead[]>([]);
   const [devices, setDevices] = useState<DeviceRead[]>([]);
@@ -375,7 +377,7 @@ const CertificatesPage = () => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("Todos");
-  const [orderBy, setOrderBy] = useState("validade");
+  const [orderBy, setOrderBy] = useState(preferences.defaultOrder);
   const [hideExpired, setHideExpired] = useState(true);
   const [page, setPage] = useState(1);
   const [installModalOpen, setInstallModalOpen] = useState(false);
@@ -383,7 +385,7 @@ const CertificatesPage = () => {
   const [installCertificateId, setInstallCertificateId] = useState<string | null>(null);
   const [selectedCertificate, setSelectedCertificate] = useState<CertificateRead | null>(null);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
-  const pageSize = 9;
+  const pageSize = preferences.pageSize;
   const isAdmin = user?.role_global === "ADMIN" || user?.role_global === "DEV";
   const isView = user?.role_global === "VIEW";
 
@@ -405,11 +407,9 @@ const CertificatesPage = () => {
   };
 
   const loadDevices = async () => {
-    if (!isAdmin) {
-      return;
-    }
+    const endpoint = isAdmin ? "/admin/devices" : "/devices/mine";
     try {
-      const response = await apiFetch("/admin/devices");
+      const response = await apiFetch(endpoint);
       if (!response.ok) {
         return;
       }
@@ -443,6 +443,25 @@ const CertificatesPage = () => {
   useEffect(() => {
     loadJobs();
   }, [user?.role_global]);
+
+  useEffect(() => {
+    setOrderBy(preferences.defaultOrder);
+  }, [preferences.defaultOrder]);
+
+  useEffect(() => {
+    if (!isView || !devices.length) return;
+    if (selectedDeviceId) return;
+    if (
+      preferences.defaultDeviceId &&
+      devices.some((device) => device.id === preferences.defaultDeviceId)
+    ) {
+      setSelectedDeviceId(preferences.defaultDeviceId);
+      return;
+    }
+    if (devices.length === 1) {
+      setSelectedDeviceId(devices[0].id);
+    }
+  }, [devices, isView, preferences.defaultDeviceId, selectedDeviceId]);
 
   useEffect(() => {
     setPage(1);
@@ -541,15 +560,7 @@ const CertificatesPage = () => {
     ];
   }, [certificates, devices, jobs]);
 
-  const availableDevices = useMemo(() => {
-    if (!isView) {
-      return devices;
-    }
-    if (!user?.id) {
-      return [];
-    }
-    return devices.filter((device) => device.assigned_user?.id === user.id);
-  }, [devices, isView, user?.id]);
+  const availableDevices = useMemo(() => devices, [devices]);
 
   const handleOpenInstall = (certificateId?: string) => {
     setInstallCertificateId(certificateId ?? null);
@@ -696,7 +707,9 @@ const CertificatesPage = () => {
           <select
             className="h-11 rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-600"
             value={orderBy}
-            onChange={(event) => setOrderBy(event.target.value)}
+            onChange={(event) =>
+              setOrderBy(event.target.value as "validade" | "empresa")
+            }
           >
             <option value="validade">Ordenar por validade</option>
             <option value="empresa">Ordenar por empresa</option>
@@ -834,10 +847,13 @@ const CertificatesPage = () => {
         }
       >
         <div className="space-y-4">
-          <p className="text-xs text-slate-500">
-            O arquivo e a senha não serão expostos no navegador. O Agent fará a
-            importação em CurrentUser. A remoção automática ocorrerá às 18:00.
-          </p>
+          <div className="rounded-2xl border border-amber-100 bg-amber-50/70 p-4 text-xs text-amber-700">
+            <p className="font-semibold">Aviso de segurança</p>
+            <p className="mt-1">
+              O arquivo e a senha não serão expostos no navegador. O Agent fará a
+              importação em CurrentUser. Remoção automática às 18:00.
+            </p>
+          </div>
 
           {selectedCert ? (
             <div className="rounded-2xl border border-slate-200 bg-white p-4">
@@ -864,7 +880,7 @@ const CertificatesPage = () => {
                         : "bg-emerald-50 text-emerald-700";
                   return (
                     <span
-                      className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${badge}`}
+                      className={`inline-flex items-center whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold ${badge}`}
                     >
                       {info.label}
                     </span>
@@ -872,10 +888,12 @@ const CertificatesPage = () => {
                 })()}
               </div>
 
-              <p className="mt-3 text-xs text-slate-600">
-                <span className="font-semibold text-slate-700">Validade:</span>{" "}
-                {formatDate(selectedCert.not_after)}
-              </p>
+              <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
+                <span>Validade</span>
+                <span className="font-semibold text-slate-700">
+                  {formatDate(selectedCert.not_after)}
+                </span>
+              </div>
             </div>
           ) : null}
 

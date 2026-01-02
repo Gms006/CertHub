@@ -216,6 +216,10 @@ curl -i "http://localhost:8010/api/v1/install-jobs" \
 curl -i "http://localhost:8010/api/v1/install-jobs/my-device" \
   -H "Authorization: Bearer <JWT_VIEW>"
 
+# VIEW: lista apenas devices permitidos
+curl -i "http://localhost:8010/api/v1/devices/mine" \
+  -H "Authorization: Bearer <JWT_VIEW>"
+
 # DEV: pode ativar auto_approve no device
 curl -i -X PATCH "http://localhost:8010/api/v1/admin/devices/<DEVICE_ID>" \
   -H "Authorization: Bearer <JWT_DEV>" \
@@ -227,6 +231,12 @@ curl -i -X PATCH "http://localhost:8010/api/v1/admin/devices/<DEVICE_ID>" \
   -H "Authorization: Bearer <JWT_ADMIN>" \
   -H "Content-Type: application/json" \
   -d "{\"auto_approve\": true}"
+
+# VIEW: não pode criar job para device não permitido
+curl -i -X POST "http://localhost:8010/api/v1/certificados/<CERT_ID>/install" \
+  -H "Authorization: Bearer <JWT_VIEW>" \
+  -H "Content-Type: application/json" \
+  -d "{\"device_id\": \"<DEVICE_ID_NAO_PERMITIDO>\"}"
 ```
 
 ### SQL (psql)
@@ -243,6 +253,7 @@ limit 10;
 
 - [ ] VIEW só enxerga abas **Certificados** e **Jobs**.
 - [ ] VIEW em Jobs usa apenas resultados do device vinculado.
+- [ ] Modal de instalação só lista devices permitidos para VIEW.
 - [ ] Filtro por device aparece apenas para ADMIN/DEV.
 - [ ] Auto approve aparece apenas no modal de Devices para DEV.
 - [ ] Auditoria exibe data e hora (dd/mm/aaaa HH:MM).
