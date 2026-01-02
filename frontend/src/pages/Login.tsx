@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
+import { Eye, EyeOff, Lock, Mail, Shield } from "lucide-react";
 
 import { useAuth } from "../hooks/useAuth";
 import { API_BASE } from "../lib/apiClient";
@@ -114,18 +115,7 @@ const Login = () => {
             <div className="flex flex-col gap-6 px-8 py-10 lg:px-10">
               <div className="flex items-center gap-3">
                 <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#0e2659] text-white">
-                  <svg
-                    width="18"
-                    height="18"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M12 2 5 5v6c0 5.25 3.44 10 7 11 3.56-1 7-5.75 7-11V5l-7-3Z" />
-                  </svg>
+                  <Shield className="h-4 w-4" />
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-slate-900">
@@ -145,19 +135,7 @@ const Login = () => {
                   E-mail
                   <div className="relative mt-2">
                     <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-                      <svg
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="M4 4h16v16H4z" />
-                        <path d="m4 6 8 6 8-6" />
-                      </svg>
+                      <Mail className="h-4 w-4" />
                     </span>
                     <input
                       className="h-11 w-full rounded-2xl border border-slate-200 bg-white pl-9 text-sm text-slate-700 placeholder:text-slate-400"
@@ -173,19 +151,7 @@ const Login = () => {
                   Senha
                   <div className="relative mt-2">
                     <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-                      <svg
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <rect x="3" y="11" width="18" height="11" rx="2" />
-                        <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                      </svg>
+                      <Lock className="h-4 w-4" />
                     </span>
                     <input
                       className="h-11 w-full rounded-2xl border border-slate-200 bg-white pl-9 pr-11 text-sm text-slate-700 placeholder:text-slate-400"
@@ -200,19 +166,11 @@ const Login = () => {
                       onClick={() => setShowPassword((prev) => !prev)}
                       className="absolute right-2 top-1/2 -translate-y-1/2 rounded-xl p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
                     >
-                      <svg
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12Z" />
-                        <circle cx="12" cy="12" r="3" />
-                      </svg>
+                      {showPassword ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
                     </button>
                   </div>
                   <span className="mt-2 block text-[11px] text-slate-400">

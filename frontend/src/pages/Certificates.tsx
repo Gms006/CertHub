@@ -1,10 +1,17 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   Activity,
+  AlertTriangle,
+  BadgeCheck,
   CalendarClock,
+  Download,
+  FileBadge2,
+  Info,
   KeyRound,
   MonitorCheck,
+  Search,
   ShieldAlert,
+  XCircle,
 } from "lucide-react";
 
 import Modal from "../components/Modal";
@@ -122,7 +129,7 @@ const formatDocument = (value: string) => {
 const statusUI = (status: CertStatus) => {
   if (status === "VENCIDO") {
     return {
-      Icon: XCircleIcon,
+      Icon: XCircle,
       iconClass: "text-red-600",
       badgeClass: "bg-red-600 text-white",
       label: "Vencido",
@@ -130,99 +137,19 @@ const statusUI = (status: CertStatus) => {
   }
   if (status === "VENCE_7D") {
     return {
-      Icon: AlertTriangleIcon,
+      Icon: AlertTriangle,
       iconClass: "text-amber-600",
       badgeClass: "bg-amber-500 text-white",
       label: "Vence em ≤ 7d",
     };
   }
   return {
-    Icon: BadgeCheckIcon,
+    Icon: BadgeCheck,
     iconClass: "text-emerald-600",
     badgeClass: "bg-emerald-600 text-white",
     label: "Válido",
   };
 };
-
-const FileBadge2Icon = ({ className }: { className?: string }) => (
-  <svg
-    className={className}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d="M6 2h9l5 5v15a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Z" />
-    <path d="M14 2v6h6" />
-    <path d="M8 18h8" />
-    <path d="M8 14h8" />
-  </svg>
-);
-
-const InfoIcon = ({ className }: { className?: string }) => (
-  <svg
-    className={className}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <circle cx="12" cy="12" r="10" />
-    <path d="M12 16v-4" />
-    <path d="M12 8h.01" />
-  </svg>
-);
-
-const AlertTriangleIcon = ({ className }: { className?: string }) => (
-  <svg
-    className={className}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
-    <path d="M12 9v4" />
-    <path d="M12 17h.01" />
-  </svg>
-);
-
-const BadgeCheckIcon = ({ className }: { className?: string }) => (
-  <svg
-    className={className}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d="M12 2 5 5v6c0 5.25 3.44 10 7 11 3.56-1 7-5.75 7-11V5l-7-3Z" />
-    <path d="m9 12 2 2 4-4" />
-  </svg>
-);
-
-const XCircleIcon = ({ className }: { className?: string }) => (
-  <svg
-    className={className}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <circle cx="12" cy="12" r="10" />
-    <path d="m15 9-6 6" />
-    <path d="m9 9 6 6" />
-  </svg>
-);
 
 const CertCard = ({
   empresa,
@@ -246,7 +173,7 @@ const CertCard = ({
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-start gap-3">
             <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-slate-50">
-              <FileBadge2Icon className="h-4 w-4 text-slate-600" />
+              <FileBadge2 className="h-4 w-4 text-slate-600" />
             </div>
 
             <div className="min-w-0">
@@ -272,7 +199,7 @@ const CertCard = ({
               onClick={onDetails}
               className="inline-flex h-9 w-[120px] items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50"
             >
-              <InfoIcon className="h-4 w-4" />
+              <Info className="h-4 w-4" />
               Detalhes
             </button>
           </div>
@@ -422,7 +349,11 @@ const CertificatesPage = () => {
 
   const loadJobs = async () => {
     const isAdmin = user?.role_global === "ADMIN" || user?.role_global === "DEV";
-    const endpoint = isAdmin ? "/install-jobs" : "/install-jobs/mine";
+    const endpoint = isAdmin
+      ? "/install-jobs"
+      : user?.role_global === "VIEW"
+        ? "/install-jobs/my-device"
+        : "/install-jobs/mine";
     try {
       const response = await apiFetch(endpoint);
       if (!response.ok) {
@@ -672,19 +603,7 @@ const CertificatesPage = () => {
         <div className="flex flex-1 flex-col gap-3 md:flex-row md:items-center">
           <div className="relative flex-1">
             <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <circle cx="11" cy="11" r="8" />
-                <path d="m21 21-4.3-4.3" />
-              </svg>
+              <Search className="h-4 w-4" />
             </span>
             <input
               className="h-11 w-full rounded-2xl border border-slate-200 bg-white pl-9 text-sm text-slate-600"
@@ -729,20 +648,7 @@ const CertificatesPage = () => {
             className="flex h-11 items-center gap-2 rounded-2xl border border-slate-200 px-4 text-sm text-slate-600"
             onClick={handleExport}
           >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-              <path d="M7 10 12 15 17 10" />
-              <path d="M12 15V3" />
-            </svg>
+            <Download className="h-4 w-4" />
             Exportar
           </button>
           <button

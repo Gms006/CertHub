@@ -1,17 +1,61 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Outlet } from "react-router-dom";
-import { SlidersHorizontal } from "lucide-react";
+import { Search, SlidersHorizontal } from "lucide-react";
 
 import Modal from "./Modal";
 import { useAuth } from "../hooks/useAuth";
 import { usePreferences } from "../hooks/usePreferences";
 
 const AppShell = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, apiFetch } = useAuth();
   const { preferences, updatePreferences } = usePreferences();
   const displayName =
     user?.nome || user?.ad_username || user?.email || "Usuário";
   const [preferencesOpen, setPreferencesOpen] = useState(false);
+  const [deviceOptions, setDeviceOptions] = useState<
+    { id: string; hostname: string; assigned_user?: { ad_username?: string } | null }[]
+  >([]);
+  const [devicesLoading, setDevicesLoading] = useState(false);
+  const hasDefaultDevice = deviceOptions.some(
+    (device) => device.id === preferences.defaultDeviceId,
+  );
+
+  useEffect(() => {
+    if (!preferencesOpen) return;
+    let mounted = true;
+    const loadDevices = async () => {
+      setDevicesLoading(true);
+      try {
+        const response = await apiFetch("/devices/mine");
+        if (!response.ok) {
+          if (mounted) {
+            setDeviceOptions([]);
+          }
+          return;
+        }
+        const data = (await response.json()) as {
+          id: string;
+          hostname: string;
+          assigned_user?: { ad_username?: string } | null;
+        }[];
+        if (mounted) {
+          setDeviceOptions(data);
+        }
+      } catch {
+        if (mounted) {
+          setDeviceOptions([]);
+        }
+      } finally {
+        if (mounted) {
+          setDevicesLoading(false);
+        }
+      }
+    };
+    loadDevices();
+    return () => {
+      mounted = false;
+    };
+  }, [apiFetch, preferencesOpen]);
 
   return (
     <div className="min-h-screen bg-slate-100">
@@ -31,19 +75,7 @@ const AppShell = () => {
           <div className="hidden w-full max-w-xl items-center gap-3 md:flex">
             <div className="relative flex-1">
               <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <circle cx="11" cy="11" r="8" />
-                  <path d="m21 21-4.3-4.3" />
-                </svg>
+                <Search className="h-4 w-4" />
               </span>
               <input
                 className="h-10 w-full rounded-2xl border border-slate-200 bg-white pl-9 text-sm text-slate-600 placeholder:text-slate-400"
@@ -201,14 +233,27 @@ const AppShell = () => {
         </label>
         <label className="flex flex-col gap-2 text-xs font-semibold text-slate-500">
           Device padrão (VIEW)
-          <input
-            className="h-10 rounded-2xl border border-slate-200 px-3 text-sm text-slate-600"
-            placeholder="Cole o ID do device autorizado"
+          <select
+            className="h-10 rounded-2xl border border-slate-200 bg-white px-3 text-sm text-slate-600"
             value={preferences.defaultDeviceId}
             onChange={(event) =>
               updatePreferences({ defaultDeviceId: event.target.value })
             }
-          />
+          >
+            <option value="">
+              {devicesLoading ? "Carregando devices..." : "Selecione um device"}
+            </option>
+            {!hasDefaultDevice && preferences.defaultDeviceId ? (
+              <option value={preferences.defaultDeviceId}>
+                Device atual (não listado)
+              </option>
+            ) : null}
+            {deviceOptions.map((device) => (
+              <option key={device.id} value={device.id}>
+                {device.hostname}
+              </option>
+            ))}
+          </select>
         </label>
         <p className="text-[11px] text-slate-400">
           Preferências ficam salvas localmente neste navegador.
