@@ -23,6 +23,40 @@ Objetivo: substituir o diretório público de `.pfx` por um fluxo controlado via
 
 ---
 
+## S8 — Piloto e rollout
+
+- Runbook completo: `docs/S8_PILOTO_ROLLOUT.md`
+- Treinamento rápido: `docs/TREINAMENTO_RAPIDO.md`
+- Smoke test (PowerShell): `scripts/windows/s8_smoke.ps1`
+
+### Como rodar o smoke test
+
+```powershell
+.\scripts\windows\s8_smoke.ps1
+```
+
+Execução garantida (Windows PowerShell):
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\windows\s8_smoke.ps1
+```
+
+> Nota: `pwsh` é PowerShell 7 (opcional). Se não estiver instalado, use `powershell`.
+
+### Notas operacionais
+
+- **Porta padrão do repo nos exemplos**: `8010` (ajuste via `uvicorn --port`).
+- `API_PORT` do `.env.example` **não é consumido** no backend (a porta vem do comando `uvicorn`).
+- Para fila RQ use `RQ_QUEUE_NAME` (não `RQ_DEFAULT_QUEUE`).
+
+### Rollback (curto)
+
+```powershell
+Unregister-ScheduledTask -TaskName "CertHub Cleanup 18h" -Confirm:$false
+Remove-Item C:\ProgramData\CertHubAgent -Recurse -Force
+Remove-Item "$env:LOCALAPPDATA\CertHubAgent" -Recurse -Force
+```
+
 ## Requisitos
 - Python 3.10+
 - Node 18+
