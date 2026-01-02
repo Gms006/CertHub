@@ -1211,9 +1211,11 @@ limit 20;
 
 **Entregáveis**
 
-- Checklist de instalação do agent.
-- Política do diretório e backups.
-- Treinamento rápido do time (1 página).
+**Status**: 🔄 **Em execução**
+
+- Runbook do piloto (Windows): `docs/S8_PILOTO_ROLLOUT.md`
+- Treinamento rápido (1 página): `docs/TREINAMENTO_RAPIDO.md`
+- Smoke test (PowerShell): `scripts/windows/s8_smoke.ps1`
 
 **Aceite**
 
