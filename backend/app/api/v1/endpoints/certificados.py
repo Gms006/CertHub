@@ -138,11 +138,11 @@ async def create_install_job(
         initial_status = JOB_STATUS_PENDING
         auto_approved = True
         auto_reason = "role"
-    elif current_user.auto_approve_install_jobs:
+    elif current_user.auto_approve_install_jobs is True:
         initial_status = JOB_STATUS_PENDING
         auto_approved = True
         auto_reason = "flag"
-    elif device.auto_approve:
+    elif device.auto_approve is True:
         initial_status = JOB_STATUS_PENDING
         auto_approved = True
         auto_reason = "device"
