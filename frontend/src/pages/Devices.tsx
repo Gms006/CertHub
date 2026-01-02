@@ -1,5 +1,11 @@
 import { useEffect, useState } from "react";
-import { Settings, ShieldCheck, ShieldX } from "lucide-react";
+import {
+  Monitor,
+  Settings,
+  ShieldCheck,
+  ShieldX,
+  UserCircle2,
+} from "lucide-react";
 
 import Modal from "../components/Modal";
 import SectionTabs from "../components/SectionTabs";
@@ -14,13 +20,14 @@ type DeviceRead = {
   domain?: string | null;
   agent_version?: string | null;
   last_seen_at?: string | null;
+  last_heartbeat_at?: string | null;
+  auto_approve?: boolean;
   is_allowed: boolean;
   assigned_user?: {
     id: string;
     ad_username: string;
     email?: string | null;
     nome?: string | null;
-    auto_approve_install_jobs?: boolean;
   } | null;
 };
 
@@ -33,6 +40,7 @@ const DevicesPage = () => {
   const [modalOpen, setModalOpen] = useState(false);
 
   const isAdmin = user?.role_global === "ADMIN" || user?.role_global === "DEV";
+  const isDev = user?.role_global === "DEV";
 
   const loadDevices = async () => {
     setLoading(true);
@@ -46,7 +54,7 @@ const DevicesPage = () => {
       setDevices(
         data.map((device) => ({
           ...device,
-          auto_approve: Boolean((device as { auto_approve?: boolean }).auto_approve),
+          auto_approve: Boolean(device.auto_approve),
         })),
       );
     } catch {
@@ -82,6 +90,17 @@ const DevicesPage = () => {
     );
   };
 
+  const formatDomainUser = (device: DeviceRead) => {
+    const userLabel = formatUserLabel(device);
+    if (device.domain && userLabel !== "Não vinculado") {
+      return `${device.domain}\\${userLabel}`;
+    }
+    if (device.domain) {
+      return device.domain;
+    }
+    return userLabel;
+  };
+
   const handleToggle = async (deviceId: string, nextAllowed: boolean) => {
     try {
       const response = await apiFetch(`/admin/devices/${deviceId}`, {
@@ -102,12 +121,12 @@ const DevicesPage = () => {
     }
   };
 
-  const handleAutoApproveToggle = async (userId: string, nextValue: boolean) => {
+  const handleAutoApproveToggle = async (deviceId: string, nextValue: boolean) => {
     try {
-      const response = await apiFetch(`/admin/users/${userId}`, {
+      const response = await apiFetch(`/admin/devices/${deviceId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ auto_approve_install_jobs: nextValue }),
+        body: JSON.stringify({ auto_approve: nextValue }),
       });
       if (!response.ok) {
         const data = (await response.json()) as { detail?: string };
@@ -117,25 +136,11 @@ const DevicesPage = () => {
       notify(nextValue ? "Auto approve ativado." : "Auto approve desativado.");
       setDevices((prev) =>
         prev.map((device) =>
-          device.assigned_user?.id === userId
-            ? {
-                ...device,
-                assigned_user: device.assigned_user
-                  ? { ...device.assigned_user, auto_approve_install_jobs: nextValue }
-                  : device.assigned_user,
-              }
-            : device,
+          device.id === deviceId ? { ...device, auto_approve: nextValue } : device,
         ),
       );
       setSelectedDevice((prev) =>
-        prev && prev.assigned_user?.id === userId
-          ? {
-              ...prev,
-              assigned_user: prev.assigned_user
-                ? { ...prev.assigned_user, auto_approve_install_jobs: nextValue }
-                : prev.assigned_user,
-            }
-          : prev,
+        prev && prev.id === deviceId ? { ...prev, auto_approve: nextValue } : prev,
       );
       loadDevices();
     } catch {
@@ -186,71 +191,78 @@ const DevicesPage = () => {
           {devices.map((device) => (
             <div
               key={device.id}
-              className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm"
+              className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm"
             >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p
-                    className="truncate text-sm font-semibold text-slate-900"
-                    title={device.hostname}
-                  >
-                    {device.hostname}
-                  </p>
-                  <p className="mt-1 text-xs text-slate-400">
-                    {formatUserLabel(device)}
-                  </p>
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-100 text-slate-500">
+                  <Monitor className="h-5 w-5" />
                 </div>
-                <span
-                  className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${
-                    device.is_allowed
-                      ? "bg-emerald-50 text-emerald-700"
-                      : "bg-rose-50 text-rose-700"
-                  }`}
-                >
-                  {device.is_allowed ? "Autorizado" : "Bloqueado"}
-                </span>
-              </div>
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                <div className="rounded-2xl bg-slate-50 p-3 text-xs text-slate-500">
-                  <p className="font-semibold text-slate-500">Agent</p>
-                  <p className="mt-1 text-sm font-semibold text-slate-700">
-                    {device.agent_version ?? "-"}
-                  </p>
+                <div className="min-w-0 flex-1 space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p
+                        className="truncate text-sm font-semibold text-slate-900"
+                        title={device.hostname}
+                      >
+                        {device.hostname}
+                      </p>
+                      <p className="mt-1 text-xs text-slate-400">
+                        {formatDomainUser(device)}
+                      </p>
+                    </div>
+                    <span
+                      className={`inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                        device.is_allowed
+                          ? "bg-emerald-50 text-emerald-700"
+                          : "bg-rose-50 text-rose-700"
+                      }`}
+                    >
+                      {device.is_allowed ? "Autorizado" : "Bloqueado"}
+                    </span>
+                  </div>
+                  <div className="space-y-1 text-xs text-slate-500">
+                    <div className="flex items-center justify-between">
+                      <span>Agent</span>
+                      <span className="font-semibold text-slate-700">
+                        {device.agent_version ?? "-"}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>Último sinal</span>
+                      <span className="font-semibold text-slate-700">
+                        {formatRelativeTime(device.last_seen_at)}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      className="inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600"
+                      onClick={() => {
+                        setSelectedDevice(device);
+                        setModalOpen(true);
+                      }}
+                    >
+                      <Settings className="h-3.5 w-3.5" />
+                      Gerenciar
+                    </button>
+                    <button
+                      className="inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-2xl bg-[#0e2659] px-3 text-xs font-semibold text-white"
+                      onClick={() => handleToggle(device.id, !device.is_allowed)}
+                    >
+                      {device.is_allowed ? (
+                        <>
+                          <ShieldX className="h-3.5 w-3.5" />
+                          Bloquear
+                        </>
+                      ) : (
+                        <>
+                          <ShieldCheck className="h-3.5 w-3.5" />
+                          Autorizar
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
-                <div className="rounded-2xl bg-slate-50 p-3 text-xs text-slate-500">
-                  <p className="font-semibold text-slate-500">Último sinal</p>
-                  <p className="mt-1 text-sm font-semibold text-slate-700">
-                    {formatRelativeTime(device.last_seen_at)}
-                  </p>
-                </div>
-              </div>
-              <div className="mt-4 flex flex-wrap gap-2">
-                <button
-                  className="inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600"
-                  onClick={() => {
-                    setSelectedDevice(device);
-                    setModalOpen(true);
-                  }}
-                >
-                  <Settings className="h-3.5 w-3.5" />
-                  Gerenciar
-                </button>
-                <button
-                  className="inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-2xl bg-[#0e2659] px-3 text-xs font-semibold text-white"
-                  onClick={() => handleToggle(device.id, !device.is_allowed)}
-                >
-                  {device.is_allowed ? (
-                    <>
-                      <ShieldX className="h-3.5 w-3.5" />
-                      Bloquear
-                    </>
-                  ) : (
-                    <>
-                      <ShieldCheck className="h-3.5 w-3.5" />
-                      Autorizar
-                    </>
-                  )}
-                </button>
               </div>
             </div>
           ))}
@@ -283,31 +295,47 @@ const DevicesPage = () => {
         }
       >
         {selectedDevice && (
-          <div className="space-y-3">
-            <div className="rounded-2xl bg-slate-50 p-4">
-              <p className="text-xs text-slate-400">Hostname</p>
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-slate-500">
+                  <Monitor className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-xs text-slate-400">Hostname</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-900">
+                    {selectedDevice.hostname}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {formatDomainUser(selectedDevice)}
+                  </p>
+                </div>
+              </div>
+              <div className="mt-4 grid gap-2 text-xs text-slate-500 md:grid-cols-2">
+                <div className="flex items-center justify-between">
+                  <span>Agent</span>
+                  <span className="font-semibold text-slate-700">
+                    {selectedDevice.agent_version ?? "-"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>Último contato</span>
+                  <span className="font-semibold text-slate-700">
+                    {formatDate(selectedDevice.last_seen_at)}
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-4">
+              <div className="flex items-center gap-2 text-xs text-slate-500">
+                <UserCircle2 className="h-4 w-4" />
+                Usuário vinculado
+              </div>
               <p className="mt-2 text-sm font-semibold text-slate-900">
-                {selectedDevice.hostname}
-              </p>
-              <p className="mt-1 text-xs text-slate-500">
-                Usuário: {formatUserLabel(selectedDevice)}
+                {formatUserLabel(selectedDevice)}
               </p>
             </div>
-            <div className="grid gap-3 md:grid-cols-2">
-              <div className="rounded-2xl bg-slate-50 p-4">
-                <p className="text-xs text-slate-400">Agent</p>
-                <p className="mt-2 text-sm text-slate-700">
-                  {selectedDevice.agent_version ?? "-"}
-                </p>
-              </div>
-              <div className="rounded-2xl bg-slate-50 p-4">
-                <p className="text-xs text-slate-400">Último contato</p>
-                <p className="mt-2 text-sm text-slate-700">
-                  {formatDate(selectedDevice.last_seen_at)}
-                </p>
-              </div>
-            </div>
-            {isAdmin ? (
+            {isDev ? (
               <div className="rounded-2xl border border-slate-200 bg-white p-4">
                 <div className="flex items-center justify-between gap-3">
                   <div>
@@ -322,39 +350,16 @@ const DevicesPage = () => {
                     <input
                       type="checkbox"
                       className="h-4 w-4 rounded border-slate-300"
-                      checked={Boolean(
-                        selectedDevice.assigned_user?.auto_approve_install_jobs,
-                      )}
-                      disabled={!selectedDevice.assigned_user}
+                      checked={Boolean(selectedDevice.auto_approve)}
                       onChange={(event) =>
-                        selectedDevice.assigned_user
-                          ? handleAutoApproveToggle(
-                              selectedDevice.assigned_user.id,
-                              event.target.checked,
-                            )
-                          : undefined
+                        handleAutoApproveToggle(selectedDevice.id, event.target.checked)
                       }
                     />
-                    {selectedDevice.assigned_user
-                      ? selectedDevice.assigned_user.auto_approve_install_jobs
-                        ? "Ativo"
-                        : "Inativo"
-                      : "Sem usuário"}
+                    {selectedDevice.auto_approve ? "Ativo" : "Inativo"}
                   </label>
                 </div>
               </div>
-            ) : (
-              <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                <p className="text-sm font-semibold text-slate-900">Auto approve</p>
-                <p className="mt-1 text-xs text-slate-500">
-                  {selectedDevice.assigned_user
-                    ? selectedDevice.assigned_user.auto_approve_install_jobs
-                      ? "Ativo"
-                      : "Inativo"
-                    : "Sem usuário"}
-                </p>
-              </div>
-            )}
+            ) : null}
           </div>
         )}
       </Modal>

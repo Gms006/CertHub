@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
 import AppShell from "./components/AppShell";
 import ProtectedRoute from "./components/ProtectedRoute";
+import { PreferencesProvider } from "./hooks/usePreferences";
 import CertificatesPage from "./pages/Certificates";
 import DevicesPage from "./pages/Devices";
 import JobsPage from "./pages/Jobs";
@@ -20,7 +21,9 @@ const App = () => {
         <Route
           element={
             <ProtectedRoute>
-              <AppShell />
+              <PreferencesProvider>
+                <AppShell />
+              </PreferencesProvider>
             </ProtectedRoute>
           }
         >

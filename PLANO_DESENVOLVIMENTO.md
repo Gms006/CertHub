@@ -1170,22 +1170,28 @@ limit 20;
 - **Certificados**
   - [x] Busca/filtros/ordenação (como no protótipo).
   - [x] Cards consistentes com CNPJ/CPF mascarado, badges e datas.
+  - [x] Modal de instalação com resumo, badge de status e devices permitidos.
   - [x] Tela “Detalhes” opcional (serial, SHA1, issuer, subject, vínculo empresa, último uso).
 - **Jobs**
   - [x] Filtro por device (ADMIN/DEV).
+  - [x] Badges de status consistentes (sem quebra de layout).
   - [ ] Filtros por status.
   - [ ] Atalho “Repetir instalação” (cria novo job) e “Cancelar job” (se PENDING).
 - **Dispositivos**
   - [x] Aprovar/bloquear device (perfil admin).
   - [x] Exibir last seen e versão do agent.
+  - [x] Cards compactos com badge Autorizado/Bloqueado e ações alinhadas ao protótipo.
+  - [x] Toggle Auto approve (DEV) espelhado do DB.
   - [ ] Destaque para agents desatualizados.
 - **Auditoria**
   - [x] Filtro por ação/ator (texto).
+  - [x] Badge de ação consistente.
   - [ ] Filtros por usuário, empresa e período.
 
 **Entregáveis (Backend/Operação)**
 
 - [x] Endpoints para listagem/admin de devices e auditoria.
+- [x] RBAC de VIEW para devices e criação de jobs (device permitido/vinculado).
 - [ ] Alertas básicos (ex.: tentativa em device bloqueado, agent desatualizado, job falhando repetidamente).
 
 **Aceite**

@@ -18,12 +18,18 @@ create_user = helpers.create_user
 headers = helpers.headers
 
 
+def allow_device(db, user, device) -> None:
+    db.add(models.UserDevice(user_id=user.id, device_id=device.id, is_allowed=True))
+    db.commit()
+
+
 def test_view_without_auto_approve_creates_requested(test_client_and_session):
     client, SessionLocal = test_client_and_session
     with SessionLocal() as db:
         viewer = create_user(db, role="VIEW", auto_approve=False)
         cert = create_certificate(db)
         device = create_device(db)
+        allow_device(db, viewer, device)
 
     response = client.post(
         f"/api/v1/certificados/{cert.id}/install",
@@ -42,6 +48,7 @@ def test_view_with_auto_approve_creates_pending(test_client_and_session):
         viewer = create_user(db, role="VIEW", auto_approve=True)
         cert = create_certificate(db)
         device = create_device(db)
+        allow_device(db, viewer, device)
 
     response = client.post(
         f"/api/v1/certificados/{cert.id}/install",
@@ -58,6 +65,7 @@ def test_auto_approve_flag_sets_approved_and_audit(test_client_and_session):
         viewer = create_user(db, role="VIEW", auto_approve=True)
         cert = create_certificate(db)
         device = create_device(db)
+        allow_device(db, viewer, device)
 
     response = client.post(
         f"/api/v1/certificados/{cert.id}/install",
@@ -86,6 +94,7 @@ def test_device_auto_approve_creates_pending(test_client_and_session):
         viewer = create_user(db, role="VIEW", auto_approve=False)
         cert = create_certificate(db)
         device = create_device(db, auto_approve=True)
+        allow_device(db, viewer, device)
 
     response = client.post(
         f"/api/v1/certificados/{cert.id}/install",
@@ -153,6 +162,7 @@ def test_admin_approves_requested_job(test_client_and_session):
         viewer = create_user(db, role="VIEW")
         cert = create_certificate(db)
         device = create_device(db)
+        allow_device(db, viewer, device)
 
     create_resp = client.post(
         f"/api/v1/certificados/{cert.id}/install",
@@ -179,6 +189,7 @@ def test_view_cannot_approve_job(test_client_and_session):
         viewer = create_user(db, role="VIEW")
         cert = create_certificate(db)
         device = create_device(db)
+        allow_device(db, viewer, device)
 
     create_resp = client.post(
         f"/api/v1/certificados/{cert.id}/install",
@@ -201,6 +212,7 @@ def test_view_without_flag_does_not_auto_approve(test_client_and_session):
         viewer = create_user(db, role="VIEW", auto_approve=False)
         cert = create_certificate(db)
         device = create_device(db)
+        allow_device(db, viewer, device)
 
     response = client.post(
         f"/api/v1/certificados/{cert.id}/install",
@@ -225,6 +237,7 @@ def test_view_listing_jobs_mine_only(test_client_and_session):
         viewer = create_user(db, role="VIEW")
         cert = create_certificate(db)
         device = create_device(db)
+        allow_device(db, viewer, device)
 
     create_resp = client.post(
         f"/api/v1/certificados/{cert.id}/install",
@@ -286,6 +299,35 @@ def test_view_cannot_list_admin_devices(test_client_and_session):
 
     response = client.get("/api/v1/admin/devices", headers=headers(viewer))
     assert response.status_code == 403
+
+
+def test_view_cannot_create_job_for_unallowed_device(test_client_and_session):
+    client, SessionLocal = test_client_and_session
+    with SessionLocal() as db:
+        viewer = create_user(db, role="VIEW")
+        cert = create_certificate(db)
+        allowed_device = create_device(db)
+        blocked_device = create_device(db)
+        db.add(
+            models.UserDevice(
+                user_id=viewer.id, device_id=allowed_device.id, is_allowed=True
+            )
+        )
+        db.commit()
+
+    response = client.post(
+        f"/api/v1/certificados/{cert.id}/install",
+        json={"device_id": str(blocked_device.id)},
+        headers=headers(viewer),
+    )
+    assert response.status_code == 403
+
+    response = client.post(
+        f"/api/v1/certificados/{cert.id}/install",
+        json={"device_id": str(allowed_device.id)},
+        headers=headers(viewer),
+    )
+    assert response.status_code == 201
 
 
 def test_list_certificates_returns_all_org_certs(test_client_and_session):

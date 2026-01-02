@@ -17,6 +17,7 @@ certhub/
 │  │  │        ├─ audit.py
 │  │  │        ├─ auth.py
 │  │  │        ├─ certificados.py
+│  │  │        ├─ devices.py
 │  │  │        └─ install_jobs.py
 │  │  ├─ core/
 │  │  │  ├─ __init__.py
@@ -74,7 +75,10 @@ certhub/
 │  │     ├─ 0007_auth_tokens_sessions.py
 │  │     ├─ 0008_device_assigned_user.py
 │  │     ├─ 0009_agent_mvp_fields.py
-│  │     └─ 0009_job_payload_tokens.py
+│  │     ├─ 0009_job_payload_tokens.py
+│  │     ├─ 0010_device_auto_approve.py
+│  │     ├─ 0010_merge_0009_heads_merge_0009_heads.py
+│  │     └─ 0011_merge_0010_heads.py
 │  ├─ tests/
 │  │  ├─ __init__.py
 │  │  ├─ conftest.py
@@ -136,6 +140,7 @@ certhub/
 │  │  │  └─ AuthContext.tsx
 │  │  ├─ hooks/
 │  │  │  ├─ useAuth.ts
+│  │  │  ├─ usePreferences.tsx
 │  │  │  └─ useToast.ts
 │  │  ├─ lib/
 │  │  │  ├─ apiClient.ts
@@ -149,7 +154,8 @@ certhub/
 │  │  │  ├─ ResetPassword.tsx
 │  │  │  └─ SetPassword.tsx
 │  │  ├─ index.css
-│  │  └─ main.tsx
+│  │  ├─ main.tsx
+│  │  └─ vite-env.d.ts
 │  ├─ index.html
 │  ├─ package-lock.json
 │  ├─ package.json

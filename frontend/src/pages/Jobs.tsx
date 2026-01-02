@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import SectionTabs from "../components/SectionTabs";
 import Toast from "../components/Toast";
 import { useAuth } from "../hooks/useAuth";
+import { usePreferences } from "../hooks/usePreferences";
 import { useToast } from "../hooks/useToast";
 import { formatDate, sanitizeSensitiveLabel } from "../lib/formatters";
 
@@ -48,6 +49,7 @@ const statusLabels: Record<string, string> = {
 
 const JobsPage = () => {
   const { apiFetch, user } = useAuth();
+  const { preferences } = usePreferences();
   const { toast, notify } = useToast();
   const [jobs, setJobs] = useState<InstallJobRead[]>([]);
   const [certificates, setCertificates] = useState<CertificateRead[]>([]);
@@ -83,11 +85,13 @@ const JobsPage = () => {
   const loadReferences = async () => {
     try {
       const certResponse = await apiFetch("/certificados");
-      const deviceResponse = isAdmin ? await apiFetch("/admin/devices") : null;
+      const deviceResponse = isAdmin
+        ? await apiFetch("/admin/devices")
+        : await apiFetch("/devices/mine");
       if (certResponse.ok) {
         setCertificates((await certResponse.json()) as CertificateRead[]);
       }
-      if (deviceResponse?.ok) {
+      if (deviceResponse.ok) {
         setDevices((await deviceResponse.json()) as DeviceRead[]);
       }
     } catch {
@@ -99,6 +103,14 @@ const JobsPage = () => {
     loadJobs();
     loadReferences();
   }, [user?.role_global]);
+
+  useEffect(() => {
+    if (!preferences.autoRefreshJobs) return;
+    const interval = window.setInterval(() => {
+      loadJobs();
+    }, 20000);
+    return () => window.clearInterval(interval);
+  }, [preferences.autoRefreshJobs, user?.role_global]);
 
   const certMap = useMemo(
     () =>
@@ -140,6 +152,9 @@ const JobsPage = () => {
       notify("Erro ao atualizar job.", "error");
     }
   };
+
+  const formatId = (value: string) =>
+    preferences.hideLongIds ? value.slice(0, 8) : value;
 
   return (
     <div className="space-y-6">
@@ -204,30 +219,30 @@ const JobsPage = () => {
                   <td className="px-4 py-4">
                     <p
                       className="max-w-[180px] truncate font-medium text-slate-800"
-                      title={certMap.get(job.cert_id) ?? job.cert_id.slice(0, 8)}
+                      title={certMap.get(job.cert_id) ?? job.cert_id}
                     >
-                      {certMap.get(job.cert_id) ?? job.cert_id.slice(0, 8)}
+                      {certMap.get(job.cert_id) ?? formatId(job.cert_id)}
                     </p>
                     <p className="text-xs text-slate-400">
                       <span
                         className="inline-block max-w-[180px] truncate"
                         title={job.requested_by_user_id}
                       >
-                        {job.requested_by_user_id}
+                        {formatId(job.requested_by_user_id)}
                       </span>
                     </p>
                   </td>
                   <td className="px-4 py-4 text-slate-600">
                     <span
                       className="inline-block max-w-[160px] truncate"
-                      title={deviceMap.get(job.device_id) ?? job.device_id.slice(0, 8)}
+                      title={deviceMap.get(job.device_id) ?? job.device_id}
                     >
-                      {deviceMap.get(job.device_id) ?? job.device_id.slice(0, 8)}
+                      {deviceMap.get(job.device_id) ?? formatId(job.device_id)}
                     </span>
                   </td>
                   <td className="px-4 py-4">
                     <span
-                      className={`inline-flex max-w-[160px] items-center truncate rounded-full px-3 py-1 text-xs font-semibold ${
+                      className={`inline-flex max-w-[160px] items-center whitespace-nowrap truncate rounded-full px-3 py-1 text-xs font-semibold ${
                         statusStyles[job.status] ?? "bg-slate-100 text-slate-600"
                       }`}
                       title={statusLabels[job.status] ?? job.status}
