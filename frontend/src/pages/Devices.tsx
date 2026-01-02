@@ -28,6 +28,7 @@ type DeviceRead = {
     ad_username: string;
     email?: string | null;
     nome?: string | null;
+    auto_approve_install_jobs?: boolean;
   } | null;
 };
 
@@ -55,6 +56,14 @@ const DevicesPage = () => {
         data.map((device) => ({
           ...device,
           auto_approve: Boolean(device.auto_approve),
+          assigned_user: device.assigned_user
+            ? {
+                ...device.assigned_user,
+                auto_approve_install_jobs: Boolean(
+                  device.assigned_user.auto_approve_install_jobs,
+                ),
+              }
+            : null,
         })),
       );
     } catch {
@@ -121,12 +130,12 @@ const DevicesPage = () => {
     }
   };
 
-  const handleAutoApproveToggle = async (deviceId: string, nextValue: boolean) => {
+  const handleAutoApproveToggle = async (userId: string, nextValue: boolean) => {
     try {
-      const response = await apiFetch(`/admin/devices/${deviceId}`, {
+      const response = await apiFetch(`/admin/users/${userId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ auto_approve: nextValue }),
+        body: JSON.stringify({ auto_approve_install_jobs: nextValue }),
       });
       if (!response.ok) {
         const data = (await response.json()) as { detail?: string };
@@ -136,11 +145,28 @@ const DevicesPage = () => {
       notify(nextValue ? "Auto approve ativado." : "Auto approve desativado.");
       setDevices((prev) =>
         prev.map((device) =>
-          device.id === deviceId ? { ...device, auto_approve: nextValue } : device,
+          device.assigned_user?.id === userId
+            ? {
+                ...device,
+                assigned_user: device.assigned_user
+                  ? {
+                      ...device.assigned_user,
+                      auto_approve_install_jobs: nextValue,
+                    }
+                  : null,
+              }
+            : device,
         ),
       );
       setSelectedDevice((prev) =>
-        prev && prev.id === deviceId ? { ...prev, auto_approve: nextValue } : prev,
+        prev && prev.assigned_user?.id === userId
+          ? {
+              ...prev,
+              assigned_user: prev.assigned_user
+                ? { ...prev.assigned_user, auto_approve_install_jobs: nextValue }
+                : null,
+            }
+          : prev,
       );
       loadDevices();
     } catch {
@@ -343,21 +369,36 @@ const DevicesPage = () => {
                       Auto approve
                     </p>
                     <p className="text-xs text-slate-500">
-                      Aprovar automaticamente instalações para este device.
+                      Aprovar automaticamente instalações para o usuário vinculado.
                     </p>
                   </div>
                   <label className="inline-flex cursor-pointer items-center gap-2 text-xs text-slate-600">
                     <input
                       type="checkbox"
                       className="h-4 w-4 rounded border-slate-300"
-                      checked={Boolean(selectedDevice.auto_approve)}
+                      checked={Boolean(
+                        selectedDevice.assigned_user?.auto_approve_install_jobs,
+                      )}
+                      disabled={!selectedDevice.assigned_user}
                       onChange={(event) =>
-                        handleAutoApproveToggle(selectedDevice.id, event.target.checked)
+                        selectedDevice.assigned_user
+                          ? handleAutoApproveToggle(
+                              selectedDevice.assigned_user.id,
+                              event.target.checked,
+                            )
+                          : undefined
                       }
                     />
-                    {selectedDevice.auto_approve ? "Ativo" : "Inativo"}
+                    {selectedDevice.assigned_user?.auto_approve_install_jobs
+                      ? "Ativo"
+                      : "Inativo"}
                   </label>
                 </div>
+                {!selectedDevice.assigned_user ? (
+                  <p className="mt-2 text-xs text-slate-400">
+                    Vincule um usuário para habilitar o auto approve.
+                  </p>
+                ) : null}
               </div>
             ) : null}
           </div>
