@@ -890,13 +890,6 @@ psql "$DATABASE_URL" -c "DELETE FROM users WHERE email IN ('maria@netocontabilid
 2. Remover o serviço Redis do `docker-compose` (se não utilizado).
 3. Reverter commits relacionados ao S4.1.
 
-**Critérios de aceite do S4.1**
-
-- Watcher reproduz o comportamento legado para create/modify/delete/move.
-- Jobs são deduplicados por `job_id` determinístico.
-- Worker RQ processa ingest/delete sem depender de Linux-specific features.
-- Logs deixam claro o fluxo evento → job → resultado.
-
 **Como validar**
 
 > Os comandos abaixo são **PowerShell** e assumem que o backend já está com dependências instaladas.
@@ -1163,7 +1156,7 @@ limit 20;
 
 **Objetivo**: transformar o protótipo em produto operacional: fácil pro time e auditável para você/TI.
 
-**Status**: 🚧 **Em andamento (parcial)**
+**Status**: ✅ **Concluído**
 
 **Entregáveis (Front)**
 
@@ -1175,28 +1168,40 @@ limit 20;
 - **Jobs**
   - [x] Filtro por device (ADMIN/DEV).
   - [x] Badges de status consistentes (sem quebra de layout).
-  - [ ] Filtros por status.
-  - [ ] Atalho “Repetir instalação” (cria novo job) e “Cancelar job” (se PENDING).
+  - [x] Filtros por status.
+  - [x] Atalho “Repetir instalação” (cria novo job) e “Cancelar job” (se PENDING).
 - **Dispositivos**
   - [x] Aprovar/bloquear device (perfil admin).
   - [x] Exibir last seen e versão do agent.
   - [x] Cards compactos com badge Autorizado/Bloqueado e ações alinhadas ao protótipo.
   - [x] Toggle Auto approve (DEV) espelhado do DB.
-  - [ ] Destaque para agents desatualizados.
+  - [x] Destaque para agents desatualizados.
 - **Auditoria**
   - [x] Filtro por ação/ator (texto).
   - [x] Badge de ação consistente.
-  - [ ] Filtros por usuário, empresa e período.
+  - [x] Filtros por usuário, empresa e período.
 
 **Entregáveis (Backend/Operação)**
 
 - [x] Endpoints para listagem/admin de devices e auditoria.
 - [x] RBAC de VIEW para devices e criação de jobs (device permitido/vinculado).
-- [ ] Alertas básicos (ex.: tentativa em device bloqueado, agent desatualizado, job falhando repetidamente).
+- [x] Alertas básicos (ex.: tentativa em device bloqueado, agent desatualizado, job falhando repetidamente).
 
-**Aceite**
+**Principais features da S7**
 
-- Maria consegue ver “quem instalou qual certificado em qual máquina e quando” e operar sem acessar diretório.
+- UX alinhada ao protótipo SaaS (Certificados, Jobs, Dispositivos, Auditoria).
+- RBAC aplicado nas telas e endpoints sensíveis.
+- Fluxo de aprovação manual documentado (REQUESTED → APPROVED/DENIED).
+- Auditoria navegável com filtros e badges consistentes.
+
+**Checklist de aceite (S7) — concluído**
+
+- [x] VIEW limitado a certificados/jobs próprios e devices permitidos.
+- [x] ADMIN/DEV aprova/nega jobs e registra auditoria (`INSTALL_APPROVED`/`INSTALL_DENIED`).
+- [x] Modal de instalação lista apenas devices permitidos.
+- [x] UI de Jobs exibe status e permite ação conforme role.
+- [x] Auditoria filtra por ação/ator/período.
+- [x] Operação confirmada: “quem instalou qual certificado em qual máquina e quando”.
 
 ---
 
