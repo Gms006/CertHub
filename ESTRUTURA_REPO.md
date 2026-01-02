@@ -95,8 +95,10 @@ certhub/
 │  └─ requirements.txt
 │
 ├─ docs/
-│  └─ api/
-│     └─ openapi.json
+│  ├─ api/
+│  │  └─ openapi.json
+│  ├─ S8_PILOTO_ROLLOUT.md
+│  └─ TREINAMENTO_RAPIDO.md
 │
 ├─ agent/
 │  └─ windows/
@@ -170,13 +172,18 @@ certhub/
 │  └─ docker-compose.yml
 │
 ├─ scripts/
-│  └─ http/
-│     ├─ login.admin.json
-│     ├─ login.dev.json
-│     ├─ payload_confirm.json
-│     ├─ payload_init.json
-│     ├─ set_confirm.json
-│     └─ set_init.json
+│  ├─ http/
+│  │  ├─ login.admin.json
+│  │  ├─ login.dev.json
+│  │  ├─ payload_confirm.json
+│  │  ├─ payload_init.json
+│  │  ├─ set_confirm.json
+│  │  └─ set_init.json
+│  └─ windows/
+│     ├─ deploy_agent.ps1
+│     ├─ install_agent.ps1
+│     ├─ publish_agent.ps1
+│     └─ s8_smoke.ps1
 │
 ├─ .env.example
 ├─ .gitignore
