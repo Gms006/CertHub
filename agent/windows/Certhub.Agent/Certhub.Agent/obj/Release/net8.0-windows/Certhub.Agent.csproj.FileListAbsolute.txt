@@ -1,0 +1,15 @@
+G:\PMA\SCRIPTS\CertHub\agent\windows\Certhub.Agent\Certhub.Agent\obj\Release\net8.0-windows\Certhub.Agent.GeneratedMSBuildEditorConfig.editorconfig
+G:\PMA\SCRIPTS\CertHub\agent\windows\Certhub.Agent\Certhub.Agent\obj\Release\net8.0-windows\Certhub.Agent.AssemblyInfoInputs.cache
+G:\PMA\SCRIPTS\CertHub\agent\windows\Certhub.Agent\Certhub.Agent\obj\Release\net8.0-windows\Certhub.Agent.AssemblyInfo.cs
+G:\PMA\SCRIPTS\CertHub\agent\windows\Certhub.Agent\Certhub.Agent\obj\Release\net8.0-windows\Certhub.Agent.csproj.CoreCompileInputs.cache
+G:\PMA\SCRIPTS\CertHub\agent\windows\Certhub.Agent\Certhub.Agent\obj\Release\net8.0-windows\Certhub.Agent.sourcelink.json
+G:\PMA\SCRIPTS\CertHub\agent\windows\Certhub.Agent\Certhub.Agent\bin\Release\net8.0-windows\Certhub.Agent.exe
+G:\PMA\SCRIPTS\CertHub\agent\windows\Certhub.Agent\Certhub.Agent\bin\Release\net8.0-windows\Certhub.Agent.deps.json
+G:\PMA\SCRIPTS\CertHub\agent\windows\Certhub.Agent\Certhub.Agent\bin\Release\net8.0-windows\Certhub.Agent.runtimeconfig.json
+G:\PMA\SCRIPTS\CertHub\agent\windows\Certhub.Agent\Certhub.Agent\bin\Release\net8.0-windows\Certhub.Agent.dll
+G:\PMA\SCRIPTS\CertHub\agent\windows\Certhub.Agent\Certhub.Agent\bin\Release\net8.0-windows\Certhub.Agent.pdb
+G:\PMA\SCRIPTS\CertHub\agent\windows\Certhub.Agent\Certhub.Agent\obj\Release\net8.0-windows\Certhub.Agent.dll
+G:\PMA\SCRIPTS\CertHub\agent\windows\Certhub.Agent\Certhub.Agent\obj\Release\net8.0-windows\refint\Certhub.Agent.dll
+G:\PMA\SCRIPTS\CertHub\agent\windows\Certhub.Agent\Certhub.Agent\obj\Release\net8.0-windows\Certhub.Agent.pdb
+G:\PMA\SCRIPTS\CertHub\agent\windows\Certhub.Agent\Certhub.Agent\obj\Release\net8.0-windows\Certhub.Agent.genruntimeconfig.cache
+G:\PMA\SCRIPTS\CertHub\agent\windows\Certhub.Agent\Certhub.Agent\obj\Release\net8.0-windows\ref\Certhub.Agent.dll

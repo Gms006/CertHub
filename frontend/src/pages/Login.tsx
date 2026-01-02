@@ -187,7 +187,7 @@ const Login = () => {
               </form>
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-500">
                 <div className="flex items-center justify-between gap-3 text-[11px] text-slate-500">
-                  <span>Instalação: CurrentUser</span>
+                  <span>Instalação: Seu Usuário Windows</span>
                   <span>Remoção: 18:00</span>
                   <span>Auditoria: habilitada</span>
                 </div>
@@ -198,7 +198,7 @@ const Login = () => {
               </div>
               <div className="flex items-center justify-between text-xs text-slate-400">
                 <span>© 2025 Neto Contabilidade</span>
-                <span>Versão: 0.1.0</span>
+                <span>Versão: 1.0.0</span>
               </div>
             </div>
 
@@ -235,9 +235,8 @@ const Login = () => {
                     </div>
                   </div>
                   <p className="mt-4 text-sm text-slate-600">
-                    A facilidade de instalar certificados sem abrir pastas nem
-                    procurar senhas é o que mais muda o jogo. E a auditoria por
-                    usuário/device traz controle de verdade.
+                    Basta acessar com o e-mail corporativo e senha, selecionar o(s) 
+                    certificado(s) desejado(s) e solicitar a instalação.
                   </p>
                   <div className="mt-4 flex gap-2">
                     {["Jobs", "Devices", "Auditoria"].map((badge) => (
