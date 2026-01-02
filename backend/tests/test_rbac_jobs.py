@@ -289,7 +289,33 @@ def test_view_listing_jobs_my_device_only(test_client_and_session):
     response = client.get("/api/v1/install-jobs/my-device", headers=headers(viewer))
     assert response.status_code == 200
     payload = response.json()
-    assert {item["id"] for item in payload} == {str(job_allowed.id)}
+    assert {item["id"] for item in payload} == {str(job_allowed.id), str(job_other.id)}
+
+
+def test_view_listing_jobs_assigned_device(test_client_and_session):
+    client, SessionLocal = test_client_and_session
+    with SessionLocal() as db:
+        viewer = create_user(db, role="VIEW")
+        other_user = create_user(db, role="VIEW")
+        cert = create_certificate(db)
+        device = create_device(db)
+        device.assigned_user_id = viewer.id
+        db.commit()
+
+        job = models.CertInstallJob(
+            org_id=viewer.org_id,
+            cert_id=cert.id,
+            device_id=device.id,
+            requested_by_user_id=other_user.id,
+            status=models.JOB_STATUS_PENDING,
+        )
+        db.add(job)
+        db.commit()
+
+    response = client.get("/api/v1/install-jobs/my-device", headers=headers(viewer))
+    assert response.status_code == 200
+    payload = response.json()
+    assert {item["id"] for item in payload} == {str(job.id)}
 
 
 def test_view_cannot_list_admin_devices(test_client_and_session):
