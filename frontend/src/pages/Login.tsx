@@ -176,12 +176,6 @@ const Login = () => {
                   <span className="mt-2 block text-[11px] text-slate-400">
                     Somente contas do domínio @netocontabilidade.com.br.
                   </span>
-                  <Link
-                    className="mt-2 inline-flex text-[11px] font-semibold text-[#22489c] transition hover:text-[#0e2659]"
-                    to="/reset-password"
-                  >
-                    Esqueci minha senha
-                  </Link>
                 </label>
                 <div className="mt-3 flex items-center justify-end">
                   <Link
@@ -198,14 +192,6 @@ const Login = () => {
                 >
                   {loading ? "Entrando..." : "Acessar"}
                 </button>
-                <div className="flex items-center justify-end text-xs">
-                  <Link
-                    className="text-[#22489c] transition hover:text-[#0e2659]"
-                    to="/reset-password"
-                  >
-                    Esqueci minha senha
-                  </Link>
-                </div>
               </form>
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-500">
                 <div className="flex items-center justify-between gap-3 text-[11px] text-slate-500">

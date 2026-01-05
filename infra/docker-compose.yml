@@ -7,7 +7,7 @@ services:
       POSTGRES_PASSWORD: 619038
       POSTGRES_DB: certhub
     ports:
-      - "5433:5432"
+      - "127.0.0.1:5433:5432"
 
     volumes:
       - certhub_pgdata:/var/lib/postgresql/data
@@ -15,7 +15,7 @@ services:
     image: redis:7.2-alpine
     container_name: certhub-redis
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
