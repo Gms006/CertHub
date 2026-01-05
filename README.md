@@ -113,6 +113,11 @@ copy .env.example .env
 - `DATABASE_URL` (Postgres local)
 - `JWT_SECRET` (não versionar segredo real)
 - `CERTS_ROOT_PATH` e `OPENSSL_PATH`
+- `FRONTEND_BASE_URL` (ex.: `http://localhost:5173` para o link de reset)
+- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` (envio de e-mail)
+
+> Em ambiente DEV, se `SMTP_HOST`/`SMTP_FROM` não estiverem configurados, o backend
+> registra o link de reset no log.
 
 > A API lê `.env` na raiz do repo. `.env.example` não contém segredos.
 
@@ -151,6 +156,28 @@ Invoke-RestMethod -Method Post "http://localhost:8010/api/v1/install-jobs/<JOB_I
   -Headers @{ Authorization = "Bearer <JWT_ADMIN>" } `
   -ContentType "application/json" `
   -Body '{"reason":"smoke test"}'
+```
+
+### Smoke test — reset de senha (curl)
+```bash
+curl -X POST "http://localhost:8010/api/v1/auth/password/reset/init" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@example.com"}'
+
+curl -X POST "http://localhost:8010/api/v1/auth/password/reset/confirm" \
+  -H "Content-Type: application/json" \
+  -d '{"token":"<TOKEN>", "new_password":"NovaSenha@123"}'
+```
+
+### Smoke test — reset de senha (PowerShell)
+```powershell
+Invoke-RestMethod -Method Post "http://localhost:8010/api/v1/auth/password/reset/init" `
+  -ContentType "application/json" `
+  -Body '{"email":"user@example.com"}'
+
+Invoke-RestMethod -Method Post "http://localhost:8010/api/v1/auth/password/reset/confirm" `
+  -ContentType "application/json" `
+  -Body '{"token":"<TOKEN>", "new_password":"NovaSenha@123"}'
 ```
 
 ---

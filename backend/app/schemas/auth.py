@@ -43,6 +43,7 @@ class RefreshResponse(BaseModel):
 
 class TokenInitResponse(BaseModel):
     ok: bool = True
+    message: str | None = None
     token: str | None = None
     expires_at: datetime | None = None
 
