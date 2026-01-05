@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Eye, EyeOff, Lock, Mail, Shield } from "lucide-react";
 
 import { useAuth } from "../hooks/useAuth";
@@ -177,6 +177,14 @@ const Login = () => {
                     Somente contas do domínio @netocontabilidade.com.br.
                   </span>
                 </label>
+                <div className="mt-3 flex items-center justify-end">
+                  <Link
+                    className="text-xs font-semibold text-[#22489c] transition hover:text-[#0e2659]"
+                    to="/reset-password"
+                  >
+                    Esqueci minha senha
+                  </Link>
+                </div>
                 <button
                   className="h-11 w-full rounded-2xl bg-[#0e2659] text-sm font-semibold text-white transition hover:bg-[#0e2659]/90"
                   type="submit"

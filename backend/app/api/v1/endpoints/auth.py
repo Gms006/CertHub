@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.core.audit import log_audit
 from app.core.config import settings
+from app.core.mailer import send_reset_password_email
 from app.core.security import (
     AUTH_TOKEN_PURPOSE_RESET_PASSWORD,
     AUTH_TOKEN_PURPOSE_SET_PASSWORD,
@@ -38,6 +39,19 @@ from app.schemas.user import UserRead
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 REFRESH_COOKIE_NAME = "refresh_token"
+PASSWORD_RESET_COOLDOWN_SECONDS = 60
+_PASSWORD_RESET_LAST_REQUEST: dict[str, datetime] = {}
+
+
+def _mask_email(email: str) -> str:
+    if "@" not in email:
+        return "***"
+    local, domain = email.split("@", 1)
+    if len(local) <= 2:
+        masked_local = f"{local[:1]}***"
+    else:
+        masked_local = f"{local[:2]}***"
+    return f"{masked_local}@{domain}"
 
 
 def _get_refresh_token(request: Request, body: dict[str, Any] | None = None) -> str | None:
@@ -332,14 +346,25 @@ def logout(
 @router.post("/password/reset/init", response_model=TokenInitResponse)
 def password_reset_init(
     payload: PasswordResetInitRequest,
+    request: Request,
     db: Session = Depends(get_db),
 ) -> TokenInitResponse:
-    statement = select(User).where(func.lower(User.email) == payload.email.lower())
+    now = datetime.now(timezone.utc)
+    email_key = payload.email.lower()
+    ip = request.client.host if request.client else "unknown"
+    rate_key = f"{email_key}:{ip}"
+    last_request = _PASSWORD_RESET_LAST_REQUEST.get(rate_key)
+    if last_request and (now - last_request).total_seconds() < PASSWORD_RESET_COOLDOWN_SECONDS:
+        return TokenInitResponse(
+            ok=True,
+            message="Se existir conta com esse e-mail, enviaremos um link para resetar a senha.",
+        )
+    _PASSWORD_RESET_LAST_REQUEST[rate_key] = now
+
+    statement = select(User).where(func.lower(User.email) == email_key)
     user = db.execute(statement).scalar_one_or_none()
     raw_token = generate_token()
-    expires_at = datetime.now(timezone.utc) + timedelta(
-        minutes=settings.reset_password_token_ttl_min
-    )
+    expires_at = now + timedelta(minutes=settings.reset_password_token_ttl_min)
     if user is not None:
         auth_token = AuthToken(
             user_id=user.id,
@@ -349,9 +374,22 @@ def password_reset_init(
         )
         db.add(auth_token)
         db.commit()
+        send_reset_password_email(recipient=user.email or payload.email, token=raw_token)
+    log_audit(
+        db=db,
+        org_id=user.org_id if user else settings.default_org_id,
+        action="PASSWORD_RESET_REQUESTED",
+        entity_type="user",
+        entity_id=user.id if user else None,
+        actor_user_id=user.id if user else None,
+        ip=request.client.host if request.client else None,
+        meta={"email": _mask_email(payload.email)},
+    )
+    db.commit()
     token_value = raw_token if settings.env.lower() == "dev" else None
     return TokenInitResponse(
         ok=True,
+        message="Se existir conta com esse e-mail, enviaremos um link para resetar a senha.",
         token=token_value,
         expires_at=expires_at if token_value else None,
     )
@@ -384,6 +422,11 @@ def password_reset_confirm(
     user.locked_until = None
     auth_token.used_at = now
     db.execute(
+        update(UserSession)
+        .where(UserSession.user_id == user.id, UserSession.revoked_at.is_(None))
+        .values(revoked_at=now)
+    )
+    db.execute(
         update(AuthToken)
         .where(
             AuthToken.user_id == user.id,
@@ -402,7 +445,7 @@ def password_reset_confirm(
         actor_user_id=user.id,
     )
     db.commit()
-    return MessageResponse(message="password reset")
+    return MessageResponse(message="Senha atualizada com sucesso.")
 
 
 @router.get("/me", response_model=UserRead)

@@ -1,24 +1,38 @@
 import { FormEvent, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { useAuth } from "../hooks/useAuth";
 
 const ResetPassword = () => {
   const { resetPasswordInit, resetPasswordConfirm, loading, message } = useAuth();
+  const navigate = useNavigate();
   const [params] = useSearchParams();
   const [email, setEmail] = useState("");
   const [token, setToken] = useState(params.get("token") ?? "");
   const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [localError, setLocalError] = useState<string | null>(null);
   const hasToken = token.length > 0;
 
   const handleInit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    setLocalError(null);
     await resetPasswordInit(email);
   };
 
   const handleConfirm = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    await resetPasswordConfirm(token, newPassword);
+    setLocalError(null);
+    if (newPassword !== confirmPassword) {
+      setLocalError("As senhas não conferem.");
+      return;
+    }
+    try {
+      await resetPasswordConfirm(token, newPassword);
+      navigate("/login", { replace: true });
+    } catch {
+      // erro já tratado no contexto
+    }
   };
 
   return (
@@ -52,6 +66,16 @@ const ResetPassword = () => {
                 required
               />
             </label>
+            <label className="block text-xs font-semibold text-slate-500">
+              Confirmar nova senha
+              <input
+                className="mt-2 h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-700"
+                type="password"
+                value={confirmPassword}
+                onChange={(event) => setConfirmPassword(event.target.value)}
+                required
+              />
+            </label>
             <button
               className="h-11 w-full rounded-2xl bg-[#0e2659] text-sm font-semibold text-white transition hover:bg-[#0e2659]/90"
               type="submit"
@@ -82,9 +106,9 @@ const ResetPassword = () => {
             </button>
           </form>
         )}
-        {message && (
+        {(localError || message) && (
           <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-            {message}
+            {localError || message}
           </div>
         )}
       </div>
