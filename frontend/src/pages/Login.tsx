@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Eye, EyeOff, Lock, Mail, Shield } from "lucide-react";
 
 import { useAuth } from "../hooks/useAuth";
@@ -184,6 +184,14 @@ const Login = () => {
                 >
                   {loading ? "Entrando..." : "Acessar"}
                 </button>
+                <div className="flex items-center justify-end text-xs">
+                  <Link
+                    className="text-[#22489c] transition hover:text-[#0e2659]"
+                    to="/reset-password"
+                  >
+                    Esqueci minha senha
+                  </Link>
+                </div>
               </form>
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-500">
                 <div className="flex items-center justify-between gap-3 text-[11px] text-slate-500">
