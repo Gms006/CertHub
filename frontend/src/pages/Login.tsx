@@ -183,6 +183,14 @@ const Login = () => {
                     Esqueci minha senha
                   </Link>
                 </label>
+                <div className="mt-3 flex items-center justify-end">
+                  <Link
+                    className="text-xs font-semibold text-[#22489c] transition hover:text-[#0e2659]"
+                    to="/reset-password"
+                  >
+                    Esqueci minha senha
+                  </Link>
+                </div>
                 <button
                   className="h-11 w-full rounded-2xl bg-[#0e2659] text-sm font-semibold text-white transition hover:bg-[#0e2659]/90"
                   type="submit"
