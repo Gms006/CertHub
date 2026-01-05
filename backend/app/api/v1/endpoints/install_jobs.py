@@ -9,6 +9,7 @@ from io import BytesIO
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
 from openpyxl import Workbook
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session
 
@@ -22,6 +23,7 @@ from app.models import (
     JOB_STATUS_CANCELED,
     JOB_STATUS_PENDING,
     JOB_STATUS_REQUESTED,
+    User,
     UserDevice,
 )
 from app.schemas.install_job import InstallJobApproveRequest, InstallJobRead
@@ -77,9 +79,10 @@ async def export_install_jobs(
 ) -> StreamingResponse:
     start_date, end_date = resolve_period_range(period)
     statement = (
-        select(CertInstallJob, Certificate.name, Device.hostname)
+        select(CertInstallJob, Certificate.name, Device.hostname, User.nome, User.ad_username)
         .join(Certificate, Certificate.id == CertInstallJob.cert_id)
         .join(Device, Device.id == CertInstallJob.device_id)
+        .join(User, User.id == CertInstallJob.requested_by_user_id)
         .where(
             CertInstallJob.org_id == current_user.org_id,
             CertInstallJob.created_at >= start_date,
@@ -131,15 +134,29 @@ async def export_install_jobs(
         "Erro",
     ]
     sheet.append(headers)
+    header_fill = PatternFill(fill_type="solid", start_color="E2E8F0", end_color="E2E8F0")
+    header_font = Font(bold=True, color="0F172A")
+    border = Border(
+        left=Side(style="thin", color="CBD5F5"),
+        right=Side(style="thin", color="CBD5F5"),
+        top=Side(style="thin", color="CBD5F5"),
+        bottom=Side(style="thin", color="CBD5F5"),
+    )
+    for cell in sheet[1]:
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        cell.border = border
 
-    for job, cert_name, device_name in results:
+    for job, cert_name, device_name, requested_name, requested_username in results:
+        requester = requested_name or requested_username
         sheet.append(
             [
                 str(job.id),
                 cert_name,
                 device_name,
                 job.status,
-                str(job.requested_by_user_id),
+                requester,
                 format_datetime(job.created_at),
                 format_datetime(job.updated_at),
                 format_datetime(job.approved_at),
@@ -148,6 +165,19 @@ async def export_install_jobs(
                 job.error_message or "",
             ]
         )
+    for row in sheet.iter_rows(min_row=2, max_row=sheet.max_row, max_col=sheet.max_column):
+        for cell in row:
+            cell.alignment = Alignment(vertical="center", wrap_text=True)
+            cell.border = border
+    for column in sheet.columns:
+        max_length = 0
+        column_letter = column[0].column_letter
+        for cell in column:
+            if cell.value is None:
+                continue
+            max_length = max(max_length, len(str(cell.value)))
+        sheet.column_dimensions[column_letter].width = min(max_length + 3, 50)
+    sheet.auto_filter.ref = sheet.dimensions
 
     buffer = BytesIO()
     workbook.save(buffer)
