@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+import calendar
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from enum import Enum
+from io import BytesIO
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import StreamingResponse
+from openpyxl import Workbook
 from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session
 
@@ -11,6 +16,7 @@ from app.core.audit import log_audit
 from app.core.security import require_admin_or_dev, require_view_or_higher
 from app.db.session import get_db
 from app.models import (
+    Certificate,
     CertInstallJob,
     Device,
     JOB_STATUS_CANCELED,
@@ -21,6 +27,138 @@ from app.models import (
 from app.schemas.install_job import InstallJobApproveRequest, InstallJobRead
 
 router = APIRouter(prefix="/install-jobs", tags=["install-jobs"])
+
+
+class ExportPeriod(str, Enum):
+    LAST_15_DAYS = "last_15_days"
+    THIS_MONTH = "this_month"
+    LAST_6_MONTHS = "last_6_months"
+
+
+class ExportScope(str, Enum):
+    ALL = "all"
+    MINE = "mine"
+    MY_DEVICE = "my-device"
+
+
+def subtract_months(value: datetime, months: int) -> datetime:
+    month = value.month - months
+    year = value.year
+    while month <= 0:
+        month += 12
+        year -= 1
+    day = min(value.day, calendar.monthrange(year, month)[1])
+    return value.replace(year=year, month=month, day=day)
+
+
+def resolve_period_range(period: ExportPeriod) -> tuple[datetime, datetime]:
+    now = datetime.now(timezone.utc)
+    if period == ExportPeriod.THIS_MONTH:
+        start = datetime(now.year, now.month, 1, tzinfo=timezone.utc)
+    elif period == ExportPeriod.LAST_6_MONTHS:
+        start = subtract_months(now, 6)
+    else:
+        start = now - timedelta(days=15)
+    return start, now
+
+
+def format_datetime(value: datetime | None) -> str:
+    if value is None:
+        return ""
+    return value.isoformat()
+
+
+@router.get("/export")
+async def export_install_jobs(
+    period: ExportPeriod = Query(default=ExportPeriod.LAST_15_DAYS),
+    scope: ExportScope = Query(default=ExportScope.ALL),
+    db: Session = Depends(get_db),
+    current_user=Depends(require_view_or_higher),
+) -> StreamingResponse:
+    start_date, end_date = resolve_period_range(period)
+    statement = (
+        select(CertInstallJob, Certificate.name, Device.hostname)
+        .join(Certificate, Certificate.id == CertInstallJob.cert_id)
+        .join(Device, Device.id == CertInstallJob.device_id)
+        .where(
+            CertInstallJob.org_id == current_user.org_id,
+            CertInstallJob.created_at >= start_date,
+            CertInstallJob.created_at <= end_date,
+        )
+    )
+
+    if scope == ExportScope.ALL:
+        if current_user.role_global not in {"ADMIN", "DEV"}:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+    elif scope == ExportScope.MINE:
+        statement = statement.where(CertInstallJob.requested_by_user_id == current_user.id)
+    elif scope == ExportScope.MY_DEVICE:
+        statement = (
+            statement.outerjoin(
+                UserDevice,
+                and_(
+                    UserDevice.device_id == CertInstallJob.device_id,
+                    UserDevice.user_id == current_user.id,
+                ),
+            )
+            .where(
+                or_(
+                    CertInstallJob.requested_by_user_id == current_user.id,
+                    Device.assigned_user_id == current_user.id,
+                    UserDevice.is_allowed.is_(True),
+                ),
+            )
+            .distinct()
+        )
+
+    statement = statement.order_by(CertInstallJob.created_at.desc())
+    results = db.execute(statement).all()
+
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Jobs"
+    headers = [
+        "ID",
+        "Certificado",
+        "Device",
+        "Status",
+        "Solicitado por",
+        "Criado em",
+        "Atualizado em",
+        "Aprovado em",
+        "Iniciado em",
+        "Finalizado em",
+        "Erro",
+    ]
+    sheet.append(headers)
+
+    for job, cert_name, device_name in results:
+        sheet.append(
+            [
+                str(job.id),
+                cert_name,
+                device_name,
+                job.status,
+                str(job.requested_by_user_id),
+                format_datetime(job.created_at),
+                format_datetime(job.updated_at),
+                format_datetime(job.approved_at),
+                format_datetime(job.started_at),
+                format_datetime(job.finished_at),
+                job.error_message or "",
+            ]
+        )
+
+    buffer = BytesIO()
+    workbook.save(buffer)
+    buffer.seek(0)
+    filename = f"jobs_{period.value}.xlsx"
+    headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
+    return StreamingResponse(
+        buffer,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers=headers,
+    )
 
 
 @router.get("", response_model=list[InstallJobRead])
