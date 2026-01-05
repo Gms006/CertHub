@@ -176,6 +176,12 @@ const Login = () => {
                   <span className="mt-2 block text-[11px] text-slate-400">
                     Somente contas do domínio @netocontabilidade.com.br.
                   </span>
+                  <Link
+                    className="mt-2 inline-flex text-[11px] font-semibold text-[#22489c] transition hover:text-[#0e2659]"
+                    to="/reset-password"
+                  >
+                    Esqueci minha senha
+                  </Link>
                 </label>
                 <button
                   className="h-11 w-full rounded-2xl bg-[#0e2659] text-sm font-semibold text-white transition hover:bg-[#0e2659]/90"
