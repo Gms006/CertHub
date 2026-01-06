@@ -29,6 +29,11 @@ Objetivo: substituir o diretório público de `.pfx` por um fluxo controlado via
 - Treinamento rápido: `docs/TREINAMENTO_RAPIDO.md`
 - Smoke test (PowerShell): `scripts/windows/s8_smoke.ps1`
 
+## S9 — Retenção e cleanup configurável
+
+- Planejamento para política de retenção por job/usuário (KEEP_UNTIL / EXEMPT).
+- Próximos stages planejados: S10 TLS/HTTPS, S11 Hardening Web, S12 Secrets, S13 Multi-tenant, S14 LGPD retenção, S15 DSAR, S16 Backups, S17 Observabilidade, S18 Empacotamento, S19 Jurídico.
+
 ### Como rodar o smoke test
 
 ```powershell

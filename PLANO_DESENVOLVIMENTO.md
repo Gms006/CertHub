@@ -1211,15 +1211,308 @@ limit 20;
 
 **Entregáveis**
 
-**Status**: 🔄 **Em execução**
+**Status**: ✅ **Concluído**
 
 - Runbook do piloto (Windows): `docs/S8_PILOTO_ROLLOUT.md`
 - Treinamento rápido (1 página): `docs/TREINAMENTO_RAPIDO.md`
 - Smoke test (PowerShell): `scripts/windows/s8_smoke.ps1`
 
+**Evidências S8**
+
+- Runbook do piloto documentado em `docs/S8_PILOTO_ROLLOUT.md` (inclui cleanup 18h e validações).
+- Treinamento rápido presente em `docs/TREINAMENTO_RAPIDO.md`.
+- Smoke test disponível em `scripts/windows/s8_smoke.ps1`.
+
 **Aceite**
 
 - 2 usuários operando por 1 semana sem fricção.
+
+---
+
+## S9 — Retenção e cleanup configurável
+
+**Objetivo**: permitir configurar a política de remoção/retensão do certificado instalado pelo Agent:
+
+- **Default**: remover às **18:00** (como hoje).
+- Por **JOB**: manter até data/hora (`KEEP_UNTIL`).
+- Por **JOB** (ADMIN/DEV): isento do cleanup automático (`EXEMPT`) **com motivo obrigatório**.
+- Por **USUÁRIO/role**: controlar quem pode escolher `KEEP_UNTIL`/`EXEMPT` (estilo auto-approve).
+
+**Status**: 🔄 **Em execução**
+
+**Entregáveis**
+
+- Migração DB adicionando campos em `cert_install_jobs` (ou tabela equivalente): `cleanup_mode`, `keep_until`, `keep_reason`, `keep_set_by_user_id`, timestamps.
+- Auditoria: ação `RETENTION_SET` + eventos de cleanup (`CERT_REMOVED_18H` / `CERT_SKIPPED_RETENTION`).
+- Backend: validações e RBAC (VIEW só `KEEP_UNTIL` com limite; `EXEMPT` só ADMIN/DEV).
+- Agent: respeitar retention no cleanup e persistir metadados junto do thumbprint.
+- Frontend: UI no modal de instalação para escolher política, com campos e bloqueios por permissão.
+- Testes automatizados cobrindo RBAC + comportamento do cleanup.
+
+**Aceite**
+
+- Por padrão continua removendo às 18h.
+- `KEEP_UNTIL` não remove antes do prazo.
+- `EXEMPT` não remove automaticamente.
+- Tudo auditado com usuário/device/job.
+
+**Rollback curto (S9)**
+
+- Reverter a migração da retenção e limpar colunas novas em `cert_install_jobs`.
+- Desativar a UI de política e manter cleanup padrão às 18h.
+- Voltar o Agent para ignorar metadata de retenção (apenas lista local de thumbprints).
+
+---
+
+## S10 — TLS/HTTPS + Hospedagem
+
+**Objetivo**: acabar com “site não seguro” e padronizar acesso interno/externo com TLS.
+
+**Status**: 🔄 **Em execução**
+
+**Entregáveis**
+
+- Reverse proxy (IIS/Nginx/Caddy) com TLS para Portal + API.
+- Certificados emitidos (CA interna ou Let’s Encrypt), incluindo renovação.
+- URLs únicas e estáveis para portal e API (ex.: `portal.<dom>` e `api.<dom>`).
+- Ajuste de base URLs (`FRONTEND_BASE_URL`, `API_BASE_URL`) e redirects.
+- Headers de segurança no proxy (HSTS, X-Content-Type-Options, X-Frame-Options/Frame-ancestors).
+
+**Aceite**
+
+- Portal e API acessíveis **somente via HTTPS** em ambiente prod.
+- Sem **mixed content** no portal (recursos carregados apenas por HTTPS).
+
+**Rollback curto (S10)**
+
+- Voltar o proxy para HTTP interno e bloquear acesso externo.
+- Reverter configurações de TLS/headers no proxy.
+
+---
+
+## S11 — CORS/CSRF/Headers (Hardening Web)
+
+**Objetivo**: restringir origens e reforçar proteção web.
+
+**Status**: 🔄 **Em execução**
+
+**Entregáveis**
+
+- CORS allowlist por domínio (portal autorizado).
+- Cookies e SameSite coerentes com TLS (Secure + HttpOnly).
+- Estratégia CSRF (onde aplicável).
+- Headers de segurança adicionais (HSTS, X-Content-Type-Options, Referrer-Policy, Permissions-Policy).
+
+**Aceite**
+
+- Requests cross-origin **somente** do portal autorizado.
+- Tentativas de origem não permitida são bloqueadas pelo backend/proxy.
+
+**Rollback curto (S11)**
+
+- Reverter CORS para modo dev (origens liberadas localmente).
+- Desativar CSRF apenas em dev se necessário.
+
+---
+
+## S12 — Secrets & Config Management
+
+**Objetivo**: padronizar gestão de segredos e configurações por ambiente.
+
+**Status**: 🔄 **Em execução**
+
+**Entregáveis**
+
+- Padrão para secrets (sem segredos no repo).
+- Perfis/ambientes (dev/stage/prod) com variáveis separadas.
+- Rotação do `JWT_SECRET` + segredo SMTP.
+- Auditoria básica de mudanças de configuração sensível.
+
+**Aceite**
+
+- Deploy prod sem `.env` solto e sem segredos em texto em commits.
+- Segredos carregados via vault/secret store ou mecanismo equivalente.
+
+**Rollback curto (S12)**
+
+- Voltar para configuração local apenas em dev.
+- Reverter rotação de segredo para chave anterior (com janela de expiração).
+
+---
+
+## S13 — Multi-tenant real (comercialização)
+
+**Objetivo**: garantir isolamento total por org/tenant.
+
+**Status**: 🔄 **Em execução**
+
+**Entregáveis**
+
+- Isolamento por `org_id` em **todas** as queries.
+- RBAC por org, inclusive em jobs, devices e auditoria.
+- Onboarding de novo escritório (criar org, admin, limites).
+- Limites e quotas por tenant.
+- Chaves e escopos por tenant.
+
+**Aceite**
+
+- Um tenant **não enxerga** dados de outro, mesmo por erro de filtro.
+- Auditorias e jobs sempre escopados ao `org_id` correto.
+
+**Rollback curto (S13)**
+
+- Desativar onboarding multi-tenant e operar com tenant único.
+- Reverter rotas que dependem de escopo multi-tenant.
+
+---
+
+## S14 — Governança LGPD (retenção + minimização + anonimização)
+
+**Objetivo**: aplicar retenção e minimização de dados pessoais nos logs.
+
+**Status**: 🔄 **Em execução**
+
+**Entregáveis**
+
+- Política de retenção para `audit_log` e logs técnicos.
+- Job periódico para anonimizar/remover registros conforme prazo.
+- Mascaramento de PII em logs e auditoria.
+- Configuração de prazos por ambiente (dev/stage/prod).
+
+**Aceite**
+
+- Logs não guardam PII além do necessário.
+- Retenção aplicada automaticamente e comprovável.
+
+**Rollback curto (S14)**
+
+- Suspender job de anonimização e manter retenção mínima.
+- Reverter mascaramento apenas em ambiente dev.
+
+---
+
+## S15 — Direitos do titular (DSAR)
+
+**Objetivo**: suportar exportação e remoção conforme solicitação.
+
+**Status**: 🔄 **Em execução**
+
+**Entregáveis**
+
+- Exportar dados do usuário (conta/sessões/auditoria relacionada).
+- Desativar/apagar conta conforme regra interna.
+- Revogar sessões/tokens ativas.
+- Trilha de auditoria das ações de DSAR.
+
+**Aceite**
+
+- Admin consegue atender solicitação de export/remoção dentro do sistema.
+- Ação registrada em auditoria com ator e justificativa.
+
+**Rollback curto (S15)**
+
+- Desativar endpoints/fluxos de DSAR e operar manualmente.
+- Reverter remoções para status “inativo” se necessário.
+
+---
+
+## S16 — Backups e Recuperação (criptografia + restore test)
+
+**Objetivo**: garantir backup seguro e restaurabilidade do sistema.
+
+**Status**: 🔄 **Em execução**
+
+**Entregáveis**
+
+- Rotina de backup do Postgres com criptografia.
+- Storage seguro para backups.
+- Teste periódico de restore (runbook).
+- Plano de recuperação de desastre documentado.
+
+**Aceite**
+
+- Restore validado e documentado.
+- Backup recuperável em ambiente isolado.
+
+**Rollback curto (S16)**
+
+- Voltar para backup manual temporário.
+- Suspender criptografia apenas em dev.
+
+---
+
+## S17 — Observabilidade e Resposta a Incidente
+
+**Objetivo**: monitorar operação e responder a incidentes de forma previsível.
+
+**Status**: 🔄 **Em execução**
+
+**Entregáveis**
+
+- Logs estruturados com `request-id`/correlação.
+- Métricas básicas (latência, erros, jobs).
+- Alertas: falha de cleanup, falha de agent, picos de auth.
+- Runbook de incidentes com passos mínimos.
+
+**Aceite**
+
+- Incidentes comuns geram sinal/alerta com playbook.
+- Eventos críticos aparecem no painel/alerta em tempo hábil.
+
+**Rollback curto (S17)**
+
+- Desativar alertas ruidosos e manter logs básicos.
+- Reverter integração de métricas se impactar performance.
+
+---
+
+## S18 — Empacotamento/Distribuição (produto)
+
+**Objetivo**: padronizar instalação e atualização do Agent e portal.
+
+**Status**: 🔄 **Em execução**
+
+**Entregáveis**
+
+- Estratégia de distribuição do Agent (MSI/installer).
+- Auto-update do Agent com rollback.
+- Versionamento do API/portal e release notes.
+- Scripts de deploy por cliente (on-prem).
+
+**Aceite**
+
+- Instalar/atualizar agent em N máquinas de forma reprodutível.
+- Versões do portal/API identificáveis e documentadas.
+
+**Rollback curto (S18)**
+
+- Desativar auto-update e fixar versão do Agent.
+- Voltar para instalação manual com scripts.
+
+---
+
+## S19 — Jurídico/Docs do Produto (mínimo viável)
+
+**Objetivo**: preparar pacote documental para venda B2B com LGPD.
+
+**Status**: 🔄 **Em execução**
+
+**Entregáveis**
+
+- Política de Privacidade (modelo).
+- Termos de Uso.
+- DPA (controlador/operador).
+- Matriz de dados (dados, finalidade, retenção).
+- Checklist LGPD operacional.
+
+**Aceite**
+
+- Pacote documental mínimo pronto para comercialização.
+
+**Rollback curto (S19)**
+
+- Retornar para uso interno sem documentação externa.
+- Marcar documentos como “rascunho” até validação jurídica.
 
 ---
 
