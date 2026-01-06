@@ -21,6 +21,7 @@ type DeviceRead = {
   agent_version?: string | null;
   last_seen_at?: string | null;
   last_heartbeat_at?: string | null;
+  last_job_at?: string | null;
   auto_approve?: boolean;
   is_allowed: boolean;
   assigned_user?: {
@@ -256,7 +257,7 @@ const DevicesPage = () => {
                     <div className="flex items-center justify-between">
                       <span>Último sinal</span>
                       <span className="font-semibold text-slate-700">
-                        {formatRelativeTime(device.last_seen_at)}
+                        {formatRelativeTime(device.last_job_at)}
                       </span>
                     </div>
                   </div>

@@ -22,6 +22,18 @@ const getCookieValue = (name: string) => {
   return match ? decodeURIComponent(match.split("=")[1]) : null;
 };
 
+const getStoredValue = (keys: string[]) => {
+  for (const key of keys) {
+    const fromLocal = localStorage.getItem(key);
+    if (fromLocal) return fromLocal;
+    const fromSession = sessionStorage.getItem(key);
+    if (fromSession) return fromSession;
+    const fromCookie = getCookieValue(key);
+    if (fromCookie) return fromCookie;
+  }
+  return null;
+};
+
 const Login = () => {
   const { login, loading, message, accessToken } = useAuth();
   const navigate = useNavigate();
@@ -46,14 +58,16 @@ const Login = () => {
 
   useEffect(() => {
     const loadDeviceInfo = async () => {
-      const deviceId =
-        localStorage.getItem("certhub_device_id") ||
-        sessionStorage.getItem("certhub_device_id") ||
-        getCookieValue("certhub_device_id");
-      const deviceToken =
-        localStorage.getItem("certhub_device_token") ||
-        sessionStorage.getItem("certhub_device_token") ||
-        getCookieValue("certhub_device_token");
+      const deviceId = getStoredValue([
+        "certhub_device_id",
+        "device_id",
+        "deviceId",
+      ]);
+      const deviceToken = getStoredValue([
+        "certhub_device_token",
+        "device_token",
+        "deviceToken",
+      ]);
       if (!deviceId || !deviceToken) {
         return;
       }
