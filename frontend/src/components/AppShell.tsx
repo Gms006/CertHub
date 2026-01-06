@@ -259,7 +259,7 @@ const AppShell = () => {
         {isDev ? (
           <a
             className="inline-flex h-10 items-center justify-center rounded-2xl border border-slate-200 px-4 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
-            href="/docs"
+            href="http://192.168.25.51:8010/docs#/"
             target="_blank"
             rel="noreferrer"
           >
