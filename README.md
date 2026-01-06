@@ -305,6 +305,7 @@ Get-Content "$env:LOCALAPPDATA\CertHubAgent\logs\agent.log" -Tail 60
 Quando um job chega com `cleanup_mode=KEEP_UNTIL`, o Agent cria uma task única no horário local do `keep_until`.
 Ela executa o cleanup manual e se auto-deleta após rodar.
 No Windows Task Scheduler, essa task é criada como V1 com `/V1 /Z` para evitar erros de EndBoundary.
+O cleanup disparado pela task usa `--mode keep_until` (audit_log com `meta_json.mode = "keep_until"`).
 
 ```powershell
 schtasks /Query /TN "CertHub KeepUntil YYYYMMDD-HHmm" /V /FO LIST

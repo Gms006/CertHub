@@ -107,7 +107,7 @@ public sealed class ScheduledCleanupTaskService
         }
 
         var taskName = $"{KeepUntilTaskPrefix} {scheduledTime:yyyyMMdd-HHmm}";
-        var taskRun = $"{normalizedPath} --cleanup --mode manual";
+        var taskRun = $"{normalizedPath} --cleanup --mode keep_until";
         var containsPath = false;
         var containsArgs = false;
         try

@@ -6,7 +6,8 @@ param(
     [string]$JwtView,
     [string]$JwtAdmin,
     [string]$AgentExePath = "C:\ProgramData\CertHubAgent\publish\Certhub.Agent.exe",
-    [string]$DatabaseUrl
+    [string]$DatabaseUrl,
+    [string]$Thumbprint
 )
 
 $ErrorActionPreference = "Stop"
@@ -70,6 +71,18 @@ if (-not [string]::IsNullOrWhiteSpace($JwtView)) {
         } else {
             Write-Warn "Task keep-until ainda existe após 60s; verifique auto-delete."
         }
+
+        if (-not [string]::IsNullOrWhiteSpace($Thumbprint)) {
+            $thumb = $Thumbprint.Replace(" ", "").ToUpperInvariant()
+            $cert = Get-ChildItem Cert:\CurrentUser\My | Where-Object { $_.Thumbprint -eq $thumb }
+            if ($null -eq $cert) {
+                Write-Pass "Certificado removido do Cert:\\CurrentUser\\My (thumbprint $thumb)."
+            } else {
+                Write-Warn "Certificado ainda presente no store (thumbprint $thumb)."
+            }
+        } else {
+            Write-Warn "Thumbprint não fornecido; pulando validação do certificado removido."
+        }
     } else {
         Write-Warn "Task keep-until não encontrada. Confirme se o Agent processou o job."
     }
@@ -100,6 +113,7 @@ if (-not [string]::IsNullOrWhiteSpace($DatabaseUrl)) {
         Write-Warn "psql não encontrado. Instale o client ou use docker exec."
     } else {
         & $psql $DatabaseUrl -c "select action, meta_json, timestamp from audit_log where action in ('RETENTION_SET','CERT_REMOVED_18H','CERT_SKIPPED_RETENTION') order by timestamp desc limit 10;"
+        & $psql $DatabaseUrl -c "select action, meta_json, timestamp from audit_log where action = 'CERT_REMOVED_18H' and meta_json->>'mode' = 'keep_until' order by timestamp desc limit 5;"
     }
 } else {
     Write-Warn "DATABASE_URL não fornecido; pulando consulta de auditoria."
