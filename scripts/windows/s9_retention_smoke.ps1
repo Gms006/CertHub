@@ -42,6 +42,7 @@ if (-not [string]::IsNullOrWhiteSpace($JwtView)) {
     }
     $taskName = "CertHub KeepUntil $($scheduledLocal.ToString('yyyyMMdd-HHmm'))"
     Write-Info "Esperando task keep-until: $taskName"
+    Write-Info "Validando que a task foi criada (schtasks /Query deve retornar 0)."
     $foundTask = $false
     for ($i = 0; $i -lt 12; $i++) {
         schtasks /Query /TN $taskName /FO LIST > $null 2>&1

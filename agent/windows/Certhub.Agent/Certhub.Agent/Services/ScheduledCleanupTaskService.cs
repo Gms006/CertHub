@@ -107,12 +107,12 @@ public sealed class ScheduledCleanupTaskService
         }
 
         var taskName = $"{KeepUntilTaskPrefix} {scheduledTime:yyyyMMdd-HHmm}";
-        var taskRun = $"\\\"{normalizedPath}\\\" --cleanup --mode manual";
+        var taskRun = $"{normalizedPath} --cleanup --mode manual";
         var containsPath = false;
         var containsArgs = false;
         try
         {
-            var queryResult = RunSchtasks($"/Query /TN \"{taskName}\" /FO LIST /V");
+            var queryResult = RunSchtasks("/Query", "/TN", taskName, "/FO", "LIST", "/V");
             if (queryResult.ExitCode == 0)
             {
                 containsPath = queryResult.Output.Contains(normalizedPath, StringComparison.OrdinalIgnoreCase);
@@ -129,8 +129,17 @@ public sealed class ScheduledCleanupTaskService
             var date = scheduledTime.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
             var time = scheduledTime.ToString("HH:mm", CultureInfo.InvariantCulture);
             var currentUser = GetCurrentUser();
-            var createArgs =
-                $"/Create /F /Z /TN \"{taskName}\" /SC ONCE /SD \"{date}\" /ST \"{time}\" /RL HIGHEST /RU \"{currentUser}\" /IT /TR \"{taskRun}\"";
+            var createArgs = new[]
+            {
+                "/Create", "/F", "/Z", "/V1",
+                "/TN", taskName,
+                "/SC", "ONCE",
+                "/SD", date,
+                "/ST", time,
+                "/RU", currentUser,
+                "/IT",
+                "/TR", taskRun
+            };
             var createResult = RunSchtasks(createArgs);
             if (createResult.ExitCode == 0)
             {
@@ -139,7 +148,7 @@ public sealed class ScheduledCleanupTaskService
             else
             {
                 _logger.Error(
-                    $"Failed to create keep-until scheduled cleanup task {taskName}. Args: {createArgs} Output: {createResult.Output} Error: {createResult.Error}");
+                    $"Failed to create keep-until scheduled cleanup task {taskName}. Args: {string.Join(' ', createArgs)} Output: {createResult.Output} Error: {createResult.Error}");
             }
         }
         catch (Exception ex)
@@ -150,7 +159,7 @@ public sealed class ScheduledCleanupTaskService
 
     private static string GetCurrentUser()
     {
-        var whoami = RunProcess("whoami.exe", string.Empty);
+        var whoami = RunProcess("whoami.exe");
         if (whoami.ExitCode == 0 && !string.IsNullOrWhiteSpace(whoami.Output))
         {
             return whoami.Output.Trim();
@@ -159,20 +168,24 @@ public sealed class ScheduledCleanupTaskService
         return Environment.UserName;
     }
 
-    private static ProcessResult RunSchtasks(string arguments)
+    private static ProcessResult RunSchtasks(params string[] args)
     {
-        return RunProcess("schtasks.exe", arguments);
+        return RunProcess("schtasks.exe", args);
     }
 
-    private static ProcessResult RunProcess(string fileName, string arguments)
+    private static ProcessResult RunProcess(string fileName, params string[] args)
     {
-        var startInfo = new ProcessStartInfo(fileName, arguments)
+        var startInfo = new ProcessStartInfo(fileName)
         {
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
             CreateNoWindow = true
         };
+        foreach (var arg in args)
+        {
+            startInfo.ArgumentList.Add(arg);
+        }
 
         using var process = Process.Start(startInfo);
         if (process is null)
