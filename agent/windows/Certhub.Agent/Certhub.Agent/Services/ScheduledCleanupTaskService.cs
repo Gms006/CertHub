@@ -107,7 +107,7 @@ public sealed class ScheduledCleanupTaskService
         }
 
         var taskName = $"{KeepUntilTaskPrefix} {scheduledTime:yyyyMMdd-HHmm}";
-        var command = $"\"{normalizedPath}\" --cleanup --mode manual";
+        var taskRun = $"\\\"{normalizedPath}\\\" --cleanup --mode manual";
         var containsPath = false;
         var containsArgs = false;
         try
@@ -128,8 +128,9 @@ public sealed class ScheduledCleanupTaskService
 
             var date = scheduledTime.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
             var time = scheduledTime.ToString("HH:mm", CultureInfo.InvariantCulture);
+            var currentUser = GetCurrentUser();
             var createArgs =
-                $"/Create /F /Z /TN \"{taskName}\" /SC ONCE /SD \"{date}\" /ST \"{time}\" /RL HIGHEST /IT /TR \"{command}\"";
+                $"/Create /F /Z /TN \"{taskName}\" /SC ONCE /SD \"{date}\" /ST \"{time}\" /RL HIGHEST /RU \"{currentUser}\" /IT /TR \"{taskRun}\"";
             var createResult = RunSchtasks(createArgs);
             if (createResult.ExitCode == 0)
             {
@@ -138,7 +139,7 @@ public sealed class ScheduledCleanupTaskService
             else
             {
                 _logger.Error(
-                    $"Failed to create keep-until scheduled cleanup task {taskName}. Output: {createResult.Output} Error: {createResult.Error}");
+                    $"Failed to create keep-until scheduled cleanup task {taskName}. Args: {createArgs} Output: {createResult.Output} Error: {createResult.Error}");
             }
         }
         catch (Exception ex)
@@ -147,9 +148,25 @@ public sealed class ScheduledCleanupTaskService
         }
     }
 
+    private static string GetCurrentUser()
+    {
+        var whoami = RunProcess("whoami.exe", string.Empty);
+        if (whoami.ExitCode == 0 && !string.IsNullOrWhiteSpace(whoami.Output))
+        {
+            return whoami.Output.Trim();
+        }
+
+        return Environment.UserName;
+    }
+
     private static ProcessResult RunSchtasks(string arguments)
     {
-        var startInfo = new ProcessStartInfo("schtasks.exe", arguments)
+        return RunProcess("schtasks.exe", arguments);
+    }
+
+    private static ProcessResult RunProcess(string fileName, string arguments)
+    {
+        var startInfo = new ProcessStartInfo(fileName, arguments)
         {
             RedirectStandardOutput = true,
             RedirectStandardError = true,
@@ -160,7 +177,7 @@ public sealed class ScheduledCleanupTaskService
         using var process = Process.Start(startInfo);
         if (process is null)
         {
-            return new ProcessResult(-1, string.Empty, "Failed to start schtasks.exe");
+            return new ProcessResult(-1, string.Empty, $"Failed to start {fileName}");
         }
 
         var output = process.StandardOutput.ReadToEnd();
