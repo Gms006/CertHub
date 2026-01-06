@@ -28,12 +28,51 @@ if ([string]::IsNullOrWhiteSpace($JwtView) -or [string]::IsNullOrWhiteSpace($Jwt
 $baseUrl = "$ApiBaseUrl$ApiV1Prefix"
 
 if (-not [string]::IsNullOrWhiteSpace($JwtView)) {
-    $keepUntil = (Get-Date).ToUniversalTime().AddHours(2).ToString("o")
+    $keepUntil = (Get-Date).ToUniversalTime().AddMinutes(2).ToString("o")
     $viewResponse = Invoke-RestMethod -Method Post "$baseUrl/certificados/$CertId/install" `
         -Headers @{ Authorization = "Bearer $JwtView" } `
         -ContentType "application/json" `
         -Body (@{ device_id = $DeviceId; cleanup_mode = "KEEP_UNTIL"; keep_until = $keepUntil } | ConvertTo-Json)
     Write-Pass "VIEW criou job KEEP_UNTIL: $($viewResponse.id)"
+
+    $keepUntilLocal = ([DateTimeOffset]::Parse($keepUntil)).ToLocalTime()
+    $scheduledLocal = Get-Date -Date $keepUntilLocal -Second 0 -Millisecond 0
+    if ($keepUntilLocal.Second -gt 0 -or $keepUntilLocal.Millisecond -gt 0) {
+        $scheduledLocal = $scheduledLocal.AddMinutes(1)
+    }
+    $taskName = "CertHub KeepUntil $($scheduledLocal.ToString('yyyyMMdd-HHmm'))"
+    Write-Info "Esperando task keep-until: $taskName"
+    Write-Info "Validando que a task foi criada (schtasks /Query deve retornar 0)."
+    $foundTask = $false
+    for ($i = 0; $i -lt 12; $i++) {
+        schtasks /Query /TN $taskName /FO LIST > $null 2>&1
+        if ($LASTEXITCODE -eq 0) {
+            $foundTask = $true
+            break
+        }
+        Start-Sleep -Seconds 5
+    }
+    if ($foundTask) {
+        Write-Pass "Task keep-until encontrada: $taskName"
+        Write-Info "Disparando task keep-until manualmente."
+        schtasks /Run /TN $taskName > $null 2>&1
+        $deleted = $false
+        for ($i = 0; $i -lt 12; $i++) {
+            Start-Sleep -Seconds 5
+            schtasks /Query /TN $taskName /FO LIST > $null 2>&1
+            if ($LASTEXITCODE -ne 0) {
+                $deleted = $true
+                break
+            }
+        }
+        if ($deleted) {
+            Write-Pass "Task keep-until auto-deletou após execução."
+        } else {
+            Write-Warn "Task keep-until ainda existe após 60s; verifique auto-delete."
+        }
+    } else {
+        Write-Warn "Task keep-until não encontrada. Confirme se o Agent processou o job."
+    }
 }
 
 if (-not [string]::IsNullOrWhiteSpace($JwtAdmin)) {

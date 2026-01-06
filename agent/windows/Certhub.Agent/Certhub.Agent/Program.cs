@@ -25,7 +25,14 @@ internal static class Program
         var exePath = Environment.ProcessPath ?? Application.ExecutablePath;
         scheduledTaskService.EnsureDailyCleanupTask(exePath);
 
-        var agentLoop = new AgentLoop(configStore, secretStore, installedThumbprintsStore, cleanupService, logger);
+        var agentLoop = new AgentLoop(
+            configStore,
+            secretStore,
+            installedThumbprintsStore,
+            cleanupService,
+            scheduledTaskService,
+            exePath,
+            logger);
 
         var context = new TrayAppContext(configStore, secretStore, agentLoop, logger);
         Application.Run(context);
