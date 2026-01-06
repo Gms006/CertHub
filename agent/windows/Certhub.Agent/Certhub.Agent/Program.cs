@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Certhub.Agent.Services;
 using Certhub.Agent.Tray;
 
@@ -25,7 +26,14 @@ internal static class Program
         var exePath = Environment.ProcessPath ?? Application.ExecutablePath;
         scheduledTaskService.EnsureDailyCleanupTask(exePath);
 
-        var agentLoop = new AgentLoop(configStore, secretStore, installedThumbprintsStore, cleanupService, logger);
+        var agentLoop = new AgentLoop(
+            configStore,
+            secretStore,
+            installedThumbprintsStore,
+            cleanupService,
+            scheduledTaskService,
+            exePath,
+            logger);
 
         var context = new TrayAppContext(configStore, secretStore, agentLoop, logger);
         Application.Run(context);
@@ -39,6 +47,11 @@ internal static class Program
         CertificateCleanupService cleanupService,
         Logger logger)
     {
+        var exePath = Environment.ProcessPath ?? Application.ExecutablePath;
+        var whoami = GetWhoami();
+        logger.Info(
+            $"Starting cleanup. Mode={ParseCleanupMode(args)}, ExePath={exePath}, User={Environment.UserName}, WhoAmI={whoami}");
+
         var config = configStore.Load();
         if (config is null || !config.IsValid())
         {
@@ -117,6 +130,11 @@ internal static class Program
         var parts = modeArg.Split('=', 2, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         if (parts.Length == 2)
         {
+            if (string.Equals(parts[1], "keep_until", StringComparison.OrdinalIgnoreCase))
+            {
+                return CleanupMode.KeepUntil;
+            }
+
             if (Enum.TryParse<CleanupMode>(parts[1], true, out var parsed))
             {
                 return parsed;
@@ -124,5 +142,32 @@ internal static class Program
         }
 
         return CleanupMode.Scheduled;
+    }
+
+    private static string GetWhoami()
+    {
+        try
+        {
+            var startInfo = new ProcessStartInfo("whoami.exe")
+            {
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+            using var process = Process.Start(startInfo);
+            if (process is null)
+            {
+                return "unknown";
+            }
+
+            var output = process.StandardOutput.ReadToEnd().Trim();
+            process.WaitForExit();
+            return string.IsNullOrWhiteSpace(output) ? "unknown" : output;
+        }
+        catch
+        {
+            return "unknown";
+        }
     }
 }
