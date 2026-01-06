@@ -22,6 +22,7 @@ PyJWT==2.10.1
 watchdog==5.0.3
 rq==1.16.2
 redis==5.2.1
+openpyxl==3.1.5
 
 # --- Dev/Test ---
 pytest==8.3.4
