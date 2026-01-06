@@ -1,3 +1,4 @@
+import { Download } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import SectionTabs from "../components/SectionTabs";
@@ -56,6 +57,7 @@ const JobsPage = () => {
   const [devices, setDevices] = useState<DeviceRead[]>([]);
   const [loading, setLoading] = useState(true);
   const [deviceFilter, setDeviceFilter] = useState("Todos");
+  const [exportPeriod, setExportPeriod] = useState("last_15_days");
 
   const isAdmin = user?.role_global === "ADMIN" || user?.role_global === "DEV";
   const isView = user?.role_global === "VIEW";
@@ -156,6 +158,37 @@ const JobsPage = () => {
   const formatId = (value: string) =>
     preferences.hideLongIds ? value.slice(0, 8) : value;
 
+  const parseFileName = (contentDisposition: string | null) => {
+    if (!contentDisposition) return null;
+    const match = /filename="([^"]+)"/.exec(contentDisposition);
+    return match?.[1] ?? null;
+  };
+
+  const handleExport = async () => {
+    try {
+      const scope = isAdmin ? "all" : isView ? "my-device" : "mine";
+      const response = await apiFetch(
+        `/install-jobs/export?period=${exportPeriod}&scope=${scope}`,
+      );
+      if (!response.ok) {
+        notify("Não foi possível exportar os jobs.", "error");
+        return;
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      const fileName =
+        parseFileName(response.headers.get("content-disposition")) ??
+        "jobs.xlsx";
+      link.href = url;
+      link.download = fileName;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      notify("Erro ao exportar os jobs.", "error");
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -172,6 +205,15 @@ const JobsPage = () => {
           {filteredJobs.length} jobs encontrados
         </p>
         <div className="flex flex-wrap items-center gap-3">
+          <select
+            className="h-10 rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-600"
+            value={exportPeriod}
+            onChange={(event) => setExportPeriod(event.target.value)}
+          >
+            <option value="last_15_days">Últimos 15 dias</option>
+            <option value="this_month">Este mês</option>
+            <option value="last_6_months">Últimos 6 meses</option>
+          </select>
           {isAdmin ? (
             <select
               className="h-10 rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-600"
@@ -186,6 +228,13 @@ const JobsPage = () => {
               ))}
             </select>
           ) : null}
+          <button
+            className="flex h-10 items-center gap-2 rounded-2xl border border-slate-200 px-4 text-sm text-slate-600"
+            onClick={handleExport}
+          >
+            <Download className="h-4 w-4" />
+            Exportar Excel
+          </button>
           <button
             className="h-10 rounded-2xl border border-slate-200 px-4 text-sm text-slate-600"
             onClick={loadJobs}
