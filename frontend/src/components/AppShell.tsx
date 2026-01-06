@@ -11,6 +11,7 @@ const AppShell = () => {
   const { preferences, updatePreferences } = usePreferences();
   const displayName =
     user?.nome || user?.ad_username || user?.email || "Usuário";
+  const isDev = user?.role_global === "DEV";
   const [preferencesOpen, setPreferencesOpen] = useState(false);
   const [deviceOptions, setDeviceOptions] = useState<
     { id: string; hostname: string; assigned_user?: { ad_username?: string } | null }[]
@@ -255,6 +256,16 @@ const AppShell = () => {
             ))}
           </select>
         </label>
+        {isDev ? (
+          <a
+            className="inline-flex h-10 items-center justify-center rounded-2xl border border-slate-200 px-4 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
+            href="/docs"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Abrir Swagger
+          </a>
+        ) : null}
         <p className="text-[11px] text-slate-400">
           Preferências ficam salvas localmente neste navegador.
         </p>
