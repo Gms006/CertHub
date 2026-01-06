@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     set_password_token_ttl_min: int = Field(10, alias="SET_PASSWORD_TOKEN_TTL_MIN")
     reset_password_token_ttl_min: int = Field(30, alias="RESET_PASSWORD_TOKEN_TTL_MIN")
     bcrypt_cost: int = Field(12, alias="BCRYPT_COST")
+    retention_keep_until_max_hours: int = Field(24, alias="RETENTION_KEEP_UNTIL_MAX_HOURS")
     lockout_max_attempts: int = Field(5, alias="LOCKOUT_MAX_ATTEMPTS")
     lockout_minutes: int = Field(15, alias="LOCKOUT_MINUTES")
     cookie_secure: bool = Field(True, alias="COOKIE_SECURE")

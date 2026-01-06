@@ -35,6 +35,9 @@ class AgentPayloadResponse(BaseModel):
     password: str
     source_path: str
     generated_at: datetime
+    cleanup_mode: Literal["DEFAULT", "KEEP_UNTIL", "EXEMPT"] | None = None
+    keep_until: datetime | None = None
+    keep_reason: str | None = None
 
 
 class AgentCleanupEvent(BaseModel):
@@ -42,6 +45,8 @@ class AgentCleanupEvent(BaseModel):
     failed_count: int
     removed_thumbprints: list[str] | None = None
     failed_thumbprints: list[str] | None = None
+    skipped_count: int | None = None
+    skipped_thumbprints: list[str] | None = None
     mode: Literal["scheduled", "fallback", "manual"]
     ran_at_local: str | None = None
 

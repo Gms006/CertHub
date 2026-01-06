@@ -31,8 +31,43 @@ Objetivo: substituir o diretório público de `.pfx` por um fluxo controlado via
 
 ## S9 — Retenção e cleanup configurável
 
-- Planejamento para política de retenção por job/usuário (KEEP_UNTIL / EXEMPT).
+- Política de retenção por job/usuário (KEEP_UNTIL / EXEMPT) com RBAC.
 - Próximos stages planejados: S10 TLS/HTTPS, S11 Hardening Web, S12 Secrets, S13 Multi-tenant, S14 LGPD retenção, S15 DSAR, S16 Backups, S17 Observabilidade, S18 Empacotamento, S19 Jurídico.
+
+### S9 Smoke test
+
+PowerShell (VIEW + ADMIN/DEV):
+
+```powershell
+.\scripts\windows\s9_retention_smoke.ps1 -CertId <CERT_ID> -DeviceId <DEVICE_ID> `
+  -JwtView <JWT_VIEW> -JwtAdmin <JWT_ADMIN>
+```
+
+Exemplos de curl:
+
+```bash
+# VIEW: KEEP_UNTIL (dentro do limite)
+curl -X POST "http://localhost:8010/api/v1/certificados/<CERT_ID>/install" \
+  -H "Authorization: Bearer <JWT_VIEW>" \
+  -H "Content-Type: application/json" \
+  -d '{"device_id":"<DEVICE_ID>","cleanup_mode":"KEEP_UNTIL","keep_until":"2025-03-01T18:00:00Z"}'
+
+# ADMIN/DEV: EXEMPT
+curl -X POST "http://localhost:8010/api/v1/certificados/<CERT_ID>/install" \
+  -H "Authorization: Bearer <JWT_ADMIN>" \
+  -H "Content-Type: application/json" \
+  -d '{"device_id":"<DEVICE_ID>","cleanup_mode":"EXEMPT","keep_reason":"Fechamento fiscal"}'
+```
+
+Consulta de auditoria (psql):
+
+```sql
+select action, meta_json, timestamp
+from audit_log
+where action in ('RETENTION_SET','CERT_REMOVED_18H','CERT_SKIPPED_RETENTION')
+order by timestamp desc
+limit 10;
+```
 
 ### Como rodar o smoke test
 

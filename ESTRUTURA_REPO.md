@@ -78,7 +78,8 @@ certhub/
 │  │     ├─ 0009_job_payload_tokens.py
 │  │     ├─ 0010_device_auto_approve.py
 │  │     ├─ 0010_merge_0009_heads_merge_0009_heads.py
-│  │     └─ 0011_merge_0010_heads.py
+│  │     ├─ 0011_merge_0010_heads.py
+│  │     └─ 0012_s9_retention_fields.py
 │  ├─ tests/
 │  │  ├─ __init__.py
 │  │  ├─ conftest.py
@@ -89,6 +90,7 @@ certhub/
 │  │  ├─ test_agent_payload_hardening.py
 │  │  ├─ test_certificate_ingest.py
 │  │  ├─ test_jobs_certificates_delete.py
+│  │  ├─ test_s9_retention_policy.py
 │  │  ├─ test_workers_queue.py
 │  │  └─ test_rbac_jobs.py
 │  ├─ alembic.ini
@@ -183,7 +185,8 @@ certhub/
 │     ├─ deploy_agent.ps1
 │     ├─ install_agent.ps1
 │     ├─ publish_agent.ps1
-│     └─ s8_smoke.ps1
+│     ├─ s8_smoke.ps1
+│     └─ s9_retention_smoke.ps1
 │
 ├─ .env.example
 ├─ .gitignore

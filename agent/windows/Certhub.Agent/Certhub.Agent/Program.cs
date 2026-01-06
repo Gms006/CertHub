@@ -83,6 +83,8 @@ internal static class Program
                 FailedCount = result.FailedCount,
                 RemovedThumbprints = result.RemovedThumbprints.ToList(),
                 FailedThumbprints = result.FailedThumbprints.ToList(),
+                SkippedCount = result.SkippedCount,
+                SkippedThumbprints = result.SkippedThumbprints.ToList(),
                 Mode = result.Mode.ToString().ToLowerInvariant(),
                 RanAtLocal = result.RanAtLocal.ToString("o"),
             }, CancellationToken.None).GetAwaiter().GetResult();
