@@ -67,7 +67,15 @@ def resolve_period_range(period: ExportPeriod) -> tuple[datetime, datetime]:
 def format_datetime(value: datetime | None) -> str:
     if value is None:
         return ""
-    return value.isoformat()
+    return value.strftime("%d/%m/%Y %H:%M:%S")
+
+
+def sanitize_certificate_name(value: str) -> str:
+    marker = "Senha"
+    if marker not in value:
+        return value
+    before, _separator, _after = value.partition(marker)
+    return before.rstrip(" -:").strip()
 
 
 @router.get("/export")
@@ -153,7 +161,7 @@ async def export_install_jobs(
         sheet.append(
             [
                 str(job.id),
-                cert_name,
+                sanitize_certificate_name(cert_name),
                 device_name,
                 job.status,
                 requester,
