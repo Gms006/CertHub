@@ -209,6 +209,8 @@ public sealed class AgentLoop
                 FailedCount = result.FailedCount,
                 RemovedThumbprints = result.RemovedThumbprints.ToList(),
                 FailedThumbprints = result.FailedThumbprints.ToList(),
+                SkippedCount = result.SkippedCount,
+                SkippedThumbprints = result.SkippedThumbprints.ToList(),
                 Mode = result.Mode.ToString().ToLowerInvariant(),
                 RanAtLocal = result.RanAtLocal.ToString("o"),
             }, cancellationToken);
@@ -362,11 +364,31 @@ public sealed class AgentLoop
         }
 
         var normalized = thumbprint.Replace(" ", string.Empty).ToUpperInvariant();
-        var stored = _thumbprintsStore.Load(_configStore.InstalledThumbprintsPath).ToList();
-        if (!stored.Contains(normalized, StringComparer.OrdinalIgnoreCase))
+        var stored = _thumbprintsStore.LoadEntries(_configStore.InstalledThumbprintsPath).ToList();
+        var existingEntry = stored.FirstOrDefault(entry =>
+            string.Equals(entry.Thumbprint, normalized, StringComparison.OrdinalIgnoreCase));
+        if (existingEntry is not null)
         {
-            stored.Add(normalized);
-            _thumbprintsStore.Save(_configStore.InstalledThumbprintsPath, stored);
+            existingEntry.JobId = payload.JobId;
+            existingEntry.CleanupMode = payload.CleanupMode ?? "DEFAULT";
+            existingEntry.KeepUntil = payload.KeepUntil;
+            existingEntry.KeepReason = payload.KeepReason;
+            existingEntry.InstalledAt = DateTimeOffset.UtcNow;
+            _thumbprintsStore.SaveEntries(_configStore.InstalledThumbprintsPath, stored);
+            _logger.Info($"Updated retention policy for thumbprint: {normalized}");
+        }
+        else
+        {
+            stored.Add(new InstalledThumbprintEntry
+            {
+                Thumbprint = normalized,
+                JobId = payload.JobId,
+                CleanupMode = payload.CleanupMode ?? "DEFAULT",
+                KeepUntil = payload.KeepUntil,
+                KeepReason = payload.KeepReason,
+                InstalledAt = DateTimeOffset.UtcNow
+            });
+            _thumbprintsStore.SaveEntries(_configStore.InstalledThumbprintsPath, stored);
             _logger.Info($"Installed thumbprint persisted via DPAPI: {normalized}");
         }
 

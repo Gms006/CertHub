@@ -3,6 +3,9 @@ from app.models.auth_token import AuthToken
 from app.models.certificate import Certificate
 from app.models.cert_install_job import (
     CertInstallJob,
+    CLEANUP_MODE_DEFAULT,
+    CLEANUP_MODE_EXEMPT,
+    CLEANUP_MODE_KEEP_UNTIL,
     JOB_STATUS_CANCELED,
     JOB_STATUS_DONE,
     JOB_STATUS_EXPIRED,
@@ -22,6 +25,9 @@ __all__ = [
     "UserSession",
     "Certificate",
     "CertInstallJob",
+    "CLEANUP_MODE_DEFAULT",
+    "CLEANUP_MODE_KEEP_UNTIL",
+    "CLEANUP_MODE_EXEMPT",
     "JOB_STATUS_REQUESTED",
     "JOB_STATUS_PENDING",
     "JOB_STATUS_IN_PROGRESS",

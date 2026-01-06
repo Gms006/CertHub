@@ -25,6 +25,10 @@ JOB_STATUS_FAILED = "FAILED"
 JOB_STATUS_EXPIRED = "EXPIRED"
 JOB_STATUS_CANCELED = "CANCELED"
 
+CLEANUP_MODE_DEFAULT = "DEFAULT"
+CLEANUP_MODE_KEEP_UNTIL = "KEEP_UNTIL"
+CLEANUP_MODE_EXEMPT = "EXEMPT"
+
 
 class CertInstallJob(Base):
     __tablename__ = "cert_install_jobs"
@@ -61,6 +65,15 @@ class CertInstallJob(Base):
     payload_token_device_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("devices.id", ondelete="SET NULL"), nullable=True
     )
+    cleanup_mode: Mapped[str] = mapped_column(
+        String, nullable=False, server_default=text(f"'{CLEANUP_MODE_DEFAULT}'")
+    )
+    keep_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    keep_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    keep_set_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    keep_set_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     status: Mapped[str] = mapped_column(String, nullable=False, default=JOB_STATUS_REQUESTED)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

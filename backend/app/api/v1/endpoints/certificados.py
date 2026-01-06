@@ -2,18 +2,22 @@ from __future__ import annotations
 
 import re
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.audit import log_audit
+from app.core.config import settings
 from app.core.security import require_admin_or_dev, require_view_or_higher
 from app.db.session import get_db
 from app.models import (
     CertInstallJob,
     Certificate,
+    CLEANUP_MODE_DEFAULT,
+    CLEANUP_MODE_EXEMPT,
+    CLEANUP_MODE_KEEP_UNTIL,
     Device,
     JOB_STATUS_PENDING,
     JOB_STATUS_REQUESTED,
@@ -134,6 +138,7 @@ async def create_install_job(
 
     auto_approved = False
     auto_reason = None
+    now = datetime.now(timezone.utc)
     if current_user.role_global in {"DEV", "ADMIN"}:
         initial_status = JOB_STATUS_PENDING
         auto_approved = True
@@ -149,16 +154,66 @@ async def create_install_job(
     else:
         initial_status = JOB_STATUS_REQUESTED
 
+    cleanup_mode = payload.cleanup_mode or CLEANUP_MODE_DEFAULT
+    keep_until = payload.keep_until
+    keep_reason = payload.keep_reason
+    keep_set_by_user_id = None
+    keep_set_at = None
+
+    if cleanup_mode == CLEANUP_MODE_KEEP_UNTIL:
+        if keep_until is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="keep_until is required when cleanup_mode is KEEP_UNTIL",
+            )
+        if keep_until.tzinfo is None:
+            keep_until = keep_until.replace(tzinfo=timezone.utc)
+        if keep_until <= now:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="keep_until must be in the future",
+            )
+        if current_user.role_global == "VIEW":
+            max_until = now + timedelta(hours=settings.retention_keep_until_max_hours)
+            if keep_until > max_until:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="keep_until exceeds retention limit for VIEW role",
+                )
+        keep_set_by_user_id = current_user.id
+        keep_set_at = now
+    elif cleanup_mode == CLEANUP_MODE_EXEMPT:
+        if current_user.role_global not in {"DEV", "ADMIN"}:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, detail="cleanup_mode EXEMPT not allowed"
+            )
+        if not keep_reason:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="keep_reason is required when cleanup_mode is EXEMPT",
+            )
+        keep_set_by_user_id = current_user.id
+        keep_set_at = now
+    else:
+        cleanup_mode = CLEANUP_MODE_DEFAULT
+        keep_until = None
+        keep_reason = None
+
     job = CertInstallJob(
         org_id=current_user.org_id,
         cert_id=certificate.id,
         device_id=device.id,
         requested_by_user_id=current_user.id,
         status=initial_status,
+        cleanup_mode=cleanup_mode,
+        keep_until=keep_until,
+        keep_reason=keep_reason,
+        keep_set_by_user_id=keep_set_by_user_id,
+        keep_set_at=keep_set_at,
     )
     if auto_approved:
         job.approved_by_user_id = current_user.id
-        job.approved_at = datetime.now(timezone.utc)
+        job.approved_at = now
     db.add(job)
     db.flush()
     log_audit(
@@ -175,6 +230,23 @@ async def create_install_job(
             "requested_by_user_id": str(current_user.id),
         },
     )
+    if cleanup_mode != CLEANUP_MODE_DEFAULT:
+        log_audit(
+            db=db,
+            org_id=current_user.org_id,
+            action="RETENTION_SET",
+            entity_type="cert_install_job",
+            entity_id=job.id,
+            actor_user_id=current_user.id,
+            meta={
+                "job_id": str(job.id),
+                "cert_id": str(certificate.id),
+                "device_id": str(device.id),
+                "cleanup_mode": cleanup_mode,
+                "keep_until": keep_until.isoformat() if keep_until else None,
+                "keep_reason": keep_reason,
+            },
+        )
     if auto_approved:
         log_audit(
             db=db,

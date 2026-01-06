@@ -1238,7 +1238,7 @@ limit 20;
 - Por **JOB** (ADMIN/DEV): isento do cleanup automático (`EXEMPT`) **com motivo obrigatório**.
 - Por **USUÁRIO/role**: controlar quem pode escolher `KEEP_UNTIL`/`EXEMPT` (estilo auto-approve).
 
-**Status**: 🔄 **Em execução**
+**Status**: ✅ **Concluído**
 
 **Entregáveis**
 
@@ -1255,6 +1255,14 @@ limit 20;
 - `KEEP_UNTIL` não remove antes do prazo.
 - `EXEMPT` não remove automaticamente.
 - Tudo auditado com usuário/device/job.
+
+**Evidências**
+
+- Migração: `backend/alembic/versions/0012_s9_retention_fields.py`.
+- Backend RBAC + audit: `backend/app/api/v1/endpoints/certificados.py`.
+- Payload com policy: `backend/app/api/v1/endpoints/agent.py`.
+- Agent DPAPI + cleanup: `agent/windows/Certhub.Agent/Certhub.Agent/Services/InstalledThumbprintsStore.cs` e `CertificateCleanupService.cs`.
+- UI: `frontend/src/pages/Certificates.tsx`.
 
 **Rollback curto (S9)**
 

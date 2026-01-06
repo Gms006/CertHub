@@ -107,10 +107,27 @@ def agent_cleanup_event(
             "failed_count": payload.failed_count,
             "removed_thumbprints": payload.removed_thumbprints,
             "failed_thumbprints": payload.failed_thumbprints,
+            "skipped_count": payload.skipped_count,
+            "skipped_thumbprints": payload.skipped_thumbprints,
             "mode": payload.mode,
             "ran_at_local": payload.ran_at_local,
         },
     )
+    if payload.skipped_count:
+        log_audit(
+            db=db,
+            org_id=device.org_id,
+            action="CERT_SKIPPED_RETENTION",
+            entity_type="cert_cleanup",
+            actor_device_id=device.id,
+            meta={
+                "device_id": str(device.id),
+                "skipped_count": payload.skipped_count,
+                "skipped_thumbprints": payload.skipped_thumbprints,
+                "mode": payload.mode,
+                "ran_at_local": payload.ran_at_local,
+            },
+        )
     db.commit()
     return {"status": "ok"}
 
@@ -421,6 +438,9 @@ def job_payload(
         password=password,
         source_path=str(path),
         generated_at=datetime.now(timezone.utc),
+        cleanup_mode=locked_job.cleanup_mode,
+        keep_until=locked_job.keep_until,
+        keep_reason=locked_job.keep_reason,
     )
 
 

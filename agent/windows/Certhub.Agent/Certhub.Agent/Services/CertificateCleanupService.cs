@@ -20,29 +20,42 @@ public sealed class CertificateCleanupService
 
     public CleanupResult Run(CleanupMode mode)
     {
-        var storedThumbprints = _thumbprintsStore.Load(_configStore.InstalledThumbprintsPath).ToList();
-        var normalizedThumbprints = storedThumbprints
-            .Select(t => t.Replace(" ", string.Empty).ToUpperInvariant())
-            .Distinct(StringComparer.OrdinalIgnoreCase)
+        var entries = _thumbprintsStore.LoadEntries(_configStore.InstalledThumbprintsPath).ToList();
+        var normalizedEntries = entries
+            .Where(entry => !string.IsNullOrWhiteSpace(entry.Thumbprint))
+            .GroupBy(entry => entry.Thumbprint.Replace(" ", string.Empty).ToUpperInvariant())
+            .Select(group =>
+            {
+                var entry = SelectBestEntry(group);
+                entry.Thumbprint = group.Key;
+                return entry;
+            })
             .ToList();
 
-        _logger.Info($"Starting cleanup ({mode}). Total stored thumbprints: {normalizedThumbprints.Count}.");
+        _logger.Info($"Starting cleanup ({mode}). Total stored thumbprints: {normalizedEntries.Count}.");
 
         var removed = new List<string>();
         var failed = new List<string>();
+        var skipped = new List<string>();
 
         using var store = new X509Store(StoreName.My, StoreLocation.CurrentUser);
         store.Open(OpenFlags.ReadWrite);
 
-        foreach (var thumbprint in normalizedThumbprints)
+        foreach (var entry in normalizedEntries)
         {
+            if (ShouldSkipRetention(entry))
+            {
+                skipped.Add(entry.Thumbprint);
+                continue;
+            }
+
             try
             {
-                var existing = store.Certificates.Find(X509FindType.FindByThumbprint, thumbprint, false);
+                var existing = store.Certificates.Find(X509FindType.FindByThumbprint, entry.Thumbprint, false);
                 if (existing.Count == 0)
                 {
-                    removed.Add(thumbprint);
-                    _logger.Warn($"Thumbprint not found in store (already removed): {thumbprint}");
+                    removed.Add(entry.Thumbprint);
+                    _logger.Warn($"Thumbprint not found in store (already removed): {entry.Thumbprint}");
                     continue;
                 }
 
@@ -51,31 +64,75 @@ public sealed class CertificateCleanupService
                     store.Remove(cert);
                 }
 
-                removed.Add(thumbprint);
-                _logger.Info($"Removed certificate thumbprint: {thumbprint}");
+                removed.Add(entry.Thumbprint);
+                _logger.Info($"Removed certificate thumbprint: {entry.Thumbprint}");
             }
             catch (Exception ex)
             {
-                failed.Add(thumbprint);
-                _logger.Error($"Failed to remove certificate thumbprint: {thumbprint}", ex);
+                failed.Add(entry.Thumbprint);
+                _logger.Error($"Failed to remove certificate thumbprint: {entry.Thumbprint}", ex);
             }
         }
 
-        var remaining = normalizedThumbprints
-            .Where(tp => failed.Contains(tp, StringComparer.OrdinalIgnoreCase))
+        var remaining = normalizedEntries
+            .Where(entry =>
+                failed.Contains(entry.Thumbprint, StringComparer.OrdinalIgnoreCase) ||
+                skipped.Contains(entry.Thumbprint, StringComparer.OrdinalIgnoreCase))
             .ToList();
 
-        _thumbprintsStore.Save(_configStore.InstalledThumbprintsPath, remaining);
+        _thumbprintsStore.SaveEntries(_configStore.InstalledThumbprintsPath, remaining);
 
         _logger.Info(
-            $"Cleanup finished. Total: {normalizedThumbprints.Count}, Removed: {removed.Count}, Failed: {failed.Count}.");
+            $"Cleanup finished. Total: {normalizedEntries.Count}, Removed: {removed.Count}, Failed: {failed.Count}, Skipped: {skipped.Count}.");
 
         return new CleanupResult(
             mode,
             DateTimeOffset.Now,
-            normalizedThumbprints.Count,
+            normalizedEntries.Count,
             removed,
-            failed);
+            failed,
+            skipped);
+    }
+
+    private static bool ShouldSkipRetention(InstalledThumbprintEntry entry)
+    {
+        var mode = entry.CleanupMode?.ToUpperInvariant() ?? "DEFAULT";
+        if (mode == "EXEMPT")
+        {
+            return true;
+        }
+        if (mode == "KEEP_UNTIL" && entry.KeepUntil.HasValue)
+        {
+            return DateTimeOffset.UtcNow < entry.KeepUntil.Value;
+        }
+        return false;
+    }
+
+    private static InstalledThumbprintEntry SelectBestEntry(IEnumerable<InstalledThumbprintEntry> entries)
+    {
+        var list = entries.ToList();
+        var exempt = list
+            .Where(entry => string.Equals(entry.CleanupMode, "EXEMPT", StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(entry => entry.InstalledAt ?? DateTimeOffset.MinValue)
+            .FirstOrDefault();
+        if (exempt is not null)
+        {
+            return exempt;
+        }
+
+        var keepUntil = list
+            .Where(entry => string.Equals(entry.CleanupMode, "KEEP_UNTIL", StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(entry => entry.KeepUntil ?? DateTimeOffset.MinValue)
+            .ThenByDescending(entry => entry.InstalledAt ?? DateTimeOffset.MinValue)
+            .FirstOrDefault();
+        if (keepUntil is not null)
+        {
+            return keepUntil;
+        }
+
+        return list
+            .OrderByDescending(entry => entry.InstalledAt ?? DateTimeOffset.MinValue)
+            .First();
     }
 }
 
@@ -91,11 +148,14 @@ public sealed record CleanupResult(
     DateTimeOffset RanAtLocal,
     int TotalThumbprints,
     IReadOnlyList<string> RemovedThumbprints,
-    IReadOnlyList<string> FailedThumbprints)
+    IReadOnlyList<string> FailedThumbprints,
+    IReadOnlyList<string> SkippedThumbprints)
 {
     public int RemovedCount => RemovedThumbprints.Count;
 
     public int FailedCount => FailedThumbprints.Count;
+
+    public int SkippedCount => SkippedThumbprints.Count;
 
     public bool Success => FailedCount == 0;
 }

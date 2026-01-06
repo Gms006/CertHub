@@ -312,6 +312,11 @@ const CertificatesPage = () => {
   const [installCertificateId, setInstallCertificateId] = useState<string | null>(null);
   const [selectedCertificate, setSelectedCertificate] = useState<CertificateRead | null>(null);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
+  const [cleanupMode, setCleanupMode] = useState<"DEFAULT" | "KEEP_UNTIL" | "EXEMPT">(
+    "DEFAULT",
+  );
+  const [keepUntil, setKeepUntil] = useState("");
+  const [keepReason, setKeepReason] = useState("");
   const pageSize = preferences.pageSize;
   const isAdmin = user?.role_global === "ADMIN" || user?.role_global === "DEV";
   const isView = user?.role_global === "VIEW";
@@ -499,6 +504,9 @@ const CertificatesPage = () => {
       setSelectedCertificate(null);
     }
     setSelectedDeviceId(null);
+    setCleanupMode("DEFAULT");
+    setKeepUntil("");
+    setKeepReason("");
     setInstallModalOpen(true);
   };
 
@@ -508,11 +516,34 @@ const CertificatesPage = () => {
       notify("Selecione certificado e dispositivo.", "error");
       return;
     }
+    if (cleanupMode === "KEEP_UNTIL" && !keepUntil) {
+      notify("Informe a data/hora para manter o certificado.", "error");
+      return;
+    }
+    if (cleanupMode === "EXEMPT" && !keepReason.trim()) {
+      notify("Informe o motivo da isenção de cleanup.", "error");
+      return;
+    }
     try {
+      const payload: Record<string, string> = {
+        device_id: selectedDeviceId,
+        cleanup_mode: cleanupMode,
+      };
+      if (cleanupMode === "KEEP_UNTIL") {
+        const parsedDate = new Date(keepUntil);
+        if (Number.isNaN(parsedDate.getTime())) {
+          notify("Data/hora inválida para retenção.", "error");
+          return;
+        }
+        payload.keep_until = parsedDate.toISOString();
+      }
+      if (cleanupMode === "EXEMPT") {
+        payload.keep_reason = keepReason.trim();
+      }
       const response = await apiFetch(`/certificados/${certId}/install`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ device_id: selectedDeviceId }),
+        body: JSON.stringify(payload),
       });
       if (!response.ok) {
         const data = (await response.json()) as { detail?: string };
@@ -523,6 +554,9 @@ const CertificatesPage = () => {
       setInstallModalOpen(false);
       setInstallCertificateId(null);
       setSelectedDeviceId(null);
+      setCleanupMode("DEFAULT");
+      setKeepUntil("");
+      setKeepReason("");
       loadJobs();
     } catch {
       notify("Falha ao criar job.", "error");
@@ -848,6 +882,44 @@ const CertificatesPage = () => {
               })}
             </select>
           </label>
+
+          <label className="block text-xs font-semibold text-slate-500">
+            Política de retenção
+            <select
+              className="mt-2 h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-600"
+              value={cleanupMode}
+              onChange={(event) =>
+                setCleanupMode(event.target.value as "DEFAULT" | "KEEP_UNTIL" | "EXEMPT")
+              }
+            >
+              <option value="DEFAULT">Remover às 18:00 (padrão)</option>
+              <option value="KEEP_UNTIL">Manter até data/hora</option>
+              {isAdmin && <option value="EXEMPT">Isento de cleanup automático</option>}
+            </select>
+          </label>
+
+          {cleanupMode === "KEEP_UNTIL" ? (
+            <label className="block text-xs font-semibold text-slate-500">
+              Manter até
+              <input
+                type="datetime-local"
+                className="mt-2 h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-600"
+                value={keepUntil}
+                onChange={(event) => setKeepUntil(event.target.value)}
+              />
+            </label>
+          ) : null}
+
+          {cleanupMode === "EXEMPT" ? (
+            <label className="block text-xs font-semibold text-slate-500">
+              Motivo da isenção
+              <textarea
+                className="mt-2 min-h-[96px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600"
+                value={keepReason}
+                onChange={(event) => setKeepReason(event.target.value)}
+              />
+            </label>
+          ) : null}
 
           <p className="text-[11px] text-slate-500">
             Dica: dispositivos “bloqueados” não receberão payload do job.

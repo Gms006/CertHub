@@ -213,6 +213,15 @@ public sealed class AgentClient
 
         [JsonPropertyName("generated_at")]
         public DateTimeOffset GeneratedAt { get; set; }
+
+        [JsonPropertyName("cleanup_mode")]
+        public string? CleanupMode { get; set; }
+
+        [JsonPropertyName("keep_until")]
+        public DateTimeOffset? KeepUntil { get; set; }
+
+        [JsonPropertyName("keep_reason")]
+        public string? KeepReason { get; set; }
     }
 
     public sealed class ResultUpdate
@@ -243,6 +252,12 @@ public sealed class AgentClient
 
         [JsonPropertyName("failed_thumbprints")]
         public List<string>? FailedThumbprints { get; set; }
+
+        [JsonPropertyName("skipped_count")]
+        public int? SkippedCount { get; set; }
+
+        [JsonPropertyName("skipped_thumbprints")]
+        public List<string>? SkippedThumbprints { get; set; }
 
         [JsonPropertyName("mode")]
         public string Mode { get; set; } = string.Empty;
