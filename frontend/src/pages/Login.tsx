@@ -252,7 +252,7 @@ const Login = () => {
                     <div>
                       <p className="text-sm font-semibold">Maria Clara</p>
                       <p className="text-xs text-slate-500">
-                        Neto Contabilidade
+                        Developer
                       </p>
                     </div>
                   </div>
