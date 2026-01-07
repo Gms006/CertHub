@@ -354,6 +354,8 @@ def update_device(
             changes[field] = [old_value, value]
 
     apply_change("is_allowed", payload.is_allowed)
+    apply_change("allow_keep_until", payload.allow_keep_until)
+    apply_change("allow_exempt", payload.allow_exempt)
     if payload.auto_approve is not None:
         if current_user.role_global != "DEV":
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
