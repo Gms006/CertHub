@@ -320,8 +320,9 @@ const CertificatesPage = () => {
   const [keepUntil, setKeepUntil] = useState("");
   const [keepReason, setKeepReason] = useState("");
   const pageSize = preferences.pageSize;
-  const isAdmin = user?.role_global === "ADMIN" || user?.role_global === "DEV";
-  const isView = user?.role_global === "VIEW";
+  const role = user?.role_global ?? "VIEW";
+  const isAdmin = role === "ADMIN" || role === "DEV";
+  const isView = role === "VIEW";
 
   const loadCertificates = async () => {
     setLoading(true);
