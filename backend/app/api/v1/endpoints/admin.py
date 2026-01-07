@@ -353,6 +353,10 @@ def update_device(
             setattr(device, field, value)
             changes[field] = [old_value, value]
 
+    if payload.allow_keep_until is not None or payload.allow_exempt is not None:
+        if current_user.role_global != "DEV":
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
+
     apply_change("is_allowed", payload.is_allowed)
     apply_change("allow_keep_until", payload.allow_keep_until)
     apply_change("allow_exempt", payload.allow_exempt)
