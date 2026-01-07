@@ -114,6 +114,16 @@ schtasks /Query /TN "CertHub KeepUntil YYYYMMDD-HHmm" /V /FO LIST
 schtasks /Run /TN "CertHub KeepUntil YYYYMMDD-HHmm"
 ```
 
+### KEEP_UNTIL (one-shot auto-delete)
+Quando um job chega com `cleanup_mode=KEEP_UNTIL`, o Agent cria uma task única no horário local do `keep_until`.
+Ela executa o cleanup com `--mode keep_until` (audit_log com `meta_json.mode = "keep_until"`).
+No Windows Task Scheduler, essa task é criada como V1 com `/V1` e o próprio Agent remove a task após a execução.
+
+```powershell
+schtasks /Query /TN "CertHub KeepUntil YYYYMMDD-HHmm" /V /FO LIST
+schtasks /Run /TN "CertHub KeepUntil YYYYMMDD-HHmm"
+```
+
 ### Remover task
 ```powershell
 Unregister-ScheduledTask -TaskName "CertHub Cleanup 18h" -Confirm:$false
