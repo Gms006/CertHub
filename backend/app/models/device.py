@@ -34,6 +34,8 @@ class Device(Base):
     last_heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     is_allowed: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
     auto_approve: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
+    allow_keep_until: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
+    allow_exempt: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
