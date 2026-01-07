@@ -512,7 +512,7 @@ const CertificatesPage = () => {
   );
   const deviceAllowsKeepUntil = selectedDevice?.allow_keep_until ?? true;
   const deviceAllowsExempt = selectedDevice?.allow_exempt ?? true;
-  const roleAllowsExempt = !isView;
+  const roleAllowsExempt = true;
   const showKeepUntilOption = Boolean(selectedDevice && deviceAllowsKeepUntil);
   const showExemptOption = Boolean(
     selectedDevice && deviceAllowsExempt && roleAllowsExempt,
