@@ -78,23 +78,29 @@ def test_list_devices_returns_auto_approve_and_patch_updates(test_client_and_ses
     client, SessionLocal = test_client_and_session
     with SessionLocal() as db:
         dev = create_user(db, role="DEV")
-        device = create_device(db, auto_approve=False)
+        device = create_device(db, auto_approve=False, allow_keep_until=False, allow_exempt=False)
 
     list_response = client.get("/api/v1/admin/devices", headers=headers(dev))
     assert list_response.status_code == 200
     payload = list_response.json()
     listed = next(item for item in payload if item["id"] == str(device.id))
     assert listed["auto_approve"] is False
+    assert listed["allow_keep_until"] is False
+    assert listed["allow_exempt"] is False
 
     patch_response = client.patch(
         f"/api/v1/admin/devices/{device.id}",
-        json={"auto_approve": True},
+        json={"auto_approve": True, "allow_keep_until": True, "allow_exempt": True},
         headers=headers(dev),
     )
     assert patch_response.status_code == 200
     assert patch_response.json()["auto_approve"] is True
+    assert patch_response.json()["allow_keep_until"] is True
+    assert patch_response.json()["allow_exempt"] is True
 
     list_response = client.get("/api/v1/admin/devices", headers=headers(dev))
     payload = list_response.json()
     listed = next(item for item in payload if item["id"] == str(device.id))
     assert listed["auto_approve"] is True
+    assert listed["allow_keep_until"] is True
+    assert listed["allow_exempt"] is True

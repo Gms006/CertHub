@@ -22,11 +22,19 @@ def create_user(
     return user
 
 
-def create_device(db: Session, *, auto_approve: bool = False) -> models.Device:
+def create_device(
+    db: Session,
+    *,
+    auto_approve: bool = False,
+    allow_keep_until: bool = True,
+    allow_exempt: bool = True,
+) -> models.Device:
     device = models.Device(
         org_id=1,
         hostname=f"device-{uuid.uuid4().hex[:6]}",
         auto_approve=auto_approve,
+        allow_keep_until=allow_keep_until,
+        allow_exempt=allow_exempt,
     )
     db.add(device)
     db.commit()
