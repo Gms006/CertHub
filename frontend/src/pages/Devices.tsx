@@ -42,6 +42,9 @@ const DevicesPage = () => {
   const [loading, setLoading] = useState(true);
   const [selectedDevice, setSelectedDevice] = useState<DeviceRead | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [retentionUpdating, setRetentionUpdating] = useState<Record<string, boolean>>(
+    {},
+  );
 
   const isAdmin = user?.role_global === "ADMIN" || user?.role_global === "DEV";
   const isDev = user?.role_global === "DEV";
@@ -184,6 +187,8 @@ const DevicesPage = () => {
     field: "allow_keep_until" | "allow_exempt",
     nextValue: boolean,
   ) => {
+    const updateKey = `${deviceId}:${field}`;
+    setRetentionUpdating((prev) => ({ ...prev, [updateKey]: true }));
     try {
       const response = await apiFetch(`/admin/devices/${deviceId}`, {
         method: "PATCH",
@@ -225,6 +230,12 @@ const DevicesPage = () => {
       loadDevices();
     } catch {
       notify("Erro ao atualizar retenção.", "error");
+    } finally {
+      setRetentionUpdating((prev) => {
+        const next = { ...prev };
+        delete next[updateKey];
+        return next;
+      });
     }
   };
 
@@ -491,6 +502,9 @@ const DevicesPage = () => {
                     type="checkbox"
                     className="h-4 w-4 rounded border-slate-300"
                     checked={Boolean(selectedDevice.allow_keep_until)}
+                    disabled={
+                      retentionUpdating[`${selectedDevice.id}:allow_keep_until`]
+                    }
                     onChange={(event) =>
                       handleRetentionToggle(
                         selectedDevice.id,
@@ -519,6 +533,7 @@ const DevicesPage = () => {
                     type="checkbox"
                     className="h-4 w-4 rounded border-slate-300"
                     checked={Boolean(selectedDevice.allow_exempt)}
+                    disabled={retentionUpdating[`${selectedDevice.id}:allow_exempt`]}
                     onChange={(event) =>
                       handleRetentionToggle(
                         selectedDevice.id,

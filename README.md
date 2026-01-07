@@ -49,7 +49,7 @@ pip install -r requirements.txt
 
 cd backend
 alembic upgrade head
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8010
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8010 --env-file .\.env
 ```
 
 ### 3) Frontend (opcional)
@@ -58,6 +58,35 @@ cd frontend
 npm install
 npm run dev
 ```
+
+# Na fase de implantação real e utilização em outras máquinas:
+```bash
+cd frontend
+npm run build
+npm run preview -- --host 0.0.0.0 --port 5173
+```
+
+### 4) Worker (opcional)
+```bash
+cd backend
+$env:REDIS_URL="redis://localhost:6379/0"
+$env:RQ_QUEUE_NAME="certs"   # ou o nome da fila que você colocou
+$env:CERTIFICADOS_ROOT="G:\CERTIFICADOS DIGITAIS"   # ajuste para sua pasta real 
+python -m app.workers.rq_worker
+```
+
+### 5) Watcher (opcional)
+```bash
+cd backend
+$env:REDIS_URL="redis://localhost:6379/0"
+$env:RQ_QUEUE_NAME="certs" # mesmo que o do worker
+$env:ORG_ID="1"
+$env:CERTIFICADOS_ROOT="G:\CERTIFICADOS DIGITAIS"   # ajuste para sua pasta real 
+$env:WATCHER_DEBOUNCE_SECONDS="2"
+$env:WATCHER_MAX_EVENTS_PER_MINUTE="60"
+python -m app.watchers.pfx_directory
+```
+
 
 ## Configuração
 A API lê `.env` na raiz do repositório. Use o `.env.example` como base.
