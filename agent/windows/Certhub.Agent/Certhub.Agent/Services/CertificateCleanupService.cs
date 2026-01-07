@@ -43,7 +43,7 @@ public sealed class CertificateCleanupService
 
         foreach (var entry in normalizedEntries)
         {
-            if (ShouldSkipRetention(entry, mode, _logger))
+            if (ShouldSkipRetention(entry, _logger))
             {
                 skipped.Add(entry.Thumbprint);
                 continue;
@@ -94,31 +94,15 @@ public sealed class CertificateCleanupService
             skipped);
     }
 
-    private static bool ShouldSkipRetention(
-        InstalledThumbprintEntry entry,
-        CleanupMode cleanupMode,
-        Logger logger)
+    private static bool ShouldSkipRetention(InstalledThumbprintEntry entry, Logger logger)
     {
-        var entryMode = entry.CleanupMode?.ToUpperInvariant() ?? "DEFAULT";
-        if (entryMode == "EXEMPT")
+        var mode = entry.CleanupMode?.ToUpperInvariant() ?? "DEFAULT";
+        if (mode == "EXEMPT")
         {
             return true;
         }
-
-        if (cleanupMode == CleanupMode.KeepUntil && entryMode != "KEEP_UNTIL")
+        if (mode == "KEEP_UNTIL" && entry.KeepUntil.HasValue)
         {
-            return true;
-        }
-
-        if (entryMode == "KEEP_UNTIL")
-        {
-            if (!entry.KeepUntil.HasValue)
-            {
-                logger.Warn(
-                    $"Retention missing keep_until value (KEEP_UNTIL). Skipping removal. Thumbprint={entry.Thumbprint}, CleanupMode={entry.CleanupMode}.");
-                return true;
-            }
-
             var nowUtc = DateTimeOffset.UtcNow;
             var keepUntilUtc = entry.KeepUntil.Value.ToUniversalTime();
             var keepUntilLocal = entry.KeepUntil.Value.ToLocalTime();
@@ -132,7 +116,6 @@ public sealed class CertificateCleanupService
             logger.Info(
                 $"Retention expired (KEEP_UNTIL). Eligible for removal. Thumbprint={entry.Thumbprint}, CleanupMode={entry.CleanupMode}, KeepUntilUtc={keepUntilUtc:O}, KeepUntilLocal={keepUntilLocal:O}, NowUtc={nowUtc:O}.");
         }
-
         return false;
     }
 
