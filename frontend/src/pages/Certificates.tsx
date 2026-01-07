@@ -47,6 +47,8 @@ type DeviceRead = {
   agent_version?: string | null;
   last_seen_at?: string | null;
   is_allowed?: boolean;
+  allow_keep_until?: boolean;
+  allow_exempt?: boolean;
   assigned_user?: {
     id: string;
     ad_username: string;
@@ -318,8 +320,9 @@ const CertificatesPage = () => {
   const [keepUntil, setKeepUntil] = useState("");
   const [keepReason, setKeepReason] = useState("");
   const pageSize = preferences.pageSize;
-  const isAdmin = user?.role_global === "ADMIN" || user?.role_global === "DEV";
-  const isView = user?.role_global === "VIEW";
+  const role = user?.role_global ?? "VIEW";
+  const isAdmin = role === "ADMIN" || role === "DEV";
+  const isView = role === "VIEW";
 
   const loadCertificates = async () => {
     setLoading(true);
@@ -346,7 +349,13 @@ const CertificatesPage = () => {
         return;
       }
       const data = (await response.json()) as DeviceRead[];
-      setDevices(data);
+      setDevices(
+        data.map((device) => ({
+          ...device,
+          allow_keep_until: device.allow_keep_until ?? true,
+          allow_exempt: device.allow_exempt ?? true,
+        })),
+      );
     } catch {
       // silencioso
     }
@@ -497,6 +506,42 @@ const CertificatesPage = () => {
   }, [certificates, devices, jobs]);
 
   const availableDevices = useMemo(() => devices, [devices]);
+  const selectedDevice = useMemo(
+    () => devices.find((device) => device.id === selectedDeviceId) ?? null,
+    [devices, selectedDeviceId],
+  );
+  const deviceAllowsKeepUntil = selectedDevice?.allow_keep_until ?? true;
+  const deviceAllowsExempt = selectedDevice?.allow_exempt ?? true;
+  const roleAllowsExempt = true;
+  const showKeepUntilOption = Boolean(selectedDevice && deviceAllowsKeepUntil);
+  const showExemptOption = Boolean(
+    selectedDevice && deviceAllowsExempt && roleAllowsExempt,
+  );
+
+  useEffect(() => {
+    if (!selectedDevice) {
+      return;
+    }
+    const keepUntilAllowed = deviceAllowsKeepUntil;
+    const exemptAllowed = deviceAllowsExempt && roleAllowsExempt;
+    if (cleanupMode === "KEEP_UNTIL" && !keepUntilAllowed) {
+      setCleanupMode("DEFAULT");
+      setKeepUntil("");
+      setKeepReason("");
+      return;
+    }
+    if (cleanupMode === "EXEMPT" && !exemptAllowed) {
+      setCleanupMode("DEFAULT");
+      setKeepUntil("");
+      setKeepReason("");
+    }
+  }, [
+    cleanupMode,
+    deviceAllowsExempt,
+    deviceAllowsKeepUntil,
+    roleAllowsExempt,
+    selectedDevice,
+  ]);
 
   const handleOpenInstall = (certificateId?: string) => {
     setInstallCertificateId(certificateId ?? null);
@@ -548,6 +593,11 @@ const CertificatesPage = () => {
       if (!response.ok) {
         const data = (await response.json()) as { detail?: string };
         notify(data?.detail ?? "Falha ao criar job.", "error");
+        if (response.status === 400 || response.status === 403) {
+          setCleanupMode("DEFAULT");
+          setKeepUntil("");
+          setKeepReason("");
+        }
         return;
       }
       notify("Job de instalação criado com sucesso.");
@@ -893,10 +943,25 @@ const CertificatesPage = () => {
               }
             >
               <option value="DEFAULT">Remover às 18:00 (padrão)</option>
-              <option value="KEEP_UNTIL">Manter até data/hora</option>
-              {isAdmin && <option value="EXEMPT">Isento de cleanup automático</option>}
+              {showKeepUntilOption && (
+                <option value="KEEP_UNTIL">Manter até data/hora</option>
+              )}
+              {showExemptOption && (
+                <option value="EXEMPT">Isento de cleanup automático</option>
+              )}
             </select>
           </label>
+
+          {isAdmin && selectedDevice ? (
+            <div className="text-[11px] text-slate-500">
+              {!deviceAllowsKeepUntil ? (
+                <p>Keep Until: Não permitido para este dispositivo.</p>
+              ) : null}
+              {!deviceAllowsExempt ? (
+                <p>Exempt: Não permitido para este dispositivo.</p>
+              ) : null}
+            </div>
+          ) : null}
 
           {cleanupMode === "KEEP_UNTIL" ? (
             <label className="block text-xs font-semibold text-slate-500">
