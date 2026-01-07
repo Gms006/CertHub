@@ -59,7 +59,7 @@ npm install
 npm run dev
 ```
 
-# Na fase de implantação real e utilização em outras máquinas:
+#### Na fase de implantação real e utilização em outras máquinas:
 ```bash
 cd frontend
 npm run build
