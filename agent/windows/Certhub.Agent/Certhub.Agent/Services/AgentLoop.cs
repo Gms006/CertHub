@@ -11,6 +11,8 @@ public sealed class AgentLoop
     private readonly DpapiStore _dpapiStore;
     private readonly InstalledThumbprintsStore _thumbprintsStore;
     private readonly CertificateCleanupService _cleanupService;
+    private readonly ScheduledCleanupTaskService _scheduledTaskService;
+    private readonly string _executablePath;
     private readonly Logger _logger;
     private readonly AgentStatus _status = new();
     private CancellationTokenSource? _cts;
@@ -23,12 +25,16 @@ public sealed class AgentLoop
         DpapiStore dpapiStore,
         InstalledThumbprintsStore thumbprintsStore,
         CertificateCleanupService cleanupService,
+        ScheduledCleanupTaskService scheduledTaskService,
+        string executablePath,
         Logger logger)
     {
         _configStore = configStore;
         _dpapiStore = dpapiStore;
         _thumbprintsStore = thumbprintsStore;
         _cleanupService = cleanupService;
+        _scheduledTaskService = scheduledTaskService;
+        _executablePath = executablePath;
         _logger = logger;
     }
 
@@ -333,6 +339,7 @@ public sealed class AgentLoop
         try
         {
             var thumbprint = InstallCertificate(payload);
+            EnsureKeepUntilCleanupTask(payload);
             await _client!.SendResultAsync(jobId, new AgentClient.ResultUpdate
             {
                 Status = "DONE",
@@ -393,6 +400,21 @@ public sealed class AgentLoop
         }
 
         return normalized;
+    }
+
+    private void EnsureKeepUntilCleanupTask(AgentClient.PayloadResponse payload)
+    {
+        if (!string.Equals(payload.CleanupMode, "KEEP_UNTIL", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        if (!payload.KeepUntil.HasValue)
+        {
+            return;
+        }
+
+        _scheduledTaskService.EnsureKeepUntilCleanupTask(payload.KeepUntil.Value, _executablePath);
     }
 
     private async Task ReportFailureAsync(Guid jobId, string errorCode, string errorMessage, CancellationToken cancellationToken)
