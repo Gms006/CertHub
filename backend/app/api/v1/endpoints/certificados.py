@@ -161,6 +161,11 @@ async def create_install_job(
     keep_set_at = None
 
     if cleanup_mode == CLEANUP_MODE_KEEP_UNTIL:
+        if not device.allow_keep_until:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="cleanup_mode KEEP_UNTIL not allowed for device",
+            )
         if keep_until is None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -183,6 +188,11 @@ async def create_install_job(
         keep_set_by_user_id = current_user.id
         keep_set_at = now
     elif cleanup_mode == CLEANUP_MODE_EXEMPT:
+        if not device.allow_exempt:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="cleanup_mode EXEMPT not allowed for device",
+            )
         if current_user.role_global not in {"DEV", "ADMIN"}:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN, detail="cleanup_mode EXEMPT not allowed"
