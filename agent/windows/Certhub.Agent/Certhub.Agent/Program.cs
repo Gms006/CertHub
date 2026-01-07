@@ -47,74 +47,87 @@ internal static class Program
         CertificateCleanupService cleanupService,
         Logger logger)
     {
-        var exePath = Environment.ProcessPath ?? Application.ExecutablePath;
-        var whoami = GetWhoami();
-        logger.Info(
-            $"Starting cleanup. Mode={ParseCleanupMode(args)}, ExePath={exePath}, User={Environment.UserName}, WhoAmI={whoami}");
-
-        var config = configStore.Load();
-        if (config is null || !config.IsValid())
-        {
-            logger.Error("Cleanup aborted: invalid or missing config.");
-            return 1;
-        }
-
-        var deviceToken = secretStore.LoadString(configStore.SecretsPath);
-        if (string.IsNullOrWhiteSpace(deviceToken))
-        {
-            logger.Error("Cleanup aborted: device token missing.");
-            return 1;
-        }
-
         var mode = ParseCleanupMode(args);
-        CleanupResult result;
+        var taskName = ParseTaskName(args);
+        var exePath = Environment.ProcessPath ?? Application.ExecutablePath;
+        var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        logger.Info(
+            $"Starting cleanup ({mode}). TaskName={taskName ?? "n/a"}, User={Environment.UserName}, LocalAppData={localAppData}, ExePath={exePath}");
+
+        var exitCode = 1;
         try
         {
-            result = cleanupService.Run(mode);
-        }
-        catch (Exception ex)
-        {
-            logger.Error("Cleanup failed with exception.", ex);
-            return 1;
-        }
-
-        if (result.Success)
-        {
-            config.LastCleanupLocalDate = DateTime.Now.Date;
-            configStore.Save(config);
-        }
-
-        try
-        {
-            var client = new AgentClient(config.ApiBaseUrl, logger);
-            client.UpdateCredentials(config.DeviceId, deviceToken);
-            client.AuthenticateAsync(config.DeviceId, deviceToken, CancellationToken.None).GetAwaiter().GetResult();
-
-            var response = client.PostCleanupAsync(new AgentClient.CleanupEvent
+            var config = configStore.Load();
+            if (config is null || !config.IsValid())
             {
-                RemovedCount = result.RemovedCount,
-                FailedCount = result.FailedCount,
-                RemovedThumbprints = result.RemovedThumbprints.ToList(),
-                FailedThumbprints = result.FailedThumbprints.ToList(),
-                SkippedCount = result.SkippedCount,
-                SkippedThumbprints = result.SkippedThumbprints.ToList(),
-                Mode = result.Mode.ToString().ToLowerInvariant(),
-                RanAtLocal = result.RanAtLocal.ToString("o"),
-            }, CancellationToken.None).GetAwaiter().GetResult();
+                logger.Error("Cleanup aborted: invalid or missing config.");
+                return exitCode;
+            }
 
-            if (!response.IsSuccessStatusCode)
+            var deviceToken = secretStore.LoadString(configStore.SecretsPath);
+            if (string.IsNullOrWhiteSpace(deviceToken))
             {
-                logger.Warn($"Cleanup audit failed: {(int)response.StatusCode} {response.ReasonPhrase}");
-                return 1;
+                logger.Error("Cleanup aborted: device token missing.");
+                return exitCode;
+            }
+
+            CleanupResult result;
+            try
+            {
+                result = cleanupService.Run(mode);
+            }
+            catch (Exception ex)
+            {
+                logger.Error("Cleanup failed with exception.", ex);
+                return exitCode;
+            }
+
+            if (result.Success)
+            {
+                config.LastCleanupLocalDate = DateTime.Now.Date;
+                configStore.Save(config);
+            }
+
+            try
+            {
+                var client = new AgentClient(config.ApiBaseUrl, logger);
+                client.UpdateCredentials(config.DeviceId, deviceToken);
+                client.AuthenticateAsync(config.DeviceId, deviceToken, CancellationToken.None).GetAwaiter().GetResult();
+
+                var response = client.PostCleanupAsync(new AgentClient.CleanupEvent
+                {
+                    RemovedCount = result.RemovedCount,
+                    FailedCount = result.FailedCount,
+                    RemovedThumbprints = result.RemovedThumbprints.ToList(),
+                    FailedThumbprints = result.FailedThumbprints.ToList(),
+                    SkippedCount = result.SkippedCount,
+                    SkippedThumbprints = result.SkippedThumbprints.ToList(),
+                    Mode = FormatCleanupMode(result.Mode),
+                    RanAtLocal = result.RanAtLocal.ToString("o"),
+                }, CancellationToken.None).GetAwaiter().GetResult();
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    logger.Warn($"Cleanup audit failed: {(int)response.StatusCode} {response.ReasonPhrase}");
+                    return exitCode;
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.Error("Cleanup audit failed with exception.", ex);
+                return exitCode;
+            }
+
+            exitCode = result.Success ? 0 : 1;
+            return exitCode;
+        }
+        finally
+        {
+            if (!string.IsNullOrWhiteSpace(taskName))
+            {
+                TryDeleteScheduledTask(taskName, logger);
             }
         }
-        catch (Exception ex)
-        {
-            logger.Error("Cleanup audit failed with exception.", ex);
-            return 1;
-        }
-
-        return result.Success ? 0 : 1;
     }
 
     private static CleanupMode ParseCleanupMode(string[] args)
@@ -144,30 +157,73 @@ internal static class Program
         return CleanupMode.Scheduled;
     }
 
-    private static string GetWhoami()
+    private static string? ParseTaskName(string[] args)
+    {
+        for (var i = 0; i < args.Length; i++)
+        {
+            var arg = args[i];
+            if (arg.StartsWith("--task-name=", StringComparison.OrdinalIgnoreCase))
+            {
+                var parts = arg.Split('=', 2, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                if (parts.Length == 2)
+                {
+                    return parts[1].Trim('"');
+                }
+            }
+
+            if (string.Equals(arg, "--task-name", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
+            {
+                return args[i + 1].Trim('"');
+            }
+        }
+
+        return null;
+    }
+
+    private static string FormatCleanupMode(CleanupMode mode)
+    {
+        return mode == CleanupMode.KeepUntil ? "keep_until" : mode.ToString().ToLowerInvariant();
+    }
+
+    private static void TryDeleteScheduledTask(string taskName, Logger logger)
     {
         try
         {
-            var startInfo = new ProcessStartInfo("whoami.exe")
+            var startInfo = new ProcessStartInfo("schtasks.exe")
             {
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
                 CreateNoWindow = true
             };
+            startInfo.ArgumentList.Add("/Delete");
+            startInfo.ArgumentList.Add("/TN");
+            startInfo.ArgumentList.Add(taskName);
+            startInfo.ArgumentList.Add("/F");
+
             using var process = Process.Start(startInfo);
             if (process is null)
             {
-                return "unknown";
+                logger.Error($"Failed to delete task {taskName}: schtasks not started.");
+                return;
             }
 
             var output = process.StandardOutput.ReadToEnd().Trim();
+            var error = process.StandardError.ReadToEnd().Trim();
             process.WaitForExit();
-            return string.IsNullOrWhiteSpace(output) ? "unknown" : output;
+
+            if (process.ExitCode == 0)
+            {
+                logger.Info($"Deleted keep-until task: {taskName}");
+            }
+            else
+            {
+                logger.Error($"Failed to delete task {taskName}. Output: {output} Error: {error}");
+            }
         }
-        catch
+        catch (Exception ex)
         {
-            return "unknown";
+            logger.Error($"Failed to delete task {taskName}", ex);
         }
     }
 }

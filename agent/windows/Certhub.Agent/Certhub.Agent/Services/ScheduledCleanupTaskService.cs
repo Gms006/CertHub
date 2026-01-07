@@ -107,7 +107,7 @@ public sealed class ScheduledCleanupTaskService
         }
 
         var taskName = $"{KeepUntilTaskPrefix} {scheduledTime:yyyyMMdd-HHmm}";
-        var taskRun = $"{normalizedPath} --cleanup --mode keep_until";
+        var taskRun = $"{normalizedPath} --cleanup --mode keep_until --task-name \"{taskName}\"";
         var containsPath = false;
         var containsArgs = false;
         try
@@ -116,7 +116,7 @@ public sealed class ScheduledCleanupTaskService
             if (queryResult.ExitCode == 0)
             {
                 containsPath = queryResult.Output.Contains(normalizedPath, StringComparison.OrdinalIgnoreCase);
-                containsArgs = queryResult.Output.Contains("--cleanup --mode manual", StringComparison.OrdinalIgnoreCase);
+                containsArgs = queryResult.Output.Contains("--cleanup --mode keep_until", StringComparison.OrdinalIgnoreCase);
                 if (containsPath && containsArgs)
                 {
                     _logger.Info($"Keep-until task already exists: {taskName}");
@@ -131,7 +131,7 @@ public sealed class ScheduledCleanupTaskService
             var currentUser = GetCurrentUser();
             var createArgs = new[]
             {
-                "/Create", "/F", "/Z", "/V1",
+                "/Create", "/F", "/V1",
                 "/TN", taskName,
                 "/SC", "ONCE",
                 "/SD", date,
