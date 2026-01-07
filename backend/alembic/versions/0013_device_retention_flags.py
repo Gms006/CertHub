@@ -24,6 +24,8 @@ def upgrade() -> None:
         "devices",
         sa.Column("allow_exempt", sa.Boolean(), nullable=False, server_default=sa.text("true")),
     )
+    op.execute("UPDATE devices SET allow_keep_until = true WHERE allow_keep_until IS NULL")
+    op.execute("UPDATE devices SET allow_exempt = true WHERE allow_exempt IS NULL")
 
 
 def downgrade() -> None:
