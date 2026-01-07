@@ -550,6 +550,66 @@ const DevicesPage = () => {
                 </div>
               </>
             ) : null}
+            <div className="rounded-2xl border border-slate-200 bg-white p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">
+                    Permitir Keep Until
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    Permite este dispositivo configurar retenção por tempo (Keep
+                    Until).
+                  </p>
+                </div>
+                <label className="inline-flex cursor-pointer items-center gap-2 text-xs text-slate-600">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-slate-300"
+                    checked={Boolean(selectedDevice.allow_keep_until)}
+                    disabled={
+                      retentionUpdating[`${selectedDevice.id}:allow_keep_until`]
+                    }
+                    onChange={(event) =>
+                      handleRetentionToggle(
+                        selectedDevice.id,
+                        "allow_keep_until",
+                        event.target.checked,
+                      )
+                    }
+                  />
+                  {selectedDevice.allow_keep_until ? "Ativo" : "Inativo"}
+                </label>
+              </div>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">
+                    Permitir Exempt
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    Permite este dispositivo marcar certificado como isento de
+                    limpeza (Exempt).
+                  </p>
+                </div>
+                <label className="inline-flex cursor-pointer items-center gap-2 text-xs text-slate-600">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-slate-300"
+                    checked={Boolean(selectedDevice.allow_exempt)}
+                    disabled={retentionUpdating[`${selectedDevice.id}:allow_exempt`]}
+                    onChange={(event) =>
+                      handleRetentionToggle(
+                        selectedDevice.id,
+                        "allow_exempt",
+                        event.target.checked,
+                      )
+                    }
+                  />
+                  {selectedDevice.allow_exempt ? "Ativo" : "Inativo"}
+                </label>
+              </div>
+            </div>
           </div>
         )}
       </Modal>
