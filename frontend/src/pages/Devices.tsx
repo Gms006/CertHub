@@ -23,6 +23,8 @@ type DeviceRead = {
   last_heartbeat_at?: string | null;
   last_job_at?: string | null;
   auto_approve?: boolean;
+  allow_keep_until?: boolean;
+  allow_exempt?: boolean;
   is_allowed: boolean;
   assigned_user?: {
     id: string;
@@ -57,6 +59,8 @@ const DevicesPage = () => {
         data.map((device) => ({
           ...device,
           auto_approve: Boolean(device.auto_approve),
+          allow_keep_until: Boolean(device.allow_keep_until),
+          allow_exempt: Boolean(device.allow_exempt),
           assigned_user: device.assigned_user
             ? {
                 ...device.assigned_user,
@@ -175,6 +179,55 @@ const DevicesPage = () => {
     }
   };
 
+  const handleRetentionToggle = async (
+    deviceId: string,
+    field: "allow_keep_until" | "allow_exempt",
+    nextValue: boolean,
+  ) => {
+    try {
+      const response = await apiFetch(`/admin/devices/${deviceId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [field]: nextValue }),
+      });
+      if (!response.ok) {
+        const data = (await response.json()) as { detail?: string };
+        notify(data?.detail ?? "Não foi possível atualizar retenção.", "error");
+        return;
+      }
+      notify(
+        field === "allow_keep_until"
+          ? nextValue
+            ? "Keep Until permitido."
+            : "Keep Until bloqueado."
+          : nextValue
+            ? "Exempt permitido."
+            : "Exempt bloqueado.",
+      );
+      setDevices((prev) =>
+        prev.map((device) =>
+          device.id === deviceId
+            ? {
+                ...device,
+                [field]: nextValue,
+              }
+            : device,
+        ),
+      );
+      setSelectedDevice((prev) =>
+        prev && prev.id === deviceId
+          ? {
+              ...prev,
+              [field]: nextValue,
+            }
+          : prev,
+      );
+      loadDevices();
+    } catch {
+      notify("Erro ao atualizar retenção.", "error");
+    }
+  };
+
   if (!isAdmin) {
     return (
       <div className="space-y-6">
@@ -258,6 +311,26 @@ const DevicesPage = () => {
                       <span>Último sinal</span>
                       <span className="font-semibold text-slate-700">
                         {formatRelativeTime(device.last_job_at)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>Retention</span>
+                      <span className="flex flex-wrap justify-end gap-1 text-[10px] font-semibold">
+                        {device.allow_keep_until ? (
+                          <span className="rounded-full bg-sky-50 px-2 py-0.5 text-sky-700">
+                            Keep Until
+                          </span>
+                        ) : null}
+                        {device.allow_exempt ? (
+                          <span className="rounded-full bg-amber-50 px-2 py-0.5 text-amber-700">
+                            Exempt
+                          </span>
+                        ) : null}
+                        {!device.allow_keep_until && !device.allow_exempt ? (
+                          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-500">
+                            Disabled
+                          </span>
+                        ) : null}
                       </span>
                     </div>
                   </div>
@@ -402,6 +475,62 @@ const DevicesPage = () => {
                 ) : null}
               </div>
             ) : null}
+            <div className="rounded-2xl border border-slate-200 bg-white p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">
+                    Permitir Keep Until
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    Permite este dispositivo configurar retenção por tempo (Keep
+                    Until).
+                  </p>
+                </div>
+                <label className="inline-flex cursor-pointer items-center gap-2 text-xs text-slate-600">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-slate-300"
+                    checked={Boolean(selectedDevice.allow_keep_until)}
+                    onChange={(event) =>
+                      handleRetentionToggle(
+                        selectedDevice.id,
+                        "allow_keep_until",
+                        event.target.checked,
+                      )
+                    }
+                  />
+                  {selectedDevice.allow_keep_until ? "Ativo" : "Inativo"}
+                </label>
+              </div>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">
+                    Permitir Exempt
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    Permite este dispositivo marcar certificado como isento de
+                    limpeza (Exempt).
+                  </p>
+                </div>
+                <label className="inline-flex cursor-pointer items-center gap-2 text-xs text-slate-600">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-slate-300"
+                    checked={Boolean(selectedDevice.allow_exempt)}
+                    onChange={(event) =>
+                      handleRetentionToggle(
+                        selectedDevice.id,
+                        "allow_exempt",
+                        event.target.checked,
+                      )
+                    }
+                  />
+                  {selectedDevice.allow_exempt ? "Ativo" : "Inativo"}
+                </label>
+              </div>
+            </div>
           </div>
         )}
       </Modal>
