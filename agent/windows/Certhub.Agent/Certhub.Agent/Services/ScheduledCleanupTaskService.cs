@@ -129,17 +129,18 @@ public sealed class ScheduledCleanupTaskService
             var date = scheduledTime.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
             var time = scheduledTime.ToString("HH:mm", CultureInfo.InvariantCulture);
             var currentUser = GetCurrentUser();
-            var createArgs = BuildKeepUntilCreateArgs(taskName, taskRun, date, time, "SYSTEM", includeInteractive: false);
-            var createResult = RunSchtasks(createArgs);
-            if (createResult.ExitCode != 0 && !string.Equals(currentUser, "SYSTEM", StringComparison.OrdinalIgnoreCase))
+            var createArgs = new[]
             {
-                _logger.Warn(
-                    $"Failed to create keep-until task as SYSTEM, retrying as {currentUser}. Output: {createResult.Output} Error: {createResult.Error}");
-                var fallbackArgs = BuildKeepUntilCreateArgs(taskName, taskRun, date, time, currentUser, includeInteractive: true);
-                createResult = RunSchtasks(fallbackArgs);
-                createArgs = fallbackArgs;
-            }
-
+                "/Create", "/F", "/V1",
+                "/TN", taskName,
+                "/SC", "ONCE",
+                "/SD", date,
+                "/ST", time,
+                "/RU", currentUser,
+                "/IT",
+                "/TR", taskRun
+            };
+            var createResult = RunSchtasks(createArgs);
             if (createResult.ExitCode == 0)
             {
                 _logger.Info($"Created keep-until scheduled cleanup task: {taskName}");
@@ -154,32 +155,6 @@ public sealed class ScheduledCleanupTaskService
         {
             _logger.Error($"Failed to ensure keep-until cleanup task {taskName}", ex);
         }
-    }
-
-    private static string[] BuildKeepUntilCreateArgs(
-        string taskName,
-        string taskRun,
-        string date,
-        string time,
-        string runAsUser,
-        bool includeInteractive)
-    {
-        var args = new List<string>
-        {
-            "/Create", "/F", "/V1",
-            "/TN", taskName,
-            "/SC", "ONCE",
-            "/SD", date,
-            "/ST", time,
-            "/RU", runAsUser
-        };
-        if (includeInteractive)
-        {
-            args.Add("/IT");
-        }
-        args.Add("/TR");
-        args.Add(taskRun);
-        return args.ToArray();
     }
 
     private static string GetCurrentUser()
