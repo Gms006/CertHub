@@ -126,10 +126,10 @@ public sealed class ScheduledCleanupTaskService
                 _logger.Warn($"Keep-until task exists with different command, updating: {taskName}");
             }
 
-            var date = scheduledTime.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
+            var date = scheduledTime.ToString("MM/dd/yyyy", CultureInfo.InvariantCulture);
             var time = scheduledTime.ToString("HH:mm", CultureInfo.InvariantCulture);
             var currentUser = GetCurrentUser();
-            var createArgs = new[]
+            var baseArgs = new List<string>
             {
                 "/Create", "/F", "/V1",
                 "/TN", taskName,
@@ -137,13 +137,25 @@ public sealed class ScheduledCleanupTaskService
                 "/SD", date,
                 "/ST", time,
                 "/RU", currentUser,
-                "/IT",
-                "/TR", taskRun
+                "/TR", taskRun,
+                "/Z"
             };
+            var createArgs = baseArgs.Concat(new[] { "/NP" }).ToArray();
             var createResult = RunSchtasks(createArgs);
+            if (createResult.ExitCode != 0)
+            {
+                _logger.Warn($"Keep-until create with /NP failed (ExitCode={createResult.ExitCode}). Retrying with /IT.");
+                createArgs = baseArgs.Concat(new[] { "/IT" }).ToArray();
+                createResult = RunSchtasks(createArgs);
+            }
             if (createResult.ExitCode == 0)
             {
                 _logger.Info($"Created keep-until scheduled cleanup task: {taskName}");
+                var queryCreated = RunSchtasks("/Query", "/TN", taskName, "/FO", "LIST", "/V");
+                if (queryCreated.ExitCode == 0)
+                {
+                    _logger.Info($"Keep-until task details:\n{queryCreated.Output}");
+                }
             }
             else
             {
