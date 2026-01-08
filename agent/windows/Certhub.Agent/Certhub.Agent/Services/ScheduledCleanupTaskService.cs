@@ -109,7 +109,7 @@ public sealed class ScheduledCleanupTaskService
         }
 
         var taskName = $"{KeepUntilTaskPrefix} {scheduledTime:yyyyMMdd-HHmm}";
-        var taskRun = $"{normalizedPath} --cleanup --mode=keep_until --task-name \"{taskName}\"";
+        var taskRun = $"\"{normalizedPath}\" --cleanup --mode=keep_until --task-name \"{taskName}\"";
         var containsPath = false;
         var containsArgs = false;
         try
@@ -143,7 +143,7 @@ public sealed class ScheduledCleanupTaskService
                     "/SD", date,
                     "/ST", time,
                     "/RU", currentUser,
-                    "/IT",
+                    "/NP",
                     "/TR", taskRun,
                     "/Z"
                 };
@@ -198,6 +198,7 @@ public sealed class ScheduledCleanupTaskService
         {
             RedirectStandardOutput = true,
             RedirectStandardError = true,
+            RedirectStandardInput = true,
             UseShellExecute = false,
             CreateNoWindow = true
         };
