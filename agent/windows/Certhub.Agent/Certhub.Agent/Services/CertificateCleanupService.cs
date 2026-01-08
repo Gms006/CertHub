@@ -32,7 +32,10 @@ public sealed class CertificateCleanupService
             })
             .ToList();
 
-        _logger.Info($"Starting cleanup ({mode}). Total stored thumbprints: {normalizedEntries.Count}.");
+        var scopedEntries = normalizedEntries
+            .Where(entry => IsInScopeForRunMode(entry, mode))
+            .ToList();
+        _logger.Info($"Starting cleanup ({mode}). Total stored thumbprints: {normalizedEntries.Count}. In-scope: {scopedEntries.Count}.");
 
         var removed = new List<string>();
         var failed = new List<string>();
@@ -41,7 +44,7 @@ public sealed class CertificateCleanupService
         using var store = new X509Store(StoreName.My, StoreLocation.CurrentUser);
         store.Open(OpenFlags.ReadWrite);
 
-        foreach (var entry in normalizedEntries)
+        foreach (var entry in scopedEntries)
         {
             if (ShouldSkipRetention(entry, _logger))
             {
@@ -74,8 +77,12 @@ public sealed class CertificateCleanupService
             }
         }
 
+        var inScopeSet = scopedEntries
+            .Select(entry => entry.Thumbprint)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
         var remaining = normalizedEntries
             .Where(entry =>
+                !inScopeSet.Contains(entry.Thumbprint) ||
                 failed.Contains(entry.Thumbprint, StringComparer.OrdinalIgnoreCase) ||
                 skipped.Contains(entry.Thumbprint, StringComparer.OrdinalIgnoreCase))
             .ToList();
@@ -83,15 +90,25 @@ public sealed class CertificateCleanupService
         _thumbprintsStore.SaveEntries(_configStore.InstalledThumbprintsPath, remaining);
 
         _logger.Info(
-            $"Cleanup finished. Total: {normalizedEntries.Count}, Removed: {removed.Count}, Failed: {failed.Count}, Skipped: {skipped.Count}.");
+            $"Cleanup finished. In-scope: {scopedEntries.Count}, Removed: {removed.Count}, Failed: {failed.Count}, Skipped: {skipped.Count}.");
 
         return new CleanupResult(
             mode,
             DateTimeOffset.Now,
-            normalizedEntries.Count,
+            scopedEntries.Count,
             removed,
             failed,
             skipped);
+    }
+
+    private static bool IsInScopeForRunMode(InstalledThumbprintEntry entry, CleanupMode runMode)
+    {
+        var mode = entry.CleanupMode?.ToUpperInvariant() ?? "DEFAULT";
+        if (runMode == CleanupMode.KeepUntil)
+        {
+            return mode == "KEEP_UNTIL";
+        }
+        return true;
     }
 
     private static bool ShouldSkipRetention(InstalledThumbprintEntry entry, Logger logger)
