@@ -339,13 +339,20 @@ public sealed class AgentLoop
         try
         {
             var thumbprint = InstallCertificate(payload);
-            EnsureKeepUntilCleanupTask(payload);
             await _client!.SendResultAsync(jobId, new AgentClient.ResultUpdate
             {
                 Status = "DONE",
                 Thumbprint = thumbprint
             }, cancellationToken);
             UpdateStatus(lastJobStatus: "DONE", error: null);
+            try
+            {
+                EnsureKeepUntilCleanupTask(payload);
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Failed to ensure keep-until cleanup task for job {jobId}", ex);
+            }
         }
         catch (Exception ex)
         {
