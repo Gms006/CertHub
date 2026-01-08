@@ -208,7 +208,7 @@ public sealed class ScheduledCleanupTaskService
             }
             catch (Exception createEx)
             {
-                _logger.Warn($"Failed to access or create Task Scheduler folder {userFolderPath}. Falling back to \\CertHub.", createEx);
+                _logger.Error($"Failed to access or create Task Scheduler folder {userFolderPath}. Falling back to \\CertHub.", createEx);
                 _logger.Warn($"Original error: {ex.Message}");
                 return certHubFolder;
             }
