@@ -32,7 +32,12 @@ public sealed class ScheduledCleanupTaskService
 
             dynamic service = Activator.CreateInstance(serviceType)!;
             service.Connect();
-            dynamic rootFolder = service.GetFolder("\\");
+            var taskFolder = GetOrCreateTaskFolder(service);
+            if (taskFolder is null)
+            {
+                _logger.Warn("Cannot register cleanup task: task folder unavailable.");
+                return;
+            }
             dynamic taskDefinition = service.NewTask(0);
 
             taskDefinition.RegistrationInfo.Description = TaskDescription;
@@ -54,7 +59,7 @@ public sealed class ScheduledCleanupTaskService
             action.Arguments = "--cleanup --mode=scheduled";
             action.WorkingDirectory = Path.GetDirectoryName(normalizedPath) ?? string.Empty;
 
-            rootFolder.RegisterTaskDefinition(
+            taskFolder.RegisterTaskDefinition(
                 TaskName,
                 taskDefinition,
                 6, // TASK_CREATE_OR_UPDATE
@@ -115,7 +120,12 @@ public sealed class ScheduledCleanupTaskService
 
             dynamic service = Activator.CreateInstance(serviceType)!;
             service.Connect();
-            dynamic rootFolder = service.GetFolder("\\");
+            var taskFolder = GetOrCreateTaskFolder(service);
+            if (taskFolder is null)
+            {
+                _logger.Warn("Cannot register keep-until cleanup task: task folder unavailable.");
+                return;
+            }
             dynamic taskDefinition = service.NewTask(0);
 
             taskDefinition.RegistrationInfo.Description = $"CertHub keep-until cleanup at {scheduledTime:O}";
@@ -139,7 +149,7 @@ public sealed class ScheduledCleanupTaskService
             action.Arguments = args;
             action.WorkingDirectory = Path.GetDirectoryName(normalizedPath) ?? string.Empty;
 
-            rootFolder.RegisterTaskDefinition(
+            taskFolder.RegisterTaskDefinition(
                 taskName,
                 taskDefinition,
                 6, // TASK_CREATE_OR_UPDATE
@@ -153,6 +163,55 @@ public sealed class ScheduledCleanupTaskService
         catch (Exception ex)
         {
             _logger.Error("Failed to ensure keep-until cleanup task (COM).", ex);
+        }
+    }
+
+    private dynamic? GetOrCreateTaskFolder(dynamic service)
+    {
+        dynamic rootFolder = service.GetFolder("\\");
+        dynamic? certHubFolder = null;
+        const string certHubPath = "\\CertHub";
+        try
+        {
+            certHubFolder = service.GetFolder(certHubPath);
+        }
+        catch (Exception ex)
+        {
+            try
+            {
+                certHubFolder = rootFolder.CreateFolder("CertHub");
+            }
+            catch (Exception createEx)
+            {
+                _logger.Error("Failed to access or create Task Scheduler folder \\CertHub.", createEx);
+                _logger.Warn($"Original error: {ex.Message}");
+                return null;
+            }
+        }
+
+        var userName = Environment.UserName;
+        if (string.IsNullOrWhiteSpace(userName))
+        {
+            return certHubFolder;
+        }
+
+        var userFolderPath = $"\\CertHub\\{userName}";
+        try
+        {
+            return service.GetFolder(userFolderPath);
+        }
+        catch (Exception ex)
+        {
+            try
+            {
+                return certHubFolder.CreateFolder(userName);
+            }
+            catch (Exception createEx)
+            {
+                _logger.Warn($"Failed to access or create Task Scheduler folder {userFolderPath}. Falling back to \\CertHub.", createEx);
+                _logger.Warn($"Original error: {ex.Message}");
+                return certHubFolder;
+            }
         }
     }
 
