@@ -132,23 +132,36 @@ internal static class Program
 
     private static CleanupMode ParseCleanupMode(string[] args)
     {
-        var modeArg = args.FirstOrDefault(arg =>
-            arg.StartsWith("--cleanup-mode", StringComparison.OrdinalIgnoreCase) ||
-            arg.StartsWith("--mode", StringComparison.OrdinalIgnoreCase));
-        if (modeArg is null)
+        for (var i = 0; i < args.Length; i++)
         {
-            return CleanupMode.Scheduled;
-        }
+            var arg = args[i];
+            if (!arg.StartsWith("--cleanup-mode", StringComparison.OrdinalIgnoreCase) &&
+                !arg.StartsWith("--mode", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
 
-        var parts = modeArg.Split('=', 2, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        if (parts.Length == 2)
-        {
-            if (string.Equals(parts[1], "keep_until", StringComparison.OrdinalIgnoreCase))
+            var parts = arg.Split('=', 2, StringSplitOptions.TrimEntries);
+            var value = parts.Length == 2 ? parts[1] : null;
+            if (value is null &&
+                (string.Equals(arg, "--mode", StringComparison.OrdinalIgnoreCase) ||
+                 string.Equals(arg, "--cleanup-mode", StringComparison.OrdinalIgnoreCase)) &&
+                i + 1 < args.Length)
+            {
+                value = args[i + 1];
+            }
+
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                continue;
+            }
+
+            if (string.Equals(value, "keep_until", StringComparison.OrdinalIgnoreCase))
             {
                 return CleanupMode.KeepUntil;
             }
 
-            if (Enum.TryParse<CleanupMode>(parts[1], true, out var parsed))
+            if (Enum.TryParse<CleanupMode>(value, true, out var parsed))
             {
                 return parsed;
             }

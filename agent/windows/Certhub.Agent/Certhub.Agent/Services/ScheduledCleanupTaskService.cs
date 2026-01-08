@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Globalization;
+using System.Threading.Tasks;
 
 namespace Certhub.Agent.Services;
 
@@ -8,6 +9,7 @@ public sealed class ScheduledCleanupTaskService
     private const string TaskName = "CertHub Cleanup 18h";
     private const string TaskDescription = "Remove temporary CertHub certificates daily at 18:00";
     private const string KeepUntilTaskPrefix = "CertHub KeepUntil";
+    private static readonly TimeSpan ProcessTimeout = TimeSpan.FromSeconds(15);
 
     private readonly Logger _logger;
 
@@ -55,7 +57,7 @@ public sealed class ScheduledCleanupTaskService
 
             dynamic action = taskDefinition.Actions.Create(0); // TASK_ACTION_EXEC
             action.Path = normalizedPath;
-            action.Arguments = "--cleanup --mode scheduled";
+            action.Arguments = "--cleanup --mode=scheduled";
             action.WorkingDirectory = Path.GetDirectoryName(normalizedPath) ?? string.Empty;
 
             rootFolder.RegisterTaskDefinition(
@@ -107,7 +109,7 @@ public sealed class ScheduledCleanupTaskService
         }
 
         var taskName = $"{KeepUntilTaskPrefix} {scheduledTime:yyyyMMdd-HHmm}";
-        var taskRun = $"{normalizedPath} --cleanup --mode keep_until --task-name \"{taskName}\"";
+        var taskRun = $"{normalizedPath} --cleanup --mode=keep_until --task-name \"{taskName}\"";
         var containsPath = false;
         var containsArgs = false;
         try
@@ -116,7 +118,7 @@ public sealed class ScheduledCleanupTaskService
             if (queryResult.ExitCode == 0)
             {
                 containsPath = queryResult.Output.Contains(normalizedPath, StringComparison.OrdinalIgnoreCase);
-                containsArgs = queryResult.Output.Contains("--cleanup --mode keep_until", StringComparison.OrdinalIgnoreCase);
+                containsArgs = queryResult.Output.Contains("--cleanup --mode=keep_until", StringComparison.OrdinalIgnoreCase);
                 if (containsPath && containsArgs)
                 {
                     _logger.Info($"Keep-until task already exists: {taskName}");
@@ -126,27 +128,32 @@ public sealed class ScheduledCleanupTaskService
                 _logger.Warn($"Keep-until task exists with different command, updating: {taskName}");
             }
 
-            var date = scheduledTime.ToString("MM/dd/yyyy", CultureInfo.InvariantCulture);
             var time = scheduledTime.ToString("HH:mm", CultureInfo.InvariantCulture);
             var currentUser = GetCurrentUser();
-            var baseArgs = new List<string>
+            var createResult = new ProcessResult(-1, string.Empty, "Keep-until task not created yet.");
+            var lastCreateArgs = Array.Empty<string>();
+            foreach (var dateFormat in new[] { "dd/MM/yyyy", "MM/dd/yyyy" })
             {
-                "/Create", "/F", "/V1",
-                "/TN", taskName,
-                "/SC", "ONCE",
-                "/SD", date,
-                "/ST", time,
-                "/RU", currentUser,
-                "/TR", taskRun,
-                "/Z"
-            };
-            var createArgs = baseArgs.Concat(new[] { "/NP" }).ToArray();
-            var createResult = RunSchtasks(createArgs);
-            if (createResult.ExitCode != 0)
-            {
-                _logger.Warn($"Keep-until create with /NP failed (ExitCode={createResult.ExitCode}). Retrying with /IT.");
-                createArgs = baseArgs.Concat(new[] { "/IT" }).ToArray();
-                createResult = RunSchtasks(createArgs);
+                var date = scheduledTime.ToString(dateFormat, CultureInfo.InvariantCulture);
+                lastCreateArgs = new[]
+                {
+                    "/Create", "/F",
+                    "/TN", taskName,
+                    "/SC", "ONCE",
+                    "/SD", date,
+                    "/ST", time,
+                    "/RU", currentUser,
+                    "/IT",
+                    "/TR", taskRun,
+                    "/Z"
+                };
+                createResult = RunSchtasks(lastCreateArgs);
+                if (createResult.ExitCode == 0)
+                {
+                    break;
+                }
+
+                _logger.Warn($"Keep-until create failed with /SD {dateFormat} (ExitCode={createResult.ExitCode}).");
             }
             if (createResult.ExitCode == 0)
             {
@@ -160,7 +167,7 @@ public sealed class ScheduledCleanupTaskService
             else
             {
                 _logger.Error(
-                    $"Failed to create keep-until scheduled cleanup task {taskName}. Args: {string.Join(' ', createArgs)} Output: {createResult.Output} Error: {createResult.Error}");
+                    $"Failed to create keep-until scheduled cleanup task {taskName}. Args: {string.Join(' ', lastCreateArgs)} Output: {createResult.Output} Error: {createResult.Error}");
             }
         }
         catch (Exception ex)
@@ -205,11 +212,27 @@ public sealed class ScheduledCleanupTaskService
             return new ProcessResult(-1, string.Empty, $"Failed to start {fileName}");
         }
 
-        var output = process.StandardOutput.ReadToEnd();
-        var error = process.StandardError.ReadToEnd();
-        process.WaitForExit();
+        var outputTask = process.StandardOutput.ReadToEndAsync();
+        var errorTask = process.StandardError.ReadToEndAsync();
+        var exited = process.WaitForExit((int)ProcessTimeout.TotalMilliseconds);
+        if (!exited)
+        {
+            try
+            {
+                process.Kill(true);
+            }
+            catch (Exception)
+            {
+            }
 
-        return new ProcessResult(process.ExitCode, output.Trim(), error.Trim());
+            return new ProcessResult(
+                -1,
+                string.Empty,
+                $"Timed out after {ProcessTimeout.TotalSeconds:0}s running {fileName}.");
+        }
+
+        Task.WaitAll(outputTask, errorTask);
+        return new ProcessResult(process.ExitCode, outputTask.Result.Trim(), errorTask.Result.Trim());
     }
 
     private readonly record struct ProcessResult(int ExitCode, string Output, string Error);
