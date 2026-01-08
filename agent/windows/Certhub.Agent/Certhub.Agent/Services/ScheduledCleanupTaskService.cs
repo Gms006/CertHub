@@ -1,7 +1,3 @@
-using System.Diagnostics;
-using System.Globalization;
-using System.Threading.Tasks;
-
 namespace Certhub.Agent.Services;
 
 public sealed class ScheduledCleanupTaskService
@@ -9,8 +5,6 @@ public sealed class ScheduledCleanupTaskService
     private const string TaskName = "CertHub Cleanup 18h";
     private const string TaskDescription = "Remove temporary CertHub certificates daily at 18:00";
     private const string KeepUntilTaskPrefix = "CertHub KeepUntil";
-    private static readonly TimeSpan ProcessTimeout = TimeSpan.FromSeconds(15);
-
     private readonly Logger _logger;
 
     public ScheduledCleanupTaskService(Logger logger)
@@ -108,133 +102,58 @@ public sealed class ScheduledCleanupTaskService
             return;
         }
 
-        var taskName = $"{KeepUntilTaskPrefix} {scheduledTime:yyyyMMdd-HHmm}";
-        var taskRun = $"\"{normalizedPath}\" --cleanup --mode=keep_until --task-name \"{taskName}\"";
-        var containsPath = false;
-        var containsArgs = false;
         try
         {
-            var queryResult = RunSchtasks("/Query", "/TN", taskName, "/FO", "LIST", "/V");
-            if (queryResult.ExitCode == 0)
+            var taskName = $"{KeepUntilTaskPrefix} {scheduledTime:yyyyMMdd-HHmm}";
+            var args = $"--cleanup --mode=keep_until --task-name \"{taskName}\"";
+            var serviceType = Type.GetTypeFromProgID("Schedule.Service");
+            if (serviceType is null)
             {
-                containsPath = queryResult.Output.Contains(normalizedPath, StringComparison.OrdinalIgnoreCase);
-                containsArgs = queryResult.Output.Contains("--cleanup --mode=keep_until", StringComparison.OrdinalIgnoreCase);
-                if (containsPath && containsArgs)
-                {
-                    _logger.Info($"Keep-until task already exists: {taskName}");
-                    return;
-                }
-
-                _logger.Warn($"Keep-until task exists with different command, updating: {taskName}");
+                _logger.Warn("Task Scheduler COM service not available.");
+                return;
             }
 
-            var time = scheduledTime.ToString("HH:mm", CultureInfo.InvariantCulture);
-            var currentUser = GetCurrentUser();
-            var createResult = new ProcessResult(-1, string.Empty, "Keep-until task not created yet.");
-            var lastCreateArgs = Array.Empty<string>();
-            foreach (var dateFormat in new[] { "dd/MM/yyyy", "MM/dd/yyyy" })
-            {
-                var date = scheduledTime.ToString(dateFormat, CultureInfo.InvariantCulture);
-                lastCreateArgs = new[]
-                {
-                    "/Create", "/F",
-                    "/TN", taskName,
-                    "/SC", "ONCE",
-                    "/SD", date,
-                    "/ST", time,
-                    "/RU", currentUser,
-                    "/NP",
-                    "/TR", taskRun,
-                    "/Z"
-                };
-                createResult = RunSchtasks(lastCreateArgs);
-                if (createResult.ExitCode == 0)
-                {
-                    break;
-                }
+            dynamic service = Activator.CreateInstance(serviceType)!;
+            service.Connect();
+            dynamic rootFolder = service.GetFolder("\\");
+            dynamic taskDefinition = service.NewTask(0);
 
-                _logger.Warn($"Keep-until create failed with /SD {dateFormat} (ExitCode={createResult.ExitCode}).");
-            }
-            if (createResult.ExitCode == 0)
-            {
-                _logger.Info($"Created keep-until scheduled cleanup task: {taskName}");
-                var queryCreated = RunSchtasks("/Query", "/TN", taskName, "/FO", "LIST", "/V");
-                if (queryCreated.ExitCode == 0)
-                {
-                    _logger.Info($"Keep-until task details:\n{queryCreated.Output}");
-                }
-            }
-            else
-            {
-                _logger.Error(
-                    $"Failed to create keep-until scheduled cleanup task {taskName}. Args: {string.Join(' ', lastCreateArgs)} Output: {createResult.Output} Error: {createResult.Error}");
-            }
+            taskDefinition.RegistrationInfo.Description = $"CertHub keep-until cleanup at {scheduledTime:O}";
+            taskDefinition.Settings.Enabled = true;
+            taskDefinition.Settings.StartWhenAvailable = true;
+            taskDefinition.Settings.Hidden = false;
+            taskDefinition.Settings.DisallowStartIfOnBatteries = false;
+            taskDefinition.Settings.StopIfGoingOnBatteries = false;
+            taskDefinition.Settings.DeleteExpiredTaskAfter = "PT10M";
+            taskDefinition.Principal.LogonType = 3; // TASK_LOGON_INTERACTIVE_TOKEN
+            taskDefinition.Principal.RunLevel = 1; // TASK_RUNLEVEL_LUA
+
+            dynamic trigger = taskDefinition.Triggers.Create(1); // TASK_TRIGGER_TIME
+            var startLocal = scheduledTime.DateTime;
+            trigger.StartBoundary = startLocal.ToString("yyyy-MM-dd'T'HH:mm:ss");
+            trigger.EndBoundary = startLocal.AddMinutes(10).ToString("yyyy-MM-dd'T'HH:mm:ss");
+            trigger.Enabled = true;
+
+            dynamic action = taskDefinition.Actions.Create(0); // TASK_ACTION_EXEC
+            action.Path = normalizedPath;
+            action.Arguments = args;
+            action.WorkingDirectory = Path.GetDirectoryName(normalizedPath) ?? string.Empty;
+
+            rootFolder.RegisterTaskDefinition(
+                taskName,
+                taskDefinition,
+                6, // TASK_CREATE_OR_UPDATE
+                null,
+                null,
+                3, // TASK_LOGON_INTERACTIVE_TOKEN
+                null);
+
+            _logger.Info($"Created keep-until scheduled cleanup task (COM): {taskName}");
         }
         catch (Exception ex)
         {
-            _logger.Error($"Failed to ensure keep-until cleanup task {taskName}", ex);
+            _logger.Error("Failed to ensure keep-until cleanup task (COM).", ex);
         }
     }
 
-    private static string GetCurrentUser()
-    {
-        var whoami = RunProcess("whoami.exe");
-        if (whoami.ExitCode == 0 && !string.IsNullOrWhiteSpace(whoami.Output))
-        {
-            return whoami.Output.Trim();
-        }
-
-        return Environment.UserName;
-    }
-
-    private static ProcessResult RunSchtasks(params string[] args)
-    {
-        return RunProcess("schtasks.exe", args);
-    }
-
-    private static ProcessResult RunProcess(string fileName, params string[] args)
-    {
-        var startInfo = new ProcessStartInfo(fileName)
-        {
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            RedirectStandardInput = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
-        foreach (var arg in args)
-        {
-            startInfo.ArgumentList.Add(arg);
-        }
-
-        using var process = Process.Start(startInfo);
-        if (process is null)
-        {
-            return new ProcessResult(-1, string.Empty, $"Failed to start {fileName}");
-        }
-
-        var outputTask = process.StandardOutput.ReadToEndAsync();
-        var errorTask = process.StandardError.ReadToEndAsync();
-        var exited = process.WaitForExit((int)ProcessTimeout.TotalMilliseconds);
-        if (!exited)
-        {
-            try
-            {
-                process.Kill(true);
-            }
-            catch (Exception)
-            {
-            }
-
-            return new ProcessResult(
-                -1,
-                string.Empty,
-                $"Timed out after {ProcessTimeout.TotalSeconds:0}s running {fileName}.");
-        }
-
-        Task.WaitAll(outputTask, errorTask);
-        return new ProcessResult(process.ExitCode, outputTask.Result.Trim(), errorTask.Result.Trim());
-    }
-
-    private readonly record struct ProcessResult(int ExitCode, string Output, string Error);
 }
