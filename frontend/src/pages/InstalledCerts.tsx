@@ -1,3 +1,4 @@
+import { RefreshCw } from "lucide-react";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { Copy } from "lucide-react";
 
@@ -252,6 +253,7 @@ const InstalledCertsPage = () => {
             className="h-10 rounded-2xl bg-white/70 px-4 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-slate-200/70 transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
             onClick={loadInstalledCerts}
           >
+            <RefreshCw className="h-4 w-4" />
             Atualizar
           </button>
         </div>

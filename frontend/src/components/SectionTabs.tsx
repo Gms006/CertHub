@@ -51,7 +51,7 @@ const SectionTabs = () => {
 
   const tabs = [
     { label: "Certificados", to: "/certificados", allow: true },
-    { label: "Jobs", to: "/jobs", allow: true },
+    { label: "Solicitações", to: "/jobs", allow: true },
     { label: "Instalados", to: "/instalados", allow: true },
     { label: "Dispositivos e Usuários", to: "/dispositivos", allow: role !== "VIEW" },
     { label: "Auditoria", to: "/auditoria", allow: role === "DEV" },
@@ -72,7 +72,7 @@ const SectionTabs = () => {
             }
           >
             <span>{tab.label}</span>
-            {tab.label === "Jobs" && requestedCount > 0 ? (
+            {tab.label === "Solicitações" && requestedCount > 0 ? (
               <span
                 className="relative inline-flex h-5 w-5 items-center justify-center rounded-full bg-amber-100 text-amber-700"
                 aria-label={`${requestedCount} job(s) aguardando aprovação`}
