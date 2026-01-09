@@ -52,5 +52,52 @@ Write-Host "Creating scheduled task '$taskName'" -ForegroundColor Cyan
 schtasks /Delete /TN "$taskName" /F | Out-Null
 schtasks /Create /TN "$taskName" /SC DAILY /ST 18:00 /TR "$taskCommand" /RL LIMITED /IT /F | Out-Null
 
+Write-Host "Creating Task Scheduler folder structure..." -ForegroundColor Cyan
+try {
+    $service = New-Object -ComObject("Schedule.Service")
+    $service.Connect()
+    $rootFolder = $service.GetFolder("\")
+    
+    # Cria \CertHub
+    try {
+        $certHubFolder = $service.GetFolder("\CertHub")
+        Write-Host "  Folder \CertHub already exists"
+    } catch {
+        $certHubFolder = $rootFolder.CreateFolder("CertHub")
+        Write-Host "  Created folder \CertHub"
+    }
+    
+    # Cria \CertHub\{username}
+    $userName = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name.Split('\')[-1]
+    $userFolderPath = "\CertHub\$userName"
+    try {
+        $userFolder = $service.GetFolder($userFolderPath)
+        Write-Host "  Folder $userFolderPath already exists"
+    } catch {
+        $userFolder = $certHubFolder.CreateFolder($userName)
+        Write-Host "  Created folder $userFolderPath"
+    }
+    
+    Write-Host "Task Scheduler folder structure ready" -ForegroundColor Green
+} catch {
+    Write-Warning "Failed to create Task Scheduler folder structure: $_"
+    Write-Warning "Keep-until tasks may require admin privileges on first run"
+}
+
+Write-Host "Setting permissions on Task Scheduler folders..." -ForegroundColor Cyan
+try {
+    $currentUserName = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name.Split('\')[-1]
+    $taskFolderPath = "C:\Windows\System32\tasks\CertHub\$currentUserName"
+    $domainUserName = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
+    
+    if (Test-Path $taskFolderPath) {
+        icacls $taskFolderPath /grant "${domainUserName}:(F)" /T /Q
+        Write-Host "  Permissions granted for $domainUserName on $taskFolderPath" -ForegroundColor Green
+    }
+} catch {
+    Write-Warning "Failed to set permissions: $_"
+    Write-Warning "You may need to run the icacls command manually as administrator"
+}
+
 Write-Host "Validating scheduled task..." -ForegroundColor Cyan
 schtasks /Query /TN "$taskName" /V /FO LIST
