@@ -36,6 +36,7 @@ certhub/
 │  │  │  ├─ cert_install_job.py
 │  │  │  ├─ certificate.py
 │  │  │  ├─ device.py
+│  │  │  ├─ device_installed_cert.py
 │  │  │  ├─ user.py
 │  │  │  ├─ user_device.py
 │  │  │  └─ user_session.py
@@ -47,6 +48,7 @@ certhub/
 │  │  │  ├─ cert_ingest.py
 │  │  │  ├─ certificate.py
 │  │  │  ├─ device.py
+│  │  │  ├─ installed_cert.py
 │  │  │  ├─ install_job.py
 │  │  │  ├─ user.py
 │  │  │  └─ user_device.py
@@ -79,7 +81,9 @@ certhub/
 │  │     ├─ 0010_device_auto_approve.py
 │  │     ├─ 0010_merge_0009_heads_merge_0009_heads.py
 │  │     ├─ 0011_merge_0010_heads.py
-│  │     └─ 0012_s9_retention_fields.py
+│  │     ├─ 0012_s9_retention_fields.py
+│  │     ├─ 0013_device_retention_flags.py
+│  │     └─ 0014_device_installed_certs.py
 │  ├─ tests/
 │  │  ├─ __init__.py
 │  │  ├─ conftest.py
@@ -91,6 +95,7 @@ certhub/
 │  │  ├─ test_certificate_ingest.py
 │  │  ├─ test_jobs_certificates_delete.py
 │  │  ├─ test_s9_retention_policy.py
+│  │  ├─ test_s9_1_installed_certs.py
 │  │  ├─ test_workers_queue.py
 │  │  └─ test_rbac_jobs.py
 │  ├─ alembic.ini
@@ -101,6 +106,7 @@ certhub/
 │  │  └─ openapi.json
 │  ├─ S8_PILOTO_ROLLOUT.md
 │  ├─ S9_QA_CHECKLIST.md
+│  ├─ S9_1_REPORT.md
 │  └─ TREINAMENTO_RAPIDO.md
 │
 ├─ agent/
@@ -124,6 +130,7 @@ certhub/
 │           │  ├─ AgentLoop.cs
 │           │  ├─ CertificateCleanupService.cs
 │           │  ├─ DpapiStore.cs
+│           │  ├─ InstalledCertsReporter.cs
 │           │  ├─ InstalledThumbprintsStore.cs
 │           │  ├─ Logger.cs
 │           │  ├─ PortalUrlHelper.cs
@@ -154,6 +161,7 @@ certhub/
 │  │  │  ├─ Audit.tsx
 │  │  │  ├─ Certificates.tsx
 │  │  │  ├─ Devices.tsx
+│  │  │  ├─ InstalledCerts.tsx
 │  │  │  ├─ Jobs.tsx
 │  │  │  ├─ Login.tsx
 │  │  │  ├─ ResetPassword.tsx

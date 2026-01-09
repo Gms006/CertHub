@@ -149,6 +149,16 @@ public sealed class AgentClient
             cancellationToken);
     }
 
+    public async Task<HttpResponseMessage> PostInstalledCertsReportAsync(
+        InstalledCertReportRequest payload,
+        CancellationToken cancellationToken)
+    {
+        return await PostWithAuthRetryAsync(
+            "agent/installed-certs/report",
+            new StringContent(JsonSerializer.Serialize(payload, JsonOptions), Encoding.UTF8, "application/json"),
+            cancellationToken);
+    }
+
     private async Task<HttpResponseMessage> PostWithAuthRetryAsync(string path, HttpContent content, CancellationToken cancellationToken)
     {
         return await SendWithAuthRetryAsync(() => new HttpRequestMessage(HttpMethod.Post, path) { Content = content }, cancellationToken);
@@ -264,6 +274,54 @@ public sealed class AgentClient
 
         [JsonPropertyName("ran_at_local")]
         public string? RanAtLocal { get; set; }
+    }
+
+    public sealed class InstalledCertReportRequest
+    {
+        [JsonPropertyName("device_id")]
+        public string DeviceId { get; set; } = string.Empty;
+
+        [JsonPropertyName("items")]
+        public List<InstalledCertReportItem> Items { get; set; } = new();
+    }
+
+    public sealed class InstalledCertReportItem
+    {
+        [JsonPropertyName("thumbprint")]
+        public string Thumbprint { get; set; } = string.Empty;
+
+        [JsonPropertyName("subject")]
+        public string? Subject { get; set; }
+
+        [JsonPropertyName("issuer")]
+        public string? Issuer { get; set; }
+
+        [JsonPropertyName("serial")]
+        public string? Serial { get; set; }
+
+        [JsonPropertyName("not_before")]
+        public DateTimeOffset? NotBefore { get; set; }
+
+        [JsonPropertyName("not_after")]
+        public DateTimeOffset? NotAfter { get; set; }
+
+        [JsonPropertyName("installed_via_agent")]
+        public bool InstalledViaAgent { get; set; }
+
+        [JsonPropertyName("cleanup_mode")]
+        public string? CleanupMode { get; set; }
+
+        [JsonPropertyName("keep_until")]
+        public DateTimeOffset? KeepUntil { get; set; }
+
+        [JsonPropertyName("keep_reason")]
+        public string? KeepReason { get; set; }
+
+        [JsonPropertyName("job_id")]
+        public Guid? JobId { get; set; }
+
+        [JsonPropertyName("installed_at")]
+        public DateTimeOffset? InstalledAt { get; set; }
     }
 
     public sealed class ApiRequestException : Exception

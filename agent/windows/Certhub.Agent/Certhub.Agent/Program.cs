@@ -16,10 +16,11 @@ internal static class Program
         var secretStore = new DpapiStore(logger);
         var installedThumbprintsStore = new InstalledThumbprintsStore(secretStore, logger);
         var cleanupService = new CertificateCleanupService(configStore, installedThumbprintsStore, logger);
+        var installedCertsReporter = new InstalledCertsReporter(configStore, installedThumbprintsStore, logger);
 
         if (args.Any(arg => string.Equals(arg, "--cleanup", StringComparison.OrdinalIgnoreCase)))
         {
-            return RunCleanup(args, configStore, secretStore, cleanupService, logger);
+            return RunCleanup(args, configStore, secretStore, cleanupService, installedCertsReporter, logger);
         }
 
         var scheduledTaskService = new ScheduledCleanupTaskService(logger);
@@ -32,6 +33,7 @@ internal static class Program
             installedThumbprintsStore,
             cleanupService,
             scheduledTaskService,
+            installedCertsReporter,
             exePath,
             logger);
 
@@ -45,6 +47,7 @@ internal static class Program
         AgentConfigStore configStore,
         DpapiStore secretStore,
         CertificateCleanupService cleanupService,
+        InstalledCertsReporter installedCertsReporter,
         Logger logger)
     {
         var mode = ParseCleanupMode(args);
@@ -110,6 +113,14 @@ internal static class Program
                 {
                     logger.Warn($"Cleanup audit failed: {(int)response.StatusCode} {response.ReasonPhrase}");
                     return exitCode;
+                }
+
+                if (config.InstalledCertsReportIntervalSeconds > 0)
+                {
+                    installedCertsReporter.SendSnapshotAsync(
+                        client,
+                        config.DeviceId,
+                        CancellationToken.None).GetAwaiter().GetResult();
                 }
             }
             catch (Exception ex)

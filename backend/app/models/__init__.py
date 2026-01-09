@@ -15,6 +15,7 @@ from app.models.cert_install_job import (
     JOB_STATUS_REQUESTED,
 )
 from app.models.device import Device
+from app.models.device_installed_cert import DeviceInstalledCert
 from app.models.user import User
 from app.models.user_device import UserDevice
 from app.models.user_session import UserSession
@@ -36,6 +37,7 @@ __all__ = [
     "JOB_STATUS_EXPIRED",
     "JOB_STATUS_CANCELED",
     "Device",
+    "DeviceInstalledCert",
     "UserDevice",
     "AuditLog",
 ]

@@ -1279,6 +1279,92 @@ limit 20;
 
 ---
 
+## S9.1 — Inventário de Certificados Instalados (CurrentUser) + Aba em tempo real
+
+**Objetivo**: disponibilizar no portal uma aba “Instalados (CurrentUser)” com atualização quase em tempo real (polling), permitindo:
+
+- Filtro: **Todos** os certificados do store vs **Somente via Agent**.
+- Badges por certificado:
+  - `Excluir às 18h` (default)
+  - `Manter até dd/mm/aaaa HH:mm` (`KEEP_UNTIL`)
+  - `Manter para sempre` (`EXEMPT`)
+  - `Não gerenciado` (cert presente no store, mas não consta no `installed_thumbprints` do agent)
+
+**Status**: ✅ **Concluído**
+
+**Entregáveis**
+
+- **AGENT (.NET)**
+  - Criar inventário do store `CurrentUser\My` (X509Store StoreName.My, StoreLocation.CurrentUser) e gerar snapshot com metadados **não sensíveis**:
+    - `thumbprint`, `subject`, `issuer`, `serial`, `not_before`, `not_after`.
+  - Determinar `installed_via_agent` comparando com `installed_thumbprints.json` (InstalledThumbprintsStore).
+  - Se `installed_via_agent=true`, anexar política de retenção do thumbprint:
+    - `cleanup_mode` (DEFAULT/KEEP_UNTIL/EXEMPT), `keep_until` (se houver), `keep_reason` (se houver), `job_id` (se houver), `installed_at`.
+  - Enviar snapshot periodicamente e também após instalar/remover/cleanup.
+  - Adicionar configuração (ex.: intervalo padrão 30s; permitir desabilitar).
+  - Garantir que o snapshot **não** inclua PFX, senha, `source_path` sensível nem nada do payload.
+
+- **BACKEND (FastAPI + Alembic + Postgres)**
+  - Criar tabela/model para snapshot por device (ex.: `device_installed_certs`), com campos sugeridos:
+    - `org_id`, `device_id`, `thumbprint` (chave composta)
+    - `subject`, `issuer`, `serial`
+    - `not_before`, `not_after`
+    - `installed_via_agent` (bool)
+    - `cleanup_mode` (nullable), `keep_until` (nullable), `keep_reason` (nullable), `job_id` (nullable)
+    - `last_seen_at`, `removed_at` (nullable)
+  - Criar migration Alembic.
+  - Criar endpoint **agent → backend** (autenticado com JWT de device):
+    - `POST /api/v1/agent/installed-certs/report`
+    - Faz upsert do snapshot e marca `removed_at` quando thumbprints antigos não aparecem mais.
+    - Registra audit (ex.: `INSTALLED_CERTS_REPORTED`) com `device_id` e contagem.
+  - Criar endpoint **portal → backend** (autenticado com JWT de user):
+    - `GET /api/v1/devices/{device_id}/installed-certs?scope=all|agent`
+    - RBAC:
+      - VIEW: somente devices permitidos/vinculados via `user_device`.
+      - ADMIN/DEV: devices do org.
+    - Retornar somente metadados e retenção (sem segredos).
+    - (Opcional) registrar audit `INSTALLED_CERTS_VIEWED`.
+
+- **FRONTEND (React/Vite)**
+  - Criar nova aba/página no portal, alinhada ao padrão de `SectionTabs`:
+    - Tab: “Instalados”
+  - UI:
+    - Toggle/segmented: “Todos” vs “Somente via Agent”.
+    - Busca por `subject`/`issuer`/`thumbprint`.
+    - (Se fizer sentido) seletor de device: para ADMIN/DEV listar devices; para VIEW somente devices permitidos (ou default my-device se existir esse conceito).
+    - Exibir “Última atualização” com base em `last_seen_at`.
+    - Polling (ex.: 10s) reutilizando padrão já existente no portal.
+  - Cards/tabela com badges de retenção conforme `cleanup_mode`; se não gerenciado, badge “Não gerenciado”.
+
+- **SEGURANÇA/LGPD**
+  - Proibir segredos no snapshot (PFX/senha/`source_path`).
+  - Garantir que o endpoint do snapshot **não** aceite user JWT (somente device JWT).
+  - Garantir RBAC no GET do portal (VIEW não pode consultar device não permitido).
+  - Rate-limit básico no report se já houver padrão para endpoints do agent (se aplicável).
+
+**Aceite**
+
+- Certificado manual instalado no CurrentUser aparece em “Todos” e **não** aparece em “Somente via Agent”.
+- Certificado instalado via portal/job aparece em “Somente via Agent” com badge correto (18h / keep_until / isento).
+- Após cleanup 18h, o cert removido some (ou fica marcado como removido) em até 1 ciclo de report/poll.
+- VIEW recebe 403 ao tentar consultar installed-certs de device não permitido.
+- Nenhuma resposta do portal contém PFX ou senha.
+
+**Validação (curta)**
+
+- Comando (backend): `pytest backend/tests/test_s9_1_installed_certs.py`.
+- Instalar manualmente um certificado no CurrentUser e validar visibilidade em “Todos”.
+- Criar job via portal, instalar via agent e validar “Somente via Agent” + badge de retenção.
+- Forçar cleanup 18h/keep_until e confirmar remoção/`removed_at` no portal.
+
+**Rollback curto (S9.1)**
+
+- Remover/ocultar a aba do frontend.
+- Desativar endpoints de snapshot (ou feature-flag).
+- (Opcional) manter a tabela sem uso; ou reverter migration se preferirem rollback completo.
+
+---
+
 ## S10 — TLS/HTTPS + Hospedagem
 
 **Objetivo**: acabar com “site não seguro” e padronizar acesso interno/externo com TLS.

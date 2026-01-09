@@ -5,6 +5,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import { PreferencesProvider } from "./hooks/usePreferences";
 import CertificatesPage from "./pages/Certificates";
 import DevicesPage from "./pages/Devices";
+import InstalledCertsPage from "./pages/InstalledCerts";
 import JobsPage from "./pages/Jobs";
 import Login from "./pages/Login";
 import AuditPage from "./pages/Audit";
@@ -30,6 +31,7 @@ const App = () => {
         >
           <Route path="/certificados" element={<CertificatesPage />} />
           <Route path="/jobs" element={<JobsPage />} />
+          <Route path="/instalados" element={<InstalledCertsPage />} />
           <Route path="/dispositivos" element={<DevicesPage />} />
           <Route path="/auditoria" element={<AuditPage />} />
           <Route path="/" element={<CertificatesPage />} />
