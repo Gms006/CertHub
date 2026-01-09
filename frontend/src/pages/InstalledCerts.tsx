@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 
 import SectionTabs from "../components/SectionTabs";
 import Toast from "../components/Toast";
 import { useAuth } from "../hooks/useAuth";
 import { usePreferences } from "../hooks/usePreferences";
 import { useToast } from "../hooks/useToast";
-import { formatDateTime } from "../lib/formatters";
+import { daysUntil, formatDateTime, parseDnCN } from "../lib/formatters";
 
 type DeviceRead = {
   id: string;
@@ -61,6 +61,7 @@ const InstalledCertsPage = () => {
   const [search, setSearch] = useState("");
   const [includeRemoved, setIncludeRemoved] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
 
   const isAdmin = user?.role_global === "ADMIN" || user?.role_global === "DEV";
 
@@ -151,6 +152,22 @@ const InstalledCertsPage = () => {
     return formatDateTime(latest);
   }, [installedCerts]);
 
+  const toggleRow = (rowKey: string) => {
+    setExpandedRows((prev) => ({
+      ...prev,
+      [rowKey]: !prev[rowKey],
+    }));
+  };
+
+  const handleCopyThumbprint = async (thumbprint: string) => {
+    try {
+      await navigator.clipboard.writeText(thumbprint);
+      notify("Thumbprint copiado", "success");
+    } catch {
+      notify("Não foi possível copiar o thumbprint.", "error");
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -234,12 +251,14 @@ const InstalledCertsPage = () => {
           Nenhum certificado encontrado.
         </div>
       ) : (
-        <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50 text-xs uppercase text-slate-400">
+        <div className="overflow-x-auto rounded-3xl border border-slate-200 bg-white">
+          <table className="w-full min-w-[980px] text-left text-sm">
+            <thead className="sticky top-0 z-10 bg-slate-50 text-xs uppercase text-slate-400">
               <tr>
+                <th className="w-10 px-4 py-3" />
                 <th className="px-4 py-3">Subject</th>
                 <th className="px-4 py-3">Issuer</th>
+                <th className="px-4 py-3">Validade</th>
                 <th className="px-4 py-3">Thumbprint</th>
                 <th className="px-4 py-3">Retenção</th>
                 <th className="px-4 py-3">Última atualização</th>
@@ -248,34 +267,165 @@ const InstalledCertsPage = () => {
             <tbody>
               {filteredCerts.map((cert) => {
                 const retention = formatRetentionLabel(cert);
+                const rowKey = `${cert.device_id}:${cert.thumbprint}`;
+                const subjectCn = parseDnCN(cert.subject);
+                const issuerCn = parseDnCN(cert.issuer);
+                const validityDays = daysUntil(cert.not_after);
+                const isExpired =
+                  cert.not_after && new Date(cert.not_after).getTime() < Date.now();
+                const validityLabel = cert.not_after
+                  ? isExpired
+                    ? "Vencido"
+                    : validityDays !== null && validityDays <= 30
+                      ? `Vence em ${validityDays}d`
+                      : "OK"
+                  : "-";
+                const validityTone = cert.not_after
+                  ? isExpired
+                    ? "bg-rose-50 text-rose-700"
+                    : validityDays !== null && validityDays <= 30
+                      ? "bg-amber-50 text-amber-700"
+                      : "bg-emerald-50 text-emerald-700"
+                  : "bg-slate-100 text-slate-500";
+                const isExpanded = expandedRows[rowKey];
                 return (
-                  <tr key={`${cert.device_id}:${cert.thumbprint}`} className="border-t border-slate-100">
-                    <td className="px-4 py-4 text-slate-700">
-                      {cert.subject ?? "-"}
-                      {cert.removed_at ? (
-                        <span className="mt-1 block text-[11px] text-rose-500">
-                          Removido em {formatDateTime(cert.removed_at)}
+                  <Fragment key={rowKey}>
+                    <tr className="border-t border-slate-100">
+                      <td className="px-4 py-4 align-top">
+                        <button
+                          type="button"
+                          className="flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
+                          onClick={() => toggleRow(rowKey)}
+                          aria-label={isExpanded ? "Recolher detalhes" : "Expandir detalhes"}
+                        >
+                          <span className={`text-xs transition ${isExpanded ? "rotate-180" : ""}`}>
+                            ▾
+                          </span>
+                        </button>
+                      </td>
+                      <td className="px-4 py-4 text-slate-700">
+                        <div className="max-w-[320px] space-y-1">
+                          <div className="truncate text-sm font-semibold text-slate-900">
+                            {subjectCn}
+                          </div>
+                          <div
+                            className="line-clamp-2 text-xs text-slate-400"
+                            title={cert.subject ?? "-"}
+                          >
+                            {cert.subject ?? "-"}
+                          </div>
+                        </div>
+                        {cert.removed_at ? (
+                          <span className="mt-2 block text-[11px] text-rose-500">
+                            Removido em {formatDateTime(cert.removed_at)}
+                          </span>
+                        ) : null}
+                      </td>
+                      <td className="px-4 py-4 text-slate-600">
+                        <div className="max-w-[260px] space-y-1">
+                          <div className="truncate text-sm font-semibold text-slate-800">
+                            {issuerCn}
+                          </div>
+                          <div
+                            className="line-clamp-2 text-xs text-slate-400"
+                            title={cert.issuer ?? "-"}
+                          >
+                            {cert.issuer ?? "-"}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 text-slate-600">
+                        <div className="space-y-1">
+                          <div className="text-sm text-slate-700">
+                            {formatDateTime(cert.not_after)}
+                          </div>
+                          <span
+                            className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${validityTone}`}
+                          >
+                            {validityLabel}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 text-slate-500">
+                        <div className="flex flex-col gap-2">
+                          <span
+                            className="font-mono text-xs text-slate-600"
+                            title={cert.thumbprint}
+                          >
+                            {formatThumbprint(cert.thumbprint, preferences.hideLongIds)}
+                          </span>
+                          <button
+                            type="button"
+                            className="w-fit text-xs font-semibold text-slate-500 underline-offset-4 transition hover:text-slate-700 hover:underline"
+                            onClick={() => handleCopyThumbprint(cert.thumbprint)}
+                          >
+                            Copiar
+                          </button>
+                        </div>
+                      </td>
+                      <td className="px-4 py-4">
+                        <span
+                          className={`inline-flex max-w-[200px] items-center rounded-full px-3 py-1 text-xs font-semibold ${retention.tone}`}
+                          title={retention.label}
+                        >
+                          {retention.label}
                         </span>
-                      ) : null}
-                    </td>
-                    <td className="px-4 py-4 text-slate-600">{cert.issuer ?? "-"}</td>
-                    <td className="px-4 py-4 text-slate-500">
-                      <span title={cert.thumbprint}>
-                        {formatThumbprint(cert.thumbprint, preferences.hideLongIds)}
-                      </span>
-                    </td>
-                    <td className="px-4 py-4">
-                      <span
-                        className={`inline-flex max-w-[220px] items-center rounded-full px-3 py-1 text-xs font-semibold ${retention.tone}`}
-                        title={retention.label}
-                      >
-                        {retention.label}
-                      </span>
-                    </td>
-                    <td className="px-4 py-4 text-slate-500">
-                      {formatDateTime(cert.last_seen_at)}
-                    </td>
-                  </tr>
+                      </td>
+                      <td className="px-4 py-4 text-slate-500">
+                        {formatDateTime(cert.last_seen_at)}
+                      </td>
+                    </tr>
+                    {isExpanded ? (
+                      <tr className="border-t border-slate-100 bg-slate-50/60">
+                        <td colSpan={7} className="px-4 py-4 text-xs text-slate-600">
+                          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                            <div>
+                              <div className="text-[11px] uppercase text-slate-400">Serial</div>
+                              <div className="mt-1 font-mono text-sm text-slate-700">
+                                {cert.serial ?? "-"}
+                              </div>
+                            </div>
+                            <div>
+                              <div className="text-[11px] uppercase text-slate-400">
+                                Not Before
+                              </div>
+                              <div className="mt-1 text-sm text-slate-700">
+                                {formatDateTime(cert.not_before)}
+                              </div>
+                            </div>
+                            <div>
+                              <div className="text-[11px] uppercase text-slate-400">Not After</div>
+                              <div className="mt-1 text-sm text-slate-700">
+                                {formatDateTime(cert.not_after)}
+                              </div>
+                            </div>
+                            <div>
+                              <div className="text-[11px] uppercase text-slate-400">
+                                Instalado em
+                              </div>
+                              <div className="mt-1 text-sm text-slate-700">
+                                {formatDateTime(cert.installed_at)}
+                              </div>
+                            </div>
+                            <div>
+                              <div className="text-[11px] uppercase text-slate-400">Job ID</div>
+                              <div className="mt-1 font-mono text-sm text-slate-700">
+                                {cert.job_id ?? "-"}
+                              </div>
+                            </div>
+                            <div>
+                              <div className="text-[11px] uppercase text-slate-400">
+                                Motivo retenção
+                              </div>
+                              <div className="mt-1 text-sm text-slate-700">
+                                {cert.keep_reason ?? "-"}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : null}
+                  </Fragment>
                 );
               })}
             </tbody>

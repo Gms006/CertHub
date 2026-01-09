@@ -1292,6 +1292,9 @@ limit 20;
 
 **Status**: ✅ **Concluído**
 
+**Atualizações**
+- polish UI: CN friendly + validade + copy/expand
+
 **Entregáveis**
 
 - **AGENT (.NET)**
