@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Outlet } from "react-router-dom";
-import { Search, SlidersHorizontal } from "lucide-react";
+import { SlidersHorizontal } from "lucide-react";
 
 import Modal from "./Modal";
 import { useAuth } from "../hooks/useAuth";
@@ -59,48 +59,39 @@ const AppShell = () => {
   }, [apiFetch, preferencesOpen]);
 
   return (
-    <div className="min-h-screen bg-slate-100">
-      <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/80 backdrop-blur">
-        <div className="flex w-full items-center justify-between gap-4 px-4 py-3">
-          <div className="flex items-center gap-3">
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100">
+      <header className="sticky top-0 z-40 border-b border-slate-200/70 bg-white/70 backdrop-blur">
+        <div className="flex w-full flex-wrap items-center justify-between gap-4 px-4 py-3">
+          <div className="flex min-w-0 items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#0e2659] text-white">
-              <span className="text-sm font-semibold">N</span>
+              <span className="text-sm font-semibold">C</span>
             </div>
-            <div>
-              <p className="text-sm font-semibold text-slate-900">
-                Neto Contabilidade
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-slate-900">CertHub</p>
+              <p className="truncate text-xs text-slate-500">
+                Portal de Certificados / Neto Contabilidade
               </p>
-              <p className="text-xs text-slate-500">Portal de Certificados</p>
             </div>
           </div>
-          <div className="hidden w-full max-w-xl items-center gap-3 md:flex">
-            <div className="relative flex-1">
-              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-                <Search className="h-4 w-4" />
-              </span>
-              <input
-                className="h-10 w-full rounded-2xl border border-slate-200 bg-white pl-9 text-sm text-slate-600 placeholder:text-slate-400"
-                placeholder="Buscar por empresa, CNPJ/CPF, titular..."
-              />
-            </div>
+          <div className="flex flex-wrap items-center justify-end gap-2">
             <button
-              className="flex h-10 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-600"
+              className="flex h-10 items-center gap-2 rounded-2xl border border-slate-200/70 bg-white/70 px-4 text-sm font-medium text-slate-600 shadow-sm transition hover:bg-white"
               onClick={() => setPreferencesOpen(true)}
             >
               <SlidersHorizontal className="h-4 w-4" />
               Preferências
             </button>
-          </div>
-          <div className="flex items-center gap-2 rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white">
-            <span>{displayName}</span>
-            <span className="text-white/40">•</span>
-            <button
-              type="button"
-              onClick={logout}
-              className="text-xs font-semibold text-white/80 transition hover:text-white"
-            >
-              Sair
-            </button>
+            <div className="flex items-center gap-2 rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white">
+              <span>{displayName}</span>
+              <span className="text-white/40">•</span>
+              <button
+                type="button"
+                onClick={logout}
+                className="text-xs font-semibold text-white/80 transition hover:text-white"
+              >
+                Sair
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -146,7 +137,7 @@ const AppShell = () => {
             </p>
           </div>
         </aside>
-        <main>
+        <main className="rounded-3xl bg-gradient-to-b from-slate-50/80 to-slate-100/80 p-4 shadow-sm ring-1 ring-slate-200/70 md:p-6">
           <Outlet />
         </main>
       </div>

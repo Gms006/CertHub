@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
+import { Copy } from "lucide-react";
 
 import SectionTabs from "../components/SectionTabs";
 import Toast from "../components/Toast";
@@ -62,6 +63,7 @@ const InstalledCertsPage = () => {
   const [includeRemoved, setIncludeRemoved] = useState(false);
   const [loading, setLoading] = useState(false);
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
+  const [copiedThumbprint, setCopiedThumbprint] = useState<string | null>(null);
 
   const isAdmin = user?.role_global === "ADMIN" || user?.role_global === "DEV";
 
@@ -163,10 +165,22 @@ const InstalledCertsPage = () => {
     try {
       await navigator.clipboard.writeText(thumbprint);
       notify("Thumbprint copiado", "success");
+      setCopiedThumbprint(thumbprint);
+      window.setTimeout(() => {
+        setCopiedThumbprint((current) => (current === thumbprint ? null : current));
+      }, 1800);
     } catch {
       notify("Não foi possível copiar o thumbprint.", "error");
     }
   };
+
+  const kpis = useMemo(() => {
+    const total = filteredCerts.length;
+    const viaAgent = filteredCerts.filter((cert) => cert.installed_via_agent).length;
+    const unmanaged = filteredCerts.filter((cert) => !cert.installed_via_agent).length;
+    const removed = filteredCerts.filter((cert) => cert.removed_at).length;
+    return { total, viaAgent, unmanaged, removed };
+  }, [filteredCerts]);
 
   return (
     <div className="space-y-6">
@@ -179,34 +193,42 @@ const InstalledCertsPage = () => {
 
       <SectionTabs />
 
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-slate-200 bg-white p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-3xl bg-white/70 p-4 shadow-sm ring-1 ring-slate-200/70 backdrop-blur">
         <div className="flex flex-wrap items-center gap-3">
-          <div className="inline-flex rounded-2xl border border-slate-200 bg-slate-50 p-1 text-xs font-semibold text-slate-600">
+          <div className="inline-flex rounded-2xl bg-white/70 p-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200/70">
             <button
               type="button"
-              className={`rounded-2xl px-3 py-1 ${scope === "all" ? "bg-white text-slate-900" : ""}`}
+              className={`rounded-2xl px-3 py-1 transition ${
+                scope === "all"
+                  ? "bg-slate-900 text-white shadow-sm"
+                  : "text-slate-700"
+              }`}
               onClick={() => setScope("all")}
             >
               Todos
             </button>
             <button
               type="button"
-              className={`rounded-2xl px-3 py-1 ${scope === "agent" ? "bg-white text-slate-900" : ""}`}
+              className={`rounded-2xl px-3 py-1 transition ${
+                scope === "agent"
+                  ? "bg-slate-900 text-white shadow-sm"
+                  : "text-slate-700"
+              }`}
               onClick={() => setScope("agent")}
             >
               Somente via Agent
             </button>
           </div>
           <input
-            className="h-10 rounded-2xl border border-slate-200 px-4 text-sm text-slate-600"
+            className="h-10 rounded-2xl bg-white px-4 text-sm text-slate-900 placeholder:text-slate-400 ring-1 ring-slate-200/70 transition focus:ring-2 focus:ring-slate-300"
             placeholder="Buscar por subject, issuer ou thumbprint"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
-          <label className="flex items-center gap-2 text-xs text-slate-500">
+          <label className="flex items-center gap-2 rounded-full px-2 py-1 text-xs text-slate-600">
             <input
               type="checkbox"
-              className="h-4 w-4 rounded border-slate-300"
+              className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-300"
               checked={includeRemoved}
               onChange={(event) => setIncludeRemoved(event.target.checked)}
             />
@@ -215,7 +237,7 @@ const InstalledCertsPage = () => {
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <select
-            className="h-10 rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-600"
+            className="h-10 rounded-2xl bg-white/70 px-4 text-sm text-slate-700 ring-1 ring-slate-200/70 transition focus:ring-2 focus:ring-slate-300"
             value={selectedDeviceId}
             onChange={(event) => setSelectedDeviceId(event.target.value)}
           >
@@ -227,12 +249,33 @@ const InstalledCertsPage = () => {
             ))}
           </select>
           <button
-            className="h-10 rounded-2xl border border-slate-200 px-4 text-sm text-slate-600"
+            className="h-10 rounded-2xl bg-white/70 px-4 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-slate-200/70 transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
             onClick={loadInstalledCerts}
           >
             Atualizar
           </button>
         </div>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-4">
+        <div className="rounded-2xl bg-white/70 p-3 text-sm shadow-sm ring-1 ring-slate-200/70">
+          <p className="text-xs text-slate-500">Total</p>
+          <p className="text-lg font-semibold text-slate-900">{kpis.total}</p>
+        </div>
+        <div className="rounded-2xl bg-white/70 p-3 text-sm shadow-sm ring-1 ring-slate-200/70">
+          <p className="text-xs text-slate-500">Via Agent</p>
+          <p className="text-lg font-semibold text-slate-900">{kpis.viaAgent}</p>
+        </div>
+        <div className="rounded-2xl bg-white/70 p-3 text-sm shadow-sm ring-1 ring-slate-200/70">
+          <p className="text-xs text-slate-500">Não gerenciado</p>
+          <p className="text-lg font-semibold text-slate-900">{kpis.unmanaged}</p>
+        </div>
+        {includeRemoved ? (
+          <div className="rounded-2xl bg-white/70 p-3 text-sm shadow-sm ring-1 ring-slate-200/70">
+            <p className="text-xs text-slate-500">Removidos</p>
+            <p className="text-lg font-semibold text-slate-900">{kpis.removed}</p>
+          </div>
+        ) : null}
       </div>
 
       <div className="flex items-center justify-between text-xs text-slate-500">
@@ -241,17 +284,17 @@ const InstalledCertsPage = () => {
       </div>
 
       {!selectedDeviceId ? (
-        <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-10 text-center text-sm text-slate-500">
+        <div className="rounded-3xl border border-dashed border-slate-200/70 bg-white/70 p-10 text-center text-sm text-slate-500 shadow-sm ring-1 ring-slate-200/70">
           Selecione um device para visualizar os certificados instalados.
         </div>
       ) : loading ? (
-        <div className="h-56 rounded-3xl border border-dashed border-slate-200 bg-white/70" />
+        <div className="h-56 rounded-3xl border border-dashed border-slate-200/70 bg-white/70 shadow-sm ring-1 ring-slate-200/70" />
       ) : filteredCerts.length === 0 ? (
-        <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-10 text-center text-sm text-slate-500">
+        <div className="rounded-3xl border border-dashed border-slate-200/70 bg-white/70 p-10 text-center text-sm text-slate-500 shadow-sm ring-1 ring-slate-200/70">
           Nenhum certificado encontrado.
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-3xl border border-slate-200 bg-white">
+        <div className="overflow-x-auto rounded-3xl bg-white/70 shadow-sm ring-1 ring-slate-200/70 backdrop-blur">
           <table className="w-full min-w-[980px] text-left text-sm">
             <thead className="sticky top-0 z-10 bg-slate-50 text-xs uppercase text-slate-400">
               <tr>
@@ -264,7 +307,7 @@ const InstalledCertsPage = () => {
                 <th className="px-4 py-3">Última atualização</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-slate-200/70">
               {filteredCerts.map((cert) => {
                 const retention = formatRetentionLabel(cert);
                 const rowKey = `${cert.device_id}:${cert.thumbprint}`;
@@ -290,11 +333,11 @@ const InstalledCertsPage = () => {
                 const isExpanded = expandedRows[rowKey];
                 return (
                   <Fragment key={rowKey}>
-                    <tr className="border-t border-slate-100">
+                    <tr className="odd:bg-white even:bg-slate-50/40 hover:bg-slate-100/60">
                       <td className="px-4 py-4 align-top">
                         <button
                           type="button"
-                          className="flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
+                          className="flex h-7 w-7 items-center justify-center rounded-full border border-slate-200/70 bg-white/70 text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
                           onClick={() => toggleRow(rowKey)}
                           aria-label={isExpanded ? "Recolher detalhes" : "Expandir detalhes"}
                         >
@@ -356,10 +399,15 @@ const InstalledCertsPage = () => {
                           </span>
                           <button
                             type="button"
-                            className="w-fit text-xs font-semibold text-slate-500 underline-offset-4 transition hover:text-slate-700 hover:underline"
+                            className="inline-flex w-fit items-center gap-1 rounded-full border border-slate-200/70 bg-white/70 px-2 py-1 text-[11px] font-semibold text-slate-600 transition hover:border-slate-300 hover:text-slate-800"
                             onClick={() => handleCopyThumbprint(cert.thumbprint)}
+                            aria-label="Copiar thumbprint"
                           >
-                            Copiar
+                            <Copy className="h-3 w-3" />
+                            <span>Copiar</span>
+                            {copiedThumbprint === cert.thumbprint ? (
+                              <span className="text-[10px] text-emerald-600">Copiado</span>
+                            ) : null}
                           </button>
                         </div>
                       </td>
@@ -376,7 +424,7 @@ const InstalledCertsPage = () => {
                       </td>
                     </tr>
                     {isExpanded ? (
-                      <tr className="border-t border-slate-100 bg-slate-50/60">
+                      <tr className="bg-slate-50/60">
                         <td colSpan={7} className="px-4 py-4 text-xs text-slate-600">
                           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                             <div>
