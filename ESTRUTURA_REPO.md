@@ -100,6 +100,7 @@ certhub/
 │  ├─ api/
 │  │  └─ openapi.json
 │  ├─ S8_PILOTO_ROLLOUT.md
+│  ├─ S9_QA_CHECKLIST.md
 │  └─ TREINAMENTO_RAPIDO.md
 │
 ├─ agent/

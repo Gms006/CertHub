@@ -1249,6 +1249,13 @@ limit 20;
 - Frontend: UI no modal de instalação para escolher política, com campos e bloqueios por permissão.
 - Testes automatizados cobrindo RBAC + comportamento do cleanup.
 
+**Entregue (S9)**
+
+- Cleanup `KEEP_UNTIL` agora atua em escopo (remove apenas `CleanupMode=KEEP_UNTIL` e preserva `DEFAULT/18h`).
+- Jobs `KEEP_UNTIL` criam task via `schtasks` (V1) com execução e auto-delete confirmados.
+- Compatibilidade garantida para devices de usuário `VIEW` (criação/execução da task sem COM).
+- Parse de argumentos suporta `--mode=keep_until` e `--mode keep_until`.
+
 **Aceite**
 
 - Por padrão continua removendo às 18h.
