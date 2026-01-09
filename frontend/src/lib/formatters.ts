@@ -55,6 +55,13 @@ export const daysUntil = (value?: string | null) => {
   return Math.ceil((date.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
 };
 
+export const parseDnCN = (dn?: string | null) => {
+  if (!dn) return "-";
+  const match = dn.match(/CN=([^,]+)/i);
+  const value = match?.[1]?.trim();
+  return value ? value : "-";
+};
+
 export const sanitizeSensitiveLabel = (value?: string | null) => {
   if (!value) return "";
   let sanitized = value;
