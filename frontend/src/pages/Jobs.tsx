@@ -1,4 +1,4 @@
-import { Download } from "lucide-react";
+import { Download, RefreshCw } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import SectionTabs from "../components/SectionTabs";
@@ -236,9 +236,10 @@ const JobsPage = () => {
             Exportar Excel
           </button>
           <button
-            className="h-10 rounded-2xl border border-slate-200 px-4 text-sm text-slate-600"
+            className="flex h-10 items-center gap-2 rounded-2xl border border-slate-200 px-4 text-sm text-slate-600"
             onClick={loadJobs}
           >
+            <RefreshCw className="h-4 w-4" />
             Atualizar
           </button>
         </div>
