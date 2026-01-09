@@ -6,7 +6,7 @@ import Toast from "../components/Toast";
 import { useAuth } from "../hooks/useAuth";
 import { usePreferences } from "../hooks/usePreferences";
 import { useToast } from "../hooks/useToast";
-import { formatDate, sanitizeSensitiveLabel } from "../lib/formatters";
+import { formatDateTime, sanitizeSensitiveLabel } from "../lib/formatters";
 
 type InstallJobRead = {
   id: string;
@@ -29,13 +29,13 @@ type DeviceRead = {
 };
 
 const statusStyles: Record<string, string> = {
-  REQUESTED: "bg-amber-50 text-amber-700",
-  PENDING: "bg-sky-50 text-sky-700",
-  IN_PROGRESS: "bg-indigo-50 text-indigo-700",
-  DONE: "bg-emerald-50 text-emerald-700",
-  FAILED: "bg-rose-50 text-rose-700",
-  EXPIRED: "bg-slate-100 text-slate-600",
-  CANCELED: "bg-rose-50 text-rose-700",
+  REQUESTED: "bg-amber-50 text-amber-700 ring-1 ring-amber-200/70",
+  PENDING: "bg-sky-50 text-sky-700 ring-1 ring-sky-200/70",
+  IN_PROGRESS: "bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200/70",
+  DONE: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/70",
+  FAILED: "bg-rose-50 text-rose-700 ring-1 ring-rose-200/70",
+  EXPIRED: "bg-slate-100 text-slate-600 ring-1 ring-slate-200/70",
+  CANCELED: "bg-rose-50 text-rose-700 ring-1 ring-rose-200/70",
 };
 
 const statusLabels: Record<string, string> = {
@@ -58,6 +58,10 @@ const JobsPage = () => {
   const [loading, setLoading] = useState(true);
   const [deviceFilter, setDeviceFilter] = useState("Todos");
   const [exportPeriod, setExportPeriod] = useState("last_15_days");
+  const [statusFilter, setStatusFilter] = useState<
+    "all" | "pending" | "done" | "error"
+  >("all");
+  const [search, setSearch] = useState("");
 
   const isAdmin = user?.role_global === "ADMIN" || user?.role_global === "DEV";
   const isView = user?.role_global === "VIEW";
@@ -127,11 +131,32 @@ const JobsPage = () => {
   );
 
   const filteredJobs = useMemo(() => {
-    if (!isAdmin || deviceFilter === "Todos") {
-      return jobs;
+    let result = jobs;
+    if (isAdmin && deviceFilter !== "Todos") {
+      result = result.filter((job) => job.device_id === deviceFilter);
     }
-    return jobs.filter((job) => job.device_id === deviceFilter);
-  }, [deviceFilter, isAdmin, jobs]);
+    if (statusFilter !== "all") {
+      const statusGroups: Record<"pending" | "done" | "error", string[]> = {
+        pending: ["REQUESTED", "PENDING", "IN_PROGRESS"],
+        done: ["DONE"],
+        error: ["FAILED", "EXPIRED", "CANCELED"],
+      };
+      const allowed = statusGroups[statusFilter];
+      result = result.filter((job) => allowed.includes(job.status));
+    }
+    const term = search.trim().toLowerCase();
+    if (!term) return result;
+    return result.filter((job) => {
+      const certName = certMap.get(job.cert_id)?.toLowerCase() ?? "";
+      const deviceName = deviceMap.get(job.device_id)?.toLowerCase() ?? "";
+      return (
+        certName.includes(term) ||
+        job.id.toLowerCase().includes(term) ||
+        job.device_id.toLowerCase().includes(term) ||
+        deviceName.includes(term)
+      );
+    });
+  }, [deviceFilter, isAdmin, jobs, statusFilter, search, certMap, deviceMap]);
 
   const handleApprove = async (jobId: string, approve: boolean) => {
     try {
@@ -192,7 +217,7 @@ const JobsPage = () => {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-slate-900">Jobs</h1>
+        <h1 className="text-2xl font-semibold text-slate-900">Solicitações</h1>
         <p className="text-sm text-slate-500">
           Controle de instalações com aprovação e acompanhamento em tempo real.
         </p>
@@ -200,48 +225,61 @@ const JobsPage = () => {
 
       <SectionTabs />
 
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-slate-200 bg-white p-4">
-        <p className="text-sm text-slate-500">
-          {filteredJobs.length} jobs encontrados
-        </p>
-        <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap gap-3 rounded-3xl border border-slate-200 bg-white p-4">
+        <select
+          className="h-10 flex-1 rounded-2xl border border-slate-200 px-4 text-sm text-slate-600"
+          value={statusFilter}
+          onChange={(event) =>
+            setStatusFilter(event.target.value as "all" | "pending" | "done" | "error")
+          }
+        >
+          <option value="all">Todos</option>
+          <option value="pending">Pendentes</option>
+          <option value="done">Concluídos</option>
+          <option value="error">Erro</option>
+        </select>
+        <input
+          className="h-10 flex-[2] rounded-2xl border border-slate-200 px-4 text-sm text-slate-600"
+          placeholder="Buscar por certificado, job id, device..."
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+        />
+        <select
+          className="h-10 flex-1 rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-600"
+          value={exportPeriod}
+          onChange={(event) => setExportPeriod(event.target.value)}
+        >
+          <option value="last_15_days">Últimos 15 dias</option>
+          <option value="this_month">Este mês</option>
+          <option value="last_6_months">Últimos 6 meses</option>
+        </select>
+        {isAdmin ? (
           <select
-            className="h-10 rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-600"
-            value={exportPeriod}
-            onChange={(event) => setExportPeriod(event.target.value)}
+            className="h-10 flex-1 rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-600"
+            value={deviceFilter}
+            onChange={(event) => setDeviceFilter(event.target.value)}
           >
-            <option value="last_15_days">Últimos 15 dias</option>
-            <option value="this_month">Este mês</option>
-            <option value="last_6_months">Últimos 6 meses</option>
+            <option value="Todos">Todos os devices</option>
+            {devices.map((device) => (
+              <option key={device.id} value={device.id}>
+                {device.hostname}
+              </option>
+            ))}
           </select>
-          {isAdmin ? (
-            <select
-              className="h-10 rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-600"
-              value={deviceFilter}
-              onChange={(event) => setDeviceFilter(event.target.value)}
-            >
-              <option value="Todos">Todos os devices</option>
-              {devices.map((device) => (
-                <option key={device.id} value={device.id}>
-                  {device.hostname}
-                </option>
-              ))}
-            </select>
-          ) : null}
-          <button
-            className="flex h-10 items-center gap-2 rounded-2xl border border-slate-200 px-4 text-sm text-slate-600"
-            onClick={handleExport}
-          >
-            <Download className="h-4 w-4" />
-            Exportar Excel
-          </button>
-          <button
-            className="h-10 rounded-2xl border border-slate-200 px-4 text-sm text-slate-600"
-            onClick={loadJobs}
-          >
-            Atualizar
-          </button>
-        </div>
+        ) : null}
+        <button
+          className="flex h-10 items-center gap-2 rounded-2xl border border-slate-200 px-4 text-sm text-slate-600"
+          onClick={handleExport}
+        >
+          <Download className="h-4 w-4" />
+          Exportar Excel
+        </button>
+        <button
+          className="h-10 rounded-2xl border border-slate-200 px-4 text-sm text-slate-600"
+          onClick={loadJobs}
+        >
+          Atualizar
+        </button>
       </div>
 
       {loading ? (
@@ -258,28 +296,26 @@ const JobsPage = () => {
                 <th className="px-4 py-3">Certificado</th>
                 <th className="px-4 py-3">Device</th>
                 <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Criado</th>
-                <th className="px-4 py-3 text-right">Ações</th>
+                <th className="px-4 py-3">Criado em</th>
+                <th className="px-4 py-3 text-right">Erros</th>
               </tr>
             </thead>
             <tbody>
               {filteredJobs.map((job) => (
                 <tr key={job.id} className="border-t border-slate-100">
                   <td className="px-4 py-4">
-                    <p
-                      className="max-w-[180px] truncate font-medium text-slate-800"
-                      title={certMap.get(job.cert_id) ?? job.cert_id}
-                    >
-                      {certMap.get(job.cert_id) ?? formatId(job.cert_id)}
-                    </p>
-                    <p className="text-xs text-slate-400">
-                      <span
-                        className="inline-block max-w-[180px] truncate"
-                        title={job.requested_by_user_id}
+                    <div className="max-w-[220px] space-y-1">
+                      <p
+                        className="truncate font-medium text-slate-900"
+                        title={certMap.get(job.cert_id) ?? job.cert_id}
                       >
+                        {certMap.get(job.cert_id) ?? formatId(job.cert_id)}
+                      </p>
+                      <p className="truncate text-xs text-slate-500">
+                        Job {formatId(job.id)} •{" "}
                         {formatId(job.requested_by_user_id)}
-                      </span>
-                    </p>
+                      </p>
+                    </div>
                   </td>
                   <td className="px-4 py-4 text-slate-600">
                     <span
@@ -292,7 +328,8 @@ const JobsPage = () => {
                   <td className="px-4 py-4">
                     <span
                       className={`inline-flex max-w-[160px] items-center whitespace-nowrap truncate rounded-full px-3 py-1 text-xs font-semibold ${
-                        statusStyles[job.status] ?? "bg-slate-100 text-slate-600"
+                        statusStyles[job.status] ??
+                        "bg-slate-100 text-slate-600 ring-1 ring-slate-200/70"
                       }`}
                       title={statusLabels[job.status] ?? job.status}
                     >
@@ -300,27 +337,41 @@ const JobsPage = () => {
                     </span>
                   </td>
                   <td className="px-4 py-4 text-slate-500">
-                    {formatDate(job.created_at)}
+                    {formatDateTime(job.created_at)}
                   </td>
                   <td className="px-4 py-4 text-right">
-                    {isAdmin && job.status === "REQUESTED" ? (
-                      <div className="flex justify-end gap-2">
-                        <button
-                          className="h-9 rounded-2xl border border-slate-200 px-3 text-xs text-slate-600"
-                          onClick={() => handleApprove(job.id, false)}
-                        >
-                          Negar
-                        </button>
-                        <button
-                          className="h-9 rounded-2xl bg-[#0e2659] px-3 text-xs font-semibold text-white"
-                          onClick={() => handleApprove(job.id, true)}
-                        >
-                          Aprovar
-                        </button>
+                    <details className="relative inline-block text-left">
+                      <summary className="list-none rounded-full border border-slate-200 px-2 py-1 text-sm text-slate-600 transition hover:border-slate-300 hover:text-slate-800">
+                        ⋯
+                      </summary>
+                      <div className="absolute right-0 z-10 mt-2 w-40 rounded-2xl border border-slate-200 bg-white p-2 text-xs text-slate-600 shadow-lg">
+                        {job.status === "FAILED" ? (
+                          <span className="block px-2 py-1 text-rose-600">
+                            Erro registrado
+                          </span>
+                        ) : (
+                          <span className="block px-2 py-1 text-slate-500">
+                            Sem erros
+                          </span>
+                        )}
+                        {isAdmin && job.status === "REQUESTED" ? (
+                          <div className="mt-2 flex flex-col gap-2">
+                            <button
+                              className="rounded-full border border-slate-200/70 px-3 py-1 text-xs text-slate-600"
+                              onClick={() => handleApprove(job.id, false)}
+                            >
+                              Negar
+                            </button>
+                            <button
+                              className="rounded-full bg-[#0e2659] px-3 py-1 text-xs font-semibold text-white"
+                              onClick={() => handleApprove(job.id, true)}
+                            >
+                              Aprovar
+                            </button>
+                          </div>
+                        ) : null}
                       </div>
-                    ) : (
-                      <span className="text-xs text-slate-400">Sem ações</span>
-                    )}
+                    </details>
                   </td>
                 </tr>
               ))}
