@@ -38,12 +38,27 @@ public sealed class AgentConfigStore
         {
             var json = File.ReadAllText(ConfigPath);
             var config = JsonSerializer.Deserialize<AgentConfig>(json, JsonOptions);
+            ApplyEnvironmentOverrides(config);
             return config;
         }
         catch (Exception ex)
         {
             _logger.Error("Failed to load config.json", ex);
             return null;
+        }
+    }
+
+    private static void ApplyEnvironmentOverrides(AgentConfig? config)
+    {
+        if (config is null)
+        {
+            return;
+        }
+
+        var intervalValue = Environment.GetEnvironmentVariable("INSTALLED_CERTS_REPORT_INTERVAL_SECONDS");
+        if (int.TryParse(intervalValue, out var intervalSeconds) && intervalSeconds >= 0)
+        {
+            config.InstalledCertsReportIntervalSeconds = intervalSeconds;
         }
     }
 

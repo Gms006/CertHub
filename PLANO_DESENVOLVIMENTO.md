@@ -1290,7 +1290,7 @@ limit 20;
   - `Manter para sempre` (`EXEMPT`)
   - `Não gerenciado` (cert presente no store, mas não consta no `installed_thumbprints` do agent)
 
-**Status**: ⏳ **Planejado**
+**Status**: ✅ **Concluído**
 
 **Entregáveis**
 
@@ -1352,6 +1352,7 @@ limit 20;
 
 **Validação (curta)**
 
+- Comando (backend): `pytest backend/tests/test_s9_1_installed_certs.py`.
 - Instalar manualmente um certificado no CurrentUser e validar visibilidade em “Todos”.
 - Criar job via portal, instalar via agent e validar “Somente via Agent” + badge de retenção.
 - Forçar cleanup 18h/keep_until e confirmar remoção/`removed_at` no portal.

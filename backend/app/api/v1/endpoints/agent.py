@@ -18,6 +18,7 @@ from app.models import (
     CertInstallJob,
     Certificate,
     Device,
+    DeviceInstalledCert,
     JOB_STATUS_DONE,
     JOB_STATUS_FAILED,
     JOB_STATUS_IN_PROGRESS,
@@ -33,6 +34,7 @@ from app.schemas.agent import (
   AgentPayloadResponse,
 )
 from app.schemas.device import DeviceRead
+from app.schemas.installed_cert import InstalledCertReportRequest
 from app.schemas.install_job import InstallJobRead
 from app.services.certificate_ingest import guess_password_from_path
 
@@ -42,6 +44,11 @@ PAYLOAD_TOKEN_TTL_SECONDS = 120
 RATE_LIMIT_WINDOW_SECONDS = 60
 RATE_LIMIT_AUTH_PER_DEVICE = 10
 RATE_LIMIT_PAYLOAD_PER_DEVICE = 5
+RATE_LIMIT_INSTALLED_CERTS_PER_DEVICE = 12
+
+
+def _normalize_thumbprint(value: str) -> str:
+    return value.replace(" ", "").upper()
 
 
 @router.post("/auth", response_model=AgentAuthResponse)
@@ -130,6 +137,102 @@ def agent_cleanup_event(
         )
     db.commit()
     return {"status": "ok"}
+
+
+@router.post("/installed-certs/report")
+def report_installed_certs(
+    payload: InstalledCertReportRequest,
+    db: Session = Depends(get_db),
+    device: Device = Depends(require_device),
+) -> dict[str, int | str]:
+    allowed, _ = check_rate_limit(
+        f"rl:agent_installed_certs:{device.id}",
+        RATE_LIMIT_INSTALLED_CERTS_PER_DEVICE,
+        RATE_LIMIT_WINDOW_SECONDS,
+    )
+    if not allowed:
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="rate limit")
+
+    if payload.device_id and payload.device_id != device.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="device mismatch")
+
+    now = datetime.now(timezone.utc)
+    items_by_thumbprint = {
+        _normalize_thumbprint(item.thumbprint): item
+        for item in payload.items
+        if item.thumbprint
+    }
+    existing_entries = db.execute(
+        select(DeviceInstalledCert).where(
+            DeviceInstalledCert.org_id == device.org_id,
+            DeviceInstalledCert.device_id == device.id,
+        )
+    ).scalars().all()
+    existing_by_thumbprint = {entry.thumbprint: entry for entry in existing_entries}
+
+    for thumbprint, item in items_by_thumbprint.items():
+        installed_via_agent = item.installed_via_agent
+        cleanup_mode = item.cleanup_mode if installed_via_agent else None
+        keep_until = item.keep_until if installed_via_agent else None
+        keep_reason = item.keep_reason if installed_via_agent else None
+        job_id = item.job_id if installed_via_agent else None
+        installed_at = item.installed_at if installed_via_agent else None
+        existing_entry = existing_by_thumbprint.get(thumbprint)
+        if existing_entry:
+            existing_entry.subject = item.subject
+            existing_entry.issuer = item.issuer
+            existing_entry.serial = item.serial
+            existing_entry.not_before = item.not_before
+            existing_entry.not_after = item.not_after
+            existing_entry.installed_via_agent = installed_via_agent
+            existing_entry.cleanup_mode = cleanup_mode
+            existing_entry.keep_until = keep_until
+            existing_entry.keep_reason = keep_reason
+            existing_entry.job_id = job_id
+            existing_entry.installed_at = installed_at
+            existing_entry.last_seen_at = now
+            existing_entry.removed_at = None
+        else:
+            db.add(
+                DeviceInstalledCert(
+                    org_id=device.org_id,
+                    device_id=device.id,
+                    thumbprint=thumbprint,
+                    subject=item.subject,
+                    issuer=item.issuer,
+                    serial=item.serial,
+                    not_before=item.not_before,
+                    not_after=item.not_after,
+                    installed_via_agent=installed_via_agent,
+                    cleanup_mode=cleanup_mode,
+                    keep_until=keep_until,
+                    keep_reason=keep_reason,
+                    job_id=job_id,
+                    installed_at=installed_at,
+                    last_seen_at=now,
+                    removed_at=None,
+                )
+            )
+
+    for entry in existing_entries:
+        if entry.thumbprint not in items_by_thumbprint and entry.removed_at is None:
+            entry.removed_at = now
+
+    log_audit(
+        db=db,
+        org_id=device.org_id,
+        action="INSTALLED_CERTS_REPORTED",
+        entity_type="device_installed_certs",
+        entity_id=str(device.id),
+        actor_device_id=device.id,
+        meta={
+            "device_id": str(device.id),
+            "count": len(items_by_thumbprint),
+            "scope": "CurrentUser\\My",
+        },
+    )
+    db.commit()
+    return {"status": "ok", "count": len(items_by_thumbprint)}
 
 
 @router.get("/jobs", response_model=list[InstallJobRead])

@@ -1,5 +1,6 @@
 using System.Net;
 using System.Security.Cryptography.X509Certificates;
+using System.Threading;
 using Certhub.Agent.Models;
 
 namespace Certhub.Agent.Services;
@@ -12,6 +13,7 @@ public sealed class AgentLoop
     private readonly InstalledThumbprintsStore _thumbprintsStore;
     private readonly CertificateCleanupService _cleanupService;
     private readonly ScheduledCleanupTaskService _scheduledTaskService;
+    private readonly InstalledCertsReporter _installedCertsReporter;
     private readonly string _executablePath;
     private readonly Logger _logger;
     private readonly AgentStatus _status = new();
@@ -19,6 +21,8 @@ public sealed class AgentLoop
     private Task? _loopTask;
     private AgentClient? _client;
     private string? _currentBaseUrl;
+    private DateTimeOffset _nextInstalledCertsReportAt = DateTimeOffset.MinValue;
+    private readonly SemaphoreSlim _installedCertsReportLock = new(1, 1);
 
     public AgentLoop(
         AgentConfigStore configStore,
@@ -26,6 +30,7 @@ public sealed class AgentLoop
         InstalledThumbprintsStore thumbprintsStore,
         CertificateCleanupService cleanupService,
         ScheduledCleanupTaskService scheduledTaskService,
+        InstalledCertsReporter installedCertsReporter,
         string executablePath,
         Logger logger)
     {
@@ -34,6 +39,7 @@ public sealed class AgentLoop
         _thumbprintsStore = thumbprintsStore;
         _cleanupService = cleanupService;
         _scheduledTaskService = scheduledTaskService;
+        _installedCertsReporter = installedCertsReporter;
         _executablePath = executablePath;
         _logger = logger;
     }
@@ -138,6 +144,8 @@ public sealed class AgentLoop
                     : TimeSpan.FromSeconds(30));
             }
 
+            await ReportInstalledCertsAsync(config, cancellationToken);
+
             var hasActiveJob = false;
             try
             {
@@ -197,6 +205,7 @@ public sealed class AgentLoop
         }
 
         await ReportCleanupAsync(result, cancellationToken);
+        await ReportInstalledCertsAsync(config, cancellationToken, force: true);
     }
 
     private async Task ReportCleanupAsync(CleanupResult result, CancellationToken cancellationToken)
@@ -251,6 +260,50 @@ public sealed class AgentLoop
         {
             _logger.Error("Heartbeat error", ex);
             UpdateStatus(error: "Heartbeat error");
+        }
+    }
+
+    private async Task ReportInstalledCertsAsync(
+        AgentConfig config,
+        CancellationToken cancellationToken,
+        bool force = false)
+    {
+        if (_client is null)
+        {
+            return;
+        }
+
+        var intervalSeconds = config.InstalledCertsReportIntervalSeconds;
+        if (intervalSeconds <= 0)
+        {
+            return;
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        if (!force && now < _nextInstalledCertsReportAt)
+        {
+            return;
+        }
+
+        if (!await _installedCertsReportLock.WaitAsync(0, cancellationToken))
+        {
+            return;
+        }
+
+        try
+        {
+            var success = await _installedCertsReporter.SendSnapshotAsync(
+                _client,
+                config.DeviceId,
+                cancellationToken);
+            if (success)
+            {
+                _nextInstalledCertsReportAt = now.AddSeconds(intervalSeconds);
+            }
+        }
+        finally
+        {
+            _installedCertsReportLock.Release();
         }
     }
 
@@ -352,6 +405,11 @@ public sealed class AgentLoop
             catch (Exception ex)
             {
                 _logger.Error($"Failed to ensure keep-until cleanup task for job {jobId}", ex);
+            }
+            var config = _configStore.Load();
+            if (config is not null)
+            {
+                await ReportInstalledCertsAsync(config, cancellationToken, force: true);
             }
         }
         catch (Exception ex)

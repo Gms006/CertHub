@@ -52,6 +52,7 @@ const SectionTabs = () => {
   const tabs = [
     { label: "Certificados", to: "/certificados", allow: true },
     { label: "Jobs", to: "/jobs", allow: true },
+    { label: "Instalados", to: "/instalados", allow: true },
     { label: "Dispositivos e Usuários", to: "/dispositivos", allow: role !== "VIEW" },
     { label: "Auditoria", to: "/auditoria", allow: role === "DEV" },
   ];

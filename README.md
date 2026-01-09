@@ -128,6 +128,15 @@ Unregister-ScheduledTask -TaskName "CertHub Cleanup 18h" -Confirm:$false
   - `scripts/windows/s8_smoke.ps1`
   - `scripts/windows/s9_retention_smoke.ps1`
 
+## Inventário Instalados (S9.1)
+- O Agent reporta periodicamente o snapshot do store `CurrentUser\\My` (metadados apenas) para o endpoint `POST /api/v1/agent/installed-certs/report`.
+- O portal consulta por device via `GET /api/v1/devices/{device_id}/installed-certs?scope=all|agent` (sem PFX/senha).
+- Variável do Agent: `INSTALLED_CERTS_REPORT_INTERVAL_SECONDS` (default 30; `0` desabilita o report).
+
+Validação rápida:
+- `pytest backend/tests/test_s9_1_installed_certs.py`
+- Verificar no portal a aba “Instalados” com filtro “Todos” vs “Somente via Agent”.
+
 ## Segurança
 - **JWT** assinado; tokens de device armazenados como **hash** (SHA256).
 - **Rate limit** para `/agent/auth` e `/agent/jobs/{id}/payload`.
