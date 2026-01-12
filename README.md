@@ -101,8 +101,44 @@ Campos principais:
 - `CERTS_ROOT_PATH` e `OPENSSL_PATH`
 - `FRONTEND_BASE_URL` (ex.: `http://localhost:5173`)
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`
+- `CORS_ALLOW_ORIGINS` (CSV com origens permitidas)
 
 > Em DEV, se `SMTP_HOST`/`SMTP_FROM` não estiverem configurados, o backend registra o link de reset no log.
+
+## S10 TLS/HTTPS (piloto LAN)
+O piloto usa Caddy para servir o frontend e fazer reverse proxy para `/api/v1` no backend.
+
+### 1) Subir backend (porta 8010)
+```bash
+cd backend
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8010 --env-file .\.env
+```
+
+### 2) Build do frontend
+```bash
+cd frontend
+npm install
+npm run build
+```
+
+### 3) Rodar o proxy Caddy
+```powershell
+caddy run --config infra/https/Caddyfile --adapter caddyfile
+```
+
+### Variáveis de ambiente (piloto)
+Backend (`.env`):
+```
+FRONTEND_BASE_URL=https://portal.local
+CORS_ALLOW_ORIGINS=http://localhost:5173,http://localhost:8011,http://192.168.25.51:5173,https://portal.local
+```
+
+Frontend (`frontend/.env`):
+```
+VITE_API_URL=/api/v1
+```
+
+Runbook completo: `infra/https/README.md`.
 
 ### KEEP_UNTIL (one-shot auto-delete)
 Quando um job chega com `cleanup_mode=KEEP_UNTIL`, o Agent cria uma task **ONCE** via `schtasks` no horário local do `keep_until`.

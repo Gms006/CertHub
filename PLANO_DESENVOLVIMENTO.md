@@ -1387,10 +1387,27 @@ limit 20;
 - Portal e API acessíveis **somente via HTTPS** em ambiente prod.
 - Sem **mixed content** no portal (recursos carregados apenas por HTTPS).
 
+**Passos (piloto LAN)**
+
+- Configurar o proxy Caddy com `tls internal` servindo o `frontend/dist` e roteando `/api/v1` para `http://127.0.0.1:8010`.
+- Ajustar `.env`:
+  - `FRONTEND_BASE_URL=https://portal.local`
+  - `CORS_ALLOW_ORIGINS=... ,https://portal.local`
+- Ajustar `frontend/.env`:
+  - `VITE_API_URL=/api/v1`
+
+**Validação (S10)**
+
+```bash
+curl -I https://portal.local
+curl -I https://portal.local/api/v1/health
+```
+
 **Rollback curto (S10)**
 
 - Voltar o proxy para HTTP interno e bloquear acesso externo.
 - Reverter configurações de TLS/headers no proxy.
+- Remover `https://portal.local` de `CORS_ALLOW_ORIGINS` e voltar `VITE_API_URL` para `http://localhost:8010/api/v1`.
 
 ---
 

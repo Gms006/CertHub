@@ -180,7 +180,10 @@ certhub/
 │  └─ vite.config.ts
 │
 ├─ infra/
-│  └─ docker-compose.yml
+│  ├─ docker-compose.yml
+│  └─ https/
+│     ├─ Caddyfile
+│     └─ README.md
 │
 ├─ scripts/
 │  ├─ http/
@@ -195,7 +198,9 @@ certhub/
 │     ├─ install_agent.ps1
 │     ├─ publish_agent.ps1
 │     ├─ s8_smoke.ps1
-│     └─ s9_retention_smoke.ps1
+│     ├─ s9_retention_smoke.ps1
+│     ├─ s10_run_caddy.ps1
+│     └─ s10_validate_tls.ps1
 │
 ├─ .env.example
 ├─ .gitignore
