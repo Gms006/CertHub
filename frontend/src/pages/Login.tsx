@@ -1,38 +1,9 @@
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
 import { Eye, EyeOff, Lock, Mail, Shield } from "lucide-react";
 
 import { useAuth } from "../hooks/useAuth";
-import { API_BASE } from "../lib/apiClient";
-import { formatRelativeTime } from "../lib/formatters";
-
-type DeviceInfo = {
-  hostname: string;
-  domain?: string | null;
-  agent_version?: string | null;
-  last_seen_at?: string | null;
-};
-
-const getCookieValue = (name: string) => {
-  if (typeof document === "undefined") return null;
-  const match = document.cookie
-    .split("; ")
-    .find((item) => item.startsWith(`${name}=`));
-  return match ? decodeURIComponent(match.split("=")[1]) : null;
-};
-
-const getStoredValue = (keys: string[]) => {
-  for (const key of keys) {
-    const fromLocal = localStorage.getItem(key);
-    if (fromLocal) return fromLocal;
-    const fromSession = sessionStorage.getItem(key);
-    if (fromSession) return fromSession;
-    const fromCookie = getCookieValue(key);
-    if (fromCookie) return fromCookie;
-  }
-  return null;
-};
 
 const Login = () => {
   const { login, loading, message, accessToken } = useAuth();
@@ -40,7 +11,6 @@ const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [deviceInfo, setDeviceInfo] = useState<DeviceInfo | null>(null);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -57,60 +27,26 @@ const Login = () => {
   }, [accessToken, navigate]);
 
   useEffect(() => {
-    const loadDeviceInfo = async () => {
-      const deviceId = getStoredValue([
-        "certhub_device_id",
-        "device_id",
-        "deviceId",
-      ]);
-      const deviceToken = getStoredValue([
-        "certhub_device_token",
-        "device_token",
-        "deviceToken",
-      ]);
-      if (!deviceId || !deviceToken) {
-        return;
-      }
-      try {
-        const authResponse = await fetch(`${API_BASE}/agent/auth`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ device_id: deviceId, device_token: deviceToken }),
-        });
-        if (!authResponse.ok) {
-          return;
-        }
-        const authData = (await authResponse.json()) as { access_token: string };
-        const meResponse = await fetch(`${API_BASE}/agent/me`, {
-          headers: { Authorization: `Bearer ${authData.access_token}` },
-        });
-        if (!meResponse.ok) {
-          return;
-        }
-        const device = (await meResponse.json()) as DeviceInfo;
-        setDeviceInfo(device);
-      } catch {
-        // silencioso
-      }
-    };
-
-    loadDeviceInfo();
+    if (typeof document === "undefined") {
+      return;
+    }
+    const keys = [
+      "certhub_device_id",
+      "device_id",
+      "deviceId",
+      "certhub_device_token",
+      "device_token",
+      "deviceToken",
+    ];
+    keys.forEach((key) => {
+      localStorage.removeItem(key);
+      sessionStorage.removeItem(key);
+      document.cookie = `${key}=; Max-Age=0; path=/`;
+    });
   }, []);
 
-  const deviceLabel = useMemo(() => {
-    if (!deviceInfo) return "Device não identificado";
-    if (deviceInfo.domain) {
-      return `${deviceInfo.domain}\\${deviceInfo.hostname}`;
-    }
-    return deviceInfo.hostname;
-  }, [deviceInfo]);
-
-  const deviceMeta = useMemo(() => {
-    if (!deviceInfo) return "Agent indisponível";
-    const version = deviceInfo.agent_version ?? "-";
-    const lastSeen = formatRelativeTime(deviceInfo.last_seen_at);
-    return `Agent ${version} • ${lastSeen}`;
-  }, [deviceInfo]);
+  const deviceLabel = "Device não identificado";
+  const deviceMeta = "Agent indisponível";
 
   return (
     <div className="relative min-h-screen bg-slate-100">
