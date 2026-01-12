@@ -6,13 +6,21 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, Security, status
+from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy import select, update, func
 from sqlalchemy.orm import Session
 
 from app.core.audit import log_audit
 from app.core.rate_limit import check_rate_limit
-from app.core.security import create_device_access_token, hash_token, require_device
+from app.core.security import (
+    create_device_access_token,
+    decode_access_token,
+    decode_device_token,
+    hash_token,
+    http_bearer,
+    require_device,
+)
 from app.db.session import get_db
 from app.models import (
     CertInstallJob,
@@ -23,6 +31,7 @@ from app.models import (
     JOB_STATUS_FAILED,
     JOB_STATUS_IN_PROGRESS,
     JOB_STATUS_PENDING,
+    User,
 )
 from app.schemas.agent import (
   AgentAuthRequest,
@@ -49,6 +58,65 @@ RATE_LIMIT_INSTALLED_CERTS_PER_DEVICE = 12
 
 def _normalize_thumbprint(value: str) -> str:
     return value.replace(" ", "").upper()
+
+
+def _extract_bearer_token(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None,
+) -> str | None:
+    if credentials:
+        return credentials.credentials
+    authorization = request.headers.get("Authorization") if request else None
+    if not authorization:
+        return None
+    scheme, _, token = authorization.partition(" ")
+    if scheme.lower() != "bearer" or not token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid authorization")
+    return token
+
+
+def require_device_payload_access(
+    request: Request,
+    db: Session = Depends(get_db),
+    credentials: HTTPAuthorizationCredentials | None = Security(http_bearer),
+) -> Device:
+    token = _extract_bearer_token(request, credentials)
+    if not token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="missing token")
+    try:
+        payload = decode_device_token(token)
+    except HTTPException:
+        try:
+            user_payload = decode_access_token(token)
+        except HTTPException as exc:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid token") from exc
+        user_id = user_payload.get("sub")
+        user = db.get(User, uuid.UUID(user_id)) if user_id else None
+        if user is not None:
+            log_audit(
+                db=db,
+                org_id=user.org_id,
+                action="PAYLOAD_DENIED",
+                entity_type="cert_install_job",
+                actor_user_id=user.id,
+                ip=request.client.host if request.client else None,
+                meta={
+                    "reason": "user_token",
+                    "user_id": str(user.id),
+                },
+            )
+            db.commit()
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="invalid device token")
+
+    device_id = payload.get("sub")
+    if not device_id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid token")
+    device = db.get(Device, uuid.UUID(device_id))
+    if device is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid device")
+    if not device.is_allowed:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="device blocked")
+    return device
 
 
 @router.post("/auth", response_model=AgentAuthResponse)
@@ -319,9 +387,10 @@ def claim_job(
 def job_payload(
     job_id: uuid.UUID,
     request: Request,
+    response: Response,
     token: str | None = Query(default=None),
     db: Session = Depends(get_db),
-    device: Device = Depends(require_device),
+    device: Device = Depends(require_device_payload_access),
 ) -> AgentPayloadResponse:
     allowed, _ = check_rate_limit(
         f"rl:agent_payload:{device.id}",
@@ -534,6 +603,7 @@ def job_payload(
         },
     )
     db.commit()
+    response.headers["Cache-Control"] = "no-store"
     return AgentPayloadResponse(
         job_id=locked_job.id,
         cert_id=certificate.id,
