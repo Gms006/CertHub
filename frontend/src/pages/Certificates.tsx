@@ -24,7 +24,6 @@ import { useToast } from "../hooks/useToast";
 import {
   daysUntil,
   extractDigits,
-  formatCnpjCpf,
   formatDate,
   sanitizeSensitiveLabel,
 } from "../lib/formatters";
@@ -32,13 +31,26 @@ import {
 type CertificateRead = {
   id: string;
   name: string;
-  subject?: string | null;
-  issuer?: string | null;
+  cn?: string | null;
+  issuer_cn?: string | null;
+  document_type?: "CNPJ" | "CPF" | null;
+  document_masked?: string | null;
   serial_number?: string | null;
   sha1_fingerprint?: string | null;
+  parse_ok?: boolean;
+  parse_error?: string | null;
+  last_ingested_at?: string | null;
+  last_error_at?: string | null;
   not_after?: string | null;
   not_before?: string | null;
   created_at: string;
+};
+
+type CertificateTechnicalRead = {
+  id: string;
+  name: string;
+  subject?: string | null;
+  issuer?: string | null;
 };
 
 type DeviceRead = {
@@ -121,13 +133,7 @@ const toISODate = (value?: string | null) => {
   return date.toISOString().slice(0, 10);
 };
 
-const formatDocument = (value: string) => {
-  const digits = (value || "").replace(/\D/g, "");
-  if (digits.length === 11 || digits.length === 14) {
-    return formatCnpjCpf(digits);
-  }
-  return "-";
-};
+const formatDocument = (value: string) => value || "-";
 
 const statusUI = (status: CertStatus) => {
   if (status === "VENCIDO") {
@@ -268,34 +274,11 @@ const CertCardsGrid = ({ children }: { children: ReactNode }) => (
   <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">{children}</div>
 );
 
-const parseTitularInfo = (value?: string | null) => {
-  if (!value) {
-    return { name: "-", document: null };
-  }
-  const match = value.match(/CN=([^,]+)/i);
-  const cnValue = (match ? match[1] : value).trim();
-  const separatorIndex = cnValue.lastIndexOf(":");
-  if (separatorIndex > -1) {
-    const name = cnValue.slice(0, separatorIndex).trim();
-    const document = cnValue.slice(separatorIndex + 1).trim() || null;
-    return { name: name || "-", document };
-  }
-  return { name: cnValue || "-", document: null };
-};
+const getCertificateDisplayName = (cert: CertificateRead) =>
+  cert.cn || sanitizeSensitiveLabel(cert.name);
 
-const extractTaxId = (value?: string | null) => {
-  const { document } = parseTitularInfo(value);
-  const raw = document ?? value ?? "";
-  const digits = extractDigits(raw);
-  if (digits.length === 11 || digits.length === 14) {
-    return formatCnpjCpf(digits);
-  }
-  const match = raw.match(/\d{11}|\d{14}/);
-  if (match) {
-    return formatCnpjCpf(match[0]);
-  }
-  return "-";
-};
+const getCertificateDocument = (cert: CertificateRead) =>
+  cert.document_masked || "-";
 
 const CertificatesPage = () => {
   const { apiFetch, user } = useAuth();
@@ -314,6 +297,8 @@ const CertificatesPage = () => {
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [installCertificateId, setInstallCertificateId] = useState<string | null>(null);
   const [selectedCertificate, setSelectedCertificate] = useState<CertificateRead | null>(null);
+  const [technicalCertificate, setTechnicalCertificate] =
+    useState<CertificateTechnicalRead | null>(null);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
   const [cleanupMode, setCleanupMode] = useState<"DEFAULT" | "KEEP_UNTIL" | "EXEMPT">(
     "DEFAULT",
@@ -342,6 +327,27 @@ const CertificatesPage = () => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (!detailModalOpen || !selectedCertificate || !isAdmin) {
+      setTechnicalCertificate(null);
+      return;
+    }
+    const loadTechnical = async () => {
+      try {
+        const response = await apiFetch(`/certificados/${selectedCertificate.id}/technical`);
+        if (!response.ok) {
+          setTechnicalCertificate(null);
+          return;
+        }
+        const data = (await response.json()) as CertificateTechnicalRead;
+        setTechnicalCertificate(data);
+      } catch {
+        setTechnicalCertificate(null);
+      }
+    };
+    loadTechnical();
+  }, [apiFetch, detailModalOpen, isAdmin, selectedCertificate]);
 
   const loadDevices = async () => {
     const endpoint = isAdmin ? "/admin/devices" : "/devices/mine";
@@ -434,14 +440,15 @@ const CertificatesPage = () => {
         }
       }
       if (!term) return true;
-      const { name: titularName, document } = parseTitularInfo(cert.subject ?? safeName);
-      const taxId = extractDigits(document ?? cert.subject ?? safeName);
+      const displayName = getCertificateDisplayName(cert);
+      const taxId = extractDigits(cert.document_masked ?? "");
       const haystack = [
-        titularName,
+        displayName,
         safeName,
         cert.serial_number,
         cert.sha1_fingerprint,
         taxId,
+        cert.document_masked,
       ]
         .filter(Boolean)
         .join(" ")
@@ -451,8 +458,8 @@ const CertificatesPage = () => {
 
     const sorted = [...filtered].sort((a, b) => {
       if (orderBy === "empresa") {
-        const aName = parseTitularInfo(a.subject ?? sanitizeSensitiveLabel(a.name)).name;
-        const bName = parseTitularInfo(b.subject ?? sanitizeSensitiveLabel(b.name)).name;
+        const aName = getCertificateDisplayName(a);
+        const bName = getCertificateDisplayName(b);
         return aName.localeCompare(bName);
       }
       const aTime = a.not_after ? new Date(a.not_after).getTime() : Number.MAX_SAFE_INTEGER;
@@ -619,11 +626,11 @@ const CertificatesPage = () => {
     const rows = filteredCertificates.map((cert) => {
       const status = getStatusInfo(cert.not_after);
       const safeName = sanitizeSensitiveLabel(cert.name);
-      const titularInfo = parseTitularInfo(cert.subject ?? safeName);
+      const displayName = getCertificateDisplayName(cert);
       return {
-        Empresa: titularInfo.name || safeName,
-        Documento: extractTaxId(cert.subject ?? safeName),
-        Titular: titularInfo.name || safeName,
+        Empresa: displayName || safeName,
+        Documento: cert.document_masked ?? "-",
+        Titular: displayName || safeName,
         Serial: cert.serial_number ?? "-",
         SHA1: cert.sha1_fingerprint ?? "-",
         Validade: formatDate(cert.not_after),
@@ -776,9 +783,8 @@ const CertificatesPage = () => {
             const statusInfo = getStatusInfo(cert.not_after);
             const certStatus = mapStatusToCert(statusInfo.key);
             const safeName = sanitizeSensitiveLabel(cert.name);
-            const titularInfo = parseTitularInfo(cert.subject ?? safeName);
-            const empresaName = titularInfo.name || safeName;
-            const documentValue = titularInfo.document ?? cert.subject ?? safeName;
+            const empresaName = getCertificateDisplayName(cert) || safeName;
+            const documentValue = getCertificateDocument(cert);
             return (
               <CertCard
                 key={cert.id}
@@ -865,10 +871,7 @@ const CertificatesPage = () => {
                     {sanitizeSensitiveLabel(selectedCert.name)}
                   </p>
                   <p className="mt-1 text-xs text-slate-500">
-                    CNPJ:{" "}
-                    {extractTaxId(
-                      selectedCert.subject ?? sanitizeSensitiveLabel(selectedCert.name),
-                    )}
+                    Documento: {getCertificateDocument(selectedCert)}
                   </p>
                 </div>
 
@@ -1020,37 +1023,23 @@ const CertificatesPage = () => {
             <div className="rounded-2xl bg-slate-50 p-4">
               <p className="text-xs text-slate-400">Empresa</p>
               <p className="mt-2 text-sm font-semibold text-slate-900">
-                {
-                  parseTitularInfo(
-                    selectedCertificate.subject ??
-                      sanitizeSensitiveLabel(selectedCertificate.name),
-                  ).name
-                }
+                {getCertificateDisplayName(selectedCertificate)}
               </p>
               <p className="mt-1 text-xs text-slate-500">
-                Documento:{" "}
-                {extractTaxId(
-                  selectedCertificate.subject ??
-                    sanitizeSensitiveLabel(selectedCertificate.name),
-                )}
+                Documento: {getCertificateDocument(selectedCertificate)}
               </p>
             </div>
             <div className="grid gap-3 md:grid-cols-2">
               <div className="rounded-2xl bg-slate-50 p-4">
                 <p className="text-xs text-slate-400">Titular</p>
                 <p className="mt-2 text-sm text-slate-700">
-                  {
-                    parseTitularInfo(
-                      selectedCertificate.subject ??
-                        sanitizeSensitiveLabel(selectedCertificate.name),
-                    ).name
-                  }
+                  {getCertificateDisplayName(selectedCertificate)}
                 </p>
               </div>
               <div className="rounded-2xl bg-slate-50 p-4">
                 <p className="text-xs text-slate-400">Emissor</p>
                 <p className="mt-2 text-sm text-slate-700">
-                  {selectedCertificate.issuer ?? "-"}
+                  {selectedCertificate.issuer_cn ?? "-"}
                 </p>
               </div>
             </div>
@@ -1082,6 +1071,21 @@ const CertificatesPage = () => {
                 </p>
               </div>
             </div>
+            {isAdmin && technicalCertificate ? (
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 text-xs text-slate-600">
+                <p className="text-[11px] font-semibold text-slate-500">
+                  Detalhes técnicos (Admin/Dev)
+                </p>
+                <p className="mt-2">
+                  <span className="font-semibold text-slate-700">Subject:</span>{" "}
+                  {technicalCertificate.subject ?? "-"}
+                </p>
+                <p className="mt-2">
+                  <span className="font-semibold text-slate-700">Issuer:</span>{" "}
+                  {technicalCertificate.issuer ?? "-"}
+                </p>
+              </div>
+            ) : null}
           </div>
         ) : (
           <p>Selecione um certificado para ver detalhes.</p>

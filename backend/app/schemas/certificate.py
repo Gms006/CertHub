@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
@@ -31,9 +32,27 @@ class CertificateRead(CertificateBase):
     model_config = ConfigDict(from_attributes=True)
 
 
-class CertificatePublicRead(CertificateBase):
+class CertificatePortalRead(CertificateBase):
     id: uuid.UUID
-    org_id: int
+    serial_number: str | None = None
+    sha1_fingerprint: str | None = None
+    parse_error: str | None = None
+    parse_ok: bool
+    last_ingested_at: datetime | None = None
+    last_error_at: datetime | None = None
+    not_before: datetime | None = None
+    not_after: datetime | None = None
+    created_at: datetime
+    cn: str | None = None
+    issuer_cn: str | None = None
+    document_type: Literal["CNPJ", "CPF"] | None = None
+    document_masked: str | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CertificateTechnicalRead(CertificateBase):
+    id: uuid.UUID
     subject: str | None = None
     issuer: str | None = None
     serial_number: str | None = None

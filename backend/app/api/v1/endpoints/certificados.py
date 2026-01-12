@@ -23,10 +23,19 @@ from app.models import (
     JOB_STATUS_REQUESTED,
     UserDevice,
 )
-from app.schemas.certificate import CertificateCreate, CertificatePublicRead
+from app.schemas.certificate import (
+    CertificateCreate,
+    CertificatePortalRead,
+    CertificateTechnicalRead,
+)
 from app.schemas.install_job import InstallJobCreate, InstallJobRead
 
 router = APIRouter(prefix="/certificados", tags=["certificados"])
+
+CN_PATTERN = re.compile(r"(?:^|,)\s*CN=([^,]+)", flags=re.IGNORECASE)
+CNPJ_PATTERN = re.compile(r"\b\d{2}\.?\d{3}\.?\d{3}/?\d{4}-?\d{2}\b")
+CPF_PATTERN = re.compile(r"\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b")
+
 
 def sanitize_certificate_name(value: str) -> str:
     sanitized = value
@@ -44,7 +53,52 @@ def sanitize_certificate_name(value: str) -> str:
     return sanitized.strip()
 
 
-@router.post("", response_model=CertificatePublicRead, status_code=status.HTTP_201_CREATED)
+def _extract_cn(value: str | None) -> str | None:
+    if not value:
+        return None
+    match = CN_PATTERN.search(value)
+    return match.group(1).strip() if match else None
+
+
+def _detect_document(value: str | None) -> tuple[str | None, str | None]:
+    if not value:
+        return None, None
+    for doc_type, pattern in (("CNPJ", CNPJ_PATTERN), ("CPF", CPF_PATTERN)):
+        match = pattern.search(value)
+        if match:
+            digits = re.sub(r"\D", "", match.group(0))
+            return doc_type, digits
+    digits = re.sub(r"\D", "", value)
+    if len(digits) >= 14:
+        return "CNPJ", digits[:14]
+    if len(digits) >= 11:
+        return "CPF", digits[:11]
+    return None, None
+
+
+def _mask_document(doc_type: str | None, digits: str | None) -> str | None:
+    if not doc_type or not digits:
+        return None
+    if doc_type == "CNPJ" and len(digits) >= 14:
+        return f"CNPJ {digits[:2]}********{digits[10:14]}**"
+    if doc_type == "CPF" and len(digits) >= 11:
+        return f"CPF ***.***.***-{digits[-2:]}"
+    return None
+
+
+def parse_subject_summary(subject: str | None, issuer: str | None) -> dict[str, str | None]:
+    cn = _extract_cn(subject)
+    issuer_cn = _extract_cn(issuer)
+    doc_type, digits = _detect_document(" ".join(filter(None, [subject, cn])))
+    return {
+        "cn": cn,
+        "issuer_cn": issuer_cn,
+        "document_type": doc_type,
+        "document_masked": _mask_document(doc_type, digits),
+    }
+
+
+@router.post("", response_model=CertificatePortalRead, status_code=status.HTTP_201_CREATED)
 async def create_certificate(
     payload: CertificateCreate,
     db: Session = Depends(get_db),
@@ -63,10 +117,14 @@ async def create_certificate(
     )
     db.commit()
     db.refresh(certificate)
-    return certificate
+    summary = parse_subject_summary(certificate.subject, certificate.issuer)
+    response = CertificatePortalRead.model_validate(certificate, from_attributes=True)
+    return response.model_copy(
+        update={"name": sanitize_certificate_name(response.name), **summary}
+    )
 
 
-@router.get("", response_model=list[CertificatePublicRead])
+@router.get("", response_model=list[CertificatePortalRead])
 async def list_certificates(
     db: Session = Depends(get_db), current_user=Depends(require_view_or_higher)
 ) -> list[Certificate]:
@@ -76,16 +134,19 @@ async def list_certificates(
         .order_by(Certificate.created_at)
     )
     certificates = db.execute(statement).scalars().all()
-    payload: list[CertificatePublicRead] = []
+    payload: list[CertificatePortalRead] = []
     for cert in certificates:
-        response = CertificatePublicRead.model_validate(cert, from_attributes=True)
+        summary = parse_subject_summary(cert.subject, cert.issuer)
+        response = CertificatePortalRead.model_validate(cert, from_attributes=True)
         payload.append(
-            response.model_copy(update={"name": sanitize_certificate_name(response.name)})
+            response.model_copy(
+                update={"name": sanitize_certificate_name(response.name), **summary}
+            )
         )
     return payload
 
 
-@router.get("/{certificate_id}", response_model=CertificatePublicRead)
+@router.get("/{certificate_id}", response_model=CertificatePortalRead)
 async def get_certificate(
     certificate_id: uuid.UUID,
     db: Session = Depends(get_db),
@@ -94,7 +155,23 @@ async def get_certificate(
     certificate = db.get(Certificate, certificate_id)
     if certificate is None or certificate.org_id != current_user.org_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="certificate not found")
-    response = CertificatePublicRead.model_validate(certificate, from_attributes=True)
+    summary = parse_subject_summary(certificate.subject, certificate.issuer)
+    response = CertificatePortalRead.model_validate(certificate, from_attributes=True)
+    return response.model_copy(
+        update={"name": sanitize_certificate_name(response.name), **summary}
+    )
+
+
+@router.get("/{certificate_id}/technical", response_model=CertificateTechnicalRead)
+async def get_certificate_technical(
+    certificate_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_admin_or_dev),
+) -> Certificate:
+    certificate = db.get(Certificate, certificate_id)
+    if certificate is None or certificate.org_id != current_user.org_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="certificate not found")
+    response = CertificateTechnicalRead.model_validate(certificate, from_attributes=True)
     return response.model_copy(update={"name": sanitize_certificate_name(response.name)})
 
 
