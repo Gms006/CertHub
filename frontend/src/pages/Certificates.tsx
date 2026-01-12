@@ -274,8 +274,15 @@ const CertCardsGrid = ({ children }: { children: ReactNode }) => (
   <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">{children}</div>
 );
 
-const getCertificateDisplayName = (cert: CertificateRead) =>
-  cert.cn || sanitizeSensitiveLabel(cert.name);
+const getCertificateDisplayName = (cert: CertificateRead) => {
+  const rawName = cert.cn || sanitizeSensitiveLabel(cert.name);
+  const separatorIndex = rawName.lastIndexOf(":");
+  if (separatorIndex > -1) {
+    const trimmed = rawName.slice(0, separatorIndex).trim();
+    return trimmed || rawName;
+  }
+  return rawName;
+};
 
 const getCertificateDocument = (cert: CertificateRead) =>
   cert.document_masked || "-";
