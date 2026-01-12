@@ -630,38 +630,23 @@ const CertificatesPage = () => {
     }
   };
 
-  const handleExport = () => {
-    const rows = filteredCertificates.map((cert) => {
-      const status = getStatusInfo(cert.not_after);
-      const safeName = sanitizeSensitiveLabel(cert.name);
-      const displayName = getCertificateDisplayName(cert);
-      return {
-        Empresa: displayName || safeName,
-        Documento: cert.document_masked ?? "-",
-        Titular: displayName || safeName,
-        Serial: cert.serial_number ?? "-",
-        SHA1: cert.sha1_fingerprint ?? "-",
-        Validade: formatDate(cert.not_after),
-        Status: status.label,
-      };
-    });
-    const header = Object.keys(rows[0] ?? {
-      Empresa: "",
-      Documento: "",
-      Titular: "",
-      Serial: "",
-      SHA1: "",
-      Validade: "",
-      Status: "",
-    });
-    const csv = [header.join(";"), ...rows.map((row) => header.map((key) => row[key as keyof typeof row]).join(";"))].join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "certificados.csv";
-    link.click();
-    URL.revokeObjectURL(url);
+  const handleExport = async () => {
+    try {
+      const response = await apiFetch("/certificados/export/excel");
+      if (!response.ok) {
+        notify("Não foi possível exportar os certificados.", "error");
+        return;
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "certificados.xlsx";
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      notify("Erro ao exportar os certificados.", "error");
+    }
   };
 
   const selectedCert = installCertificateId

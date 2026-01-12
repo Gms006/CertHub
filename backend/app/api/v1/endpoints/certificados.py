@@ -3,8 +3,12 @@ from __future__ import annotations
 import re
 import uuid
 from datetime import datetime, timedelta, timezone
+from io import BytesIO
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import StreamingResponse
+from openpyxl import Workbook
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -144,6 +148,97 @@ async def list_certificates(
             )
         )
     return payload
+
+
+@router.get("/export/excel")
+async def export_certificates(
+    db: Session = Depends(get_db), current_user=Depends(require_view_or_higher)
+) -> StreamingResponse:
+    statement = (
+        select(Certificate)
+        .where(Certificate.org_id == current_user.org_id)
+        .order_by(Certificate.created_at)
+    )
+    certificates = db.execute(statement).scalars().all()
+
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Certificados"
+    headers = [
+        "Empresa",
+        "Documento",
+        "Titular",
+        "Serial",
+        "SHA1",
+        "Validade",
+        "Status",
+    ]
+    sheet.append(headers)
+    header_fill = PatternFill(fill_type="solid", start_color="E2E8F0", end_color="E2E8F0")
+    header_font = Font(bold=True, color="0F172A")
+    border = Border(
+        left=Side(style="thin", color="CBD5F5"),
+        right=Side(style="thin", color="CBD5F5"),
+        top=Side(style="thin", color="CBD5F5"),
+        bottom=Side(style="thin", color="CBD5F5"),
+    )
+    for cell in sheet[1]:
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        cell.border = border
+
+    def get_status(not_after: datetime) -> str:
+        now = datetime.now(timezone.utc)
+        if not_after <= now:
+            return "Vencido"
+        days_until = (not_after - now).days
+        if days_until <= 7:
+            return "Vence em 7d"
+        if days_until <= 30:
+            return "Vence em 30d"
+        return "Válido"
+
+    for cert in certificates:
+        summary = parse_subject_summary(cert.subject, cert.issuer)
+        sheet.append(
+            [
+                sanitize_certificate_name(cert.name),
+                summary.get("document_masked") or "-",
+                summary.get("cn") or "-",
+                cert.serial_number or "-",
+                cert.sha1_fingerprint or "-",
+                cert.not_after.strftime("%d/%m/%Y") if cert.not_after else "-",
+                get_status(cert.not_after) if cert.not_after else "-",
+            ]
+        )
+
+    for row in sheet.iter_rows(min_row=2, max_row=sheet.max_row, max_col=sheet.max_column):
+        for cell in row:
+            cell.alignment = Alignment(vertical="center", wrap_text=True)
+            cell.border = border
+
+    for column in sheet.columns:
+        max_length = 0
+        column_letter = column[0].column_letter
+        for cell in column:
+            if cell.value is None:
+                continue
+            max_length = max(max_length, len(str(cell.value)))
+        sheet.column_dimensions[column_letter].width = min(max_length + 3, 50)
+
+    sheet.auto_filter.ref = sheet.dimensions
+
+    buffer = BytesIO()
+    workbook.save(buffer)
+    buffer.seek(0)
+    filename = "certificados.xlsx"
+    headers_response = {"Content-Disposition": f'attachment; filename="{filename}"'}
+    return StreamingResponse(
+        buffer,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers=headers_response,
+    )
 
 
 @router.get("/{certificate_id}", response_model=CertificatePortalRead)
