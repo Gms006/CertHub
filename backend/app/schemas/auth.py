@@ -7,6 +7,10 @@ from pydantic import BaseModel
 from app.schemas.user import UserRead
 
 
+class AuthUserRead(UserRead):
+    retention_keep_until_max_hours: int | None = None
+
+
 class PasswordSetInitRequest(BaseModel):
     email: str
 
@@ -29,7 +33,7 @@ class LoginResponse(BaseModel):
     access_token: str
     refresh_token: str | None = None
     token_type: str = "bearer"
-    user: UserRead
+    user: AuthUserRead
 
 
 class RefreshRequest(BaseModel):

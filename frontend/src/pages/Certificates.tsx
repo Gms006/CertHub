@@ -324,6 +324,7 @@ const CertificatesPage = () => {
   const role = user?.role_global ?? "VIEW";
   const isAdmin = role === "ADMIN" || role === "DEV";
   const isView = role === "VIEW";
+  const keepUntilMaxHours = user?.retention_keep_until_max_hours ?? null;
 
   const loadCertificates = async () => {
     setLoading(true);
@@ -983,6 +984,12 @@ const CertificatesPage = () => {
                 value={keepUntil}
                 onChange={(event) => setKeepUntil(event.target.value)}
               />
+              {isView && keepUntilMaxHours ? (
+                <span className="mt-2 block text-[11px] font-medium text-amber-600">
+                  Aviso: período máximo permitido para VIEW é de{" "}
+                  {keepUntilMaxHours} {keepUntilMaxHours === 1 ? "hora" : "horas"}.
+                </span>
+              ) : null}
             </label>
           ) : null}
 

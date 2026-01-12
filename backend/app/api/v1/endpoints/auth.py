@@ -24,6 +24,7 @@ from app.core.security import (
 from app.db.session import get_db
 from app.models import AuthToken, User, UserSession
 from app.schemas.auth import (
+    AuthUserRead,
     LoginRequest,
     LoginResponse,
     MessageResponse,
@@ -34,7 +35,6 @@ from app.schemas.auth import (
     RefreshResponse,
     TokenInitResponse,
 )
-from app.schemas.user import UserRead
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -271,10 +271,12 @@ def login(
     )
     db.commit()
     _set_refresh_cookie(response, refresh_token)
+    auth_user = AuthUserRead.model_validate(user, from_attributes=True)
+    auth_user.retention_keep_until_max_hours = settings.retention_keep_until_max_hours
     return LoginResponse(
         access_token=access_token,
         refresh_token=None,
-        user=UserRead.model_validate(user, from_attributes=True),
+        user=auth_user,
     )
 
 
@@ -448,6 +450,8 @@ def password_reset_confirm(
     return MessageResponse(message="Senha atualizada com sucesso.")
 
 
-@router.get("/me", response_model=UserRead)
-def me(current_user=Depends(get_current_user)) -> UserRead:
-    return UserRead.model_validate(current_user, from_attributes=True)
+@router.get("/me", response_model=AuthUserRead)
+def me(current_user=Depends(get_current_user)) -> AuthUserRead:
+    auth_user = AuthUserRead.model_validate(current_user, from_attributes=True)
+    auth_user.retention_keep_until_max_hours = settings.retention_keep_until_max_hours
+    return auth_user
