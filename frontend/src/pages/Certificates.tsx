@@ -517,6 +517,7 @@ const CertificatesPage = () => {
   const showExemptOption = Boolean(
     selectedDevice && deviceAllowsExempt && roleAllowsExempt,
   );
+  const keepUntilMaxHours = 24;
 
   useEffect(() => {
     if (!selectedDevice) {
@@ -972,6 +973,12 @@ const CertificatesPage = () => {
                 value={keepUntil}
                 onChange={(event) => setKeepUntil(event.target.value)}
               />
+              {isView ? (
+                <p className="mt-2 text-[11px] font-normal text-amber-600">
+                  Aviso: o período máximo permitido para VIEW é de{" "}
+                  {keepUntilMaxHours} horas.
+                </p>
+              ) : null}
             </label>
           ) : null}
 
