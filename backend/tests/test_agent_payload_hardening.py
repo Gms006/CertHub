@@ -73,6 +73,14 @@ def test_payload_rejects_user_jwt(test_client_and_session, tmp_path):
     )
 
     assert response.status_code == status.HTTP_403_FORBIDDEN
+    audit = (
+        db.query(models.AuditLog)
+        .filter_by(action="PAYLOAD_DENIED", actor_user_id=user.id)
+        .order_by(models.AuditLog.timestamp.desc())
+        .first()
+    )
+    assert audit
+    assert audit.meta_json["reason"] == "user_token"
 
 
 def test_payload_requires_token(test_client_and_session, tmp_path):

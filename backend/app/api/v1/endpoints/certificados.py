@@ -23,7 +23,7 @@ from app.models import (
     JOB_STATUS_REQUESTED,
     UserDevice,
 )
-from app.schemas.certificate import CertificateCreate, CertificateRead
+from app.schemas.certificate import CertificateCreate, CertificatePublicRead
 from app.schemas.install_job import InstallJobCreate, InstallJobRead
 
 router = APIRouter(prefix="/certificados", tags=["certificados"])
@@ -44,7 +44,7 @@ def sanitize_certificate_name(value: str) -> str:
     return sanitized.strip()
 
 
-@router.post("", response_model=CertificateRead, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=CertificatePublicRead, status_code=status.HTTP_201_CREATED)
 async def create_certificate(
     payload: CertificateCreate,
     db: Session = Depends(get_db),
@@ -66,7 +66,7 @@ async def create_certificate(
     return certificate
 
 
-@router.get("", response_model=list[CertificateRead])
+@router.get("", response_model=list[CertificatePublicRead])
 async def list_certificates(
     db: Session = Depends(get_db), current_user=Depends(require_view_or_higher)
 ) -> list[Certificate]:
@@ -76,13 +76,26 @@ async def list_certificates(
         .order_by(Certificate.created_at)
     )
     certificates = db.execute(statement).scalars().all()
-    payload: list[CertificateRead] = []
+    payload: list[CertificatePublicRead] = []
     for cert in certificates:
-        response = CertificateRead.model_validate(cert, from_attributes=True)
+        response = CertificatePublicRead.model_validate(cert, from_attributes=True)
         payload.append(
             response.model_copy(update={"name": sanitize_certificate_name(response.name)})
         )
     return payload
+
+
+@router.get("/{certificate_id}", response_model=CertificatePublicRead)
+async def get_certificate(
+    certificate_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_view_or_higher),
+) -> Certificate:
+    certificate = db.get(Certificate, certificate_id)
+    if certificate is None or certificate.org_id != current_user.org_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="certificate not found")
+    response = CertificatePublicRead.model_validate(certificate, from_attributes=True)
+    return response.model_copy(update={"name": sanitize_certificate_name(response.name)})
 
 
 @router.post(
@@ -192,6 +205,11 @@ async def create_install_job(
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="cleanup_mode EXEMPT not allowed for device",
+            )
+        if current_user.role_global == "VIEW":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="cleanup_mode EXEMPT not allowed for VIEW role",
             )
         if not keep_reason:
             raise HTTPException(
