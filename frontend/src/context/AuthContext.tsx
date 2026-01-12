@@ -16,6 +16,7 @@ type AuthUser = {
   email: string | null;
   nome?: string | null;
   role_global?: string;
+  retention_keep_until_max_hours?: number | null;
 };
 
 type LoginResponse = {
