@@ -25,10 +25,7 @@ app = FastAPI(title="CertHub API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://192.168.25.51:5173",
-    ],
+    allow_origins=settings.cors_allow_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

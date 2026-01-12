@@ -32,6 +32,14 @@ class Settings(BaseSettings):
     cookie_samesite: str = Field("strict", alias="COOKIE_SAMESITE")
     cookie_httponly: bool = Field(True, alias="COOKIE_HTTPONLY")
     allow_legacy_headers: bool = Field(False, alias="ALLOW_LEGACY_HEADERS")
+    cors_allow_origins: list[str] = Field(
+        default_factory=lambda: [
+            "http://localhost:5173",
+            "http://localhost:8011",
+            "http://192.168.25.51:5173",
+        ],
+        alias="CORS_ALLOW_ORIGINS",
+    )
     smtp_host: str | None = Field(None, alias="SMTP_HOST")
     smtp_port: int = Field(587, alias="SMTP_PORT")
     smtp_user: str | None = Field(None, alias="SMTP_USER")
@@ -44,6 +52,11 @@ class Settings(BaseSettings):
             object.__setattr__(self, "cookie_secure", False)
         if "COOKIE_SAMESITE" not in os.environ and self.env.lower() != "prod":
             object.__setattr__(self, "cookie_samesite", "lax")
+        if "CORS_ALLOW_ORIGINS" in os.environ:
+            raw_value = os.environ.get("CORS_ALLOW_ORIGINS", "")
+            parsed = [value.strip() for value in raw_value.split(",") if value.strip()]
+            if parsed:
+                object.__setattr__(self, "cors_allow_origins", parsed)
 
 
 settings = Settings()
