@@ -277,11 +277,12 @@ const CertCardsGrid = ({ children }: { children: ReactNode }) => (
 const getCertificateDisplayName = (cert: CertificateRead) => {
   const rawName = cert.cn || sanitizeSensitiveLabel(cert.name);
   const separatorIndex = rawName.lastIndexOf(":");
-  if (separatorIndex > -1) {
-    const trimmed = rawName.slice(0, separatorIndex).trim();
-    return trimmed || rawName;
-  }
-  return rawName;
+  const base = separatorIndex > -1 ? rawName.slice(0, separatorIndex).trim() : rawName;
+  const trimmed = base.replace(
+    /(?:\s+|:)(\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}|\d{3}\.?\d{3}\.?\d{3}-?\d{2})$/,
+    "",
+  );
+  return trimmed.trim() || base || rawName;
 };
 
 const getCertificateDocument = (cert: CertificateRead) =>
