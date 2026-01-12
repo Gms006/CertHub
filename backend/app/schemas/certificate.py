@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
@@ -21,6 +22,42 @@ class CertificateRead(CertificateBase):
     sha1_fingerprint: str | None = None
     parse_error: str | None = None
     source_path: str | None = None
+    parse_ok: bool
+    last_ingested_at: datetime | None = None
+    last_error_at: datetime | None = None
+    not_before: datetime | None = None
+    not_after: datetime | None = None
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CertificatePortalRead(CertificateBase):
+    id: uuid.UUID
+    serial_number: str | None = None
+    sha1_fingerprint: str | None = None
+    parse_error: str | None = None
+    parse_ok: bool
+    last_ingested_at: datetime | None = None
+    last_error_at: datetime | None = None
+    not_before: datetime | None = None
+    not_after: datetime | None = None
+    created_at: datetime
+    cn: str | None = None
+    issuer_cn: str | None = None
+    document_type: Literal["CNPJ", "CPF"] | None = None
+    document_masked: str | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CertificateTechnicalRead(CertificateBase):
+    id: uuid.UUID
+    subject: str | None = None
+    issuer: str | None = None
+    serial_number: str | None = None
+    sha1_fingerprint: str | None = None
+    parse_error: str | None = None
     parse_ok: bool
     last_ingested_at: datetime | None = None
     last_error_at: datetime | None = None
