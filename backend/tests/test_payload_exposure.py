@@ -49,6 +49,18 @@ def test_job_endpoints_do_not_expose_payload_fields(test_client_and_session, tmp
     for key in ("pfx_base64", "password", "payload_token", "source_path"):
         assert key not in payload
 
+    certs_response = client.get("/api/v1/certificados", headers=headers)
+    assert certs_response.status_code == status.HTTP_200_OK
+    certs_payload = certs_response.json()
+    assert certs_payload
+    for item in certs_payload:
+        assert "source_path" not in item
+
+    cert_response = client.get(f"/api/v1/certificados/{certificate.id}", headers=headers)
+    assert cert_response.status_code == status.HTTP_200_OK
+    cert_payload = cert_response.json()
+    assert "source_path" not in cert_payload
+
     list_response = client.get("/api/v1/install-jobs/mine", headers=headers)
     assert list_response.status_code == status.HTTP_200_OK
     listed = list_response.json()
