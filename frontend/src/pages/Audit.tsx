@@ -1,4 +1,4 @@
-import { RefreshCw } from "lucide-react";
+import { Filter, RefreshCw, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import SectionTabs from "../components/SectionTabs";
@@ -67,15 +67,33 @@ const AuditPage = () => {
     return () => window.clearInterval(interval);
   }, [preferences.autoRefreshAudit]);
 
+  const uniqueActions = useMemo(
+    () =>
+      Array.from(new Set(audits.map((a) => a.action)))
+        .sort()
+        .filter((action) => action.trim().length > 0),
+    [audits],
+  );
+
+  const uniqueActors = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          audits
+            .map((a) => a.actor_label)
+            .filter((a): a is string => a != null && a.trim().length > 0),
+        ),
+      ).sort(),
+    [audits],
+  );
+
   const filteredAudits = useMemo(() => {
-    const actionTerm = actionFilter.trim().toLowerCase();
-    const actorTerm = actorFilter.trim().toLowerCase();
     return audits.filter((audit) => {
-      const actionOk = actionTerm
-        ? audit.action.toLowerCase().includes(actionTerm)
+      const actionOk = actionFilter
+        ? audit.action === actionFilter
         : true;
-      const actorOk = actorTerm
-        ? (audit.actor_label ?? "").toLowerCase().includes(actorTerm)
+      const actorOk = actorFilter
+        ? audit.actor_label === actorFilter
         : true;
       return actionOk && actorOk;
     });
@@ -106,24 +124,46 @@ const AuditPage = () => {
 
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-3xl bg-white/70 p-4 shadow-sm ring-1 ring-slate-200/70 backdrop-blur">
         <div className="flex flex-1 flex-wrap items-center gap-3">
-          <input
-            className="h-10 flex-1 rounded-2xl bg-white px-4 text-sm text-slate-900 placeholder:text-slate-400 ring-1 ring-slate-200/70 transition focus:ring-2 focus:ring-slate-300"
-            placeholder="Filtrar por ação"
-            value={actionFilter}
-            onChange={(event) => setActionFilter(event.target.value)}
-          />
-          <input
-            className="h-10 flex-1 rounded-2xl bg-white px-4 text-sm text-slate-900 placeholder:text-slate-400 ring-1 ring-slate-200/70 transition focus:ring-2 focus:ring-slate-300"
-            placeholder="Filtrar por ator"
-            value={actorFilter}
-            onChange={(event) => setActorFilter(event.target.value)}
-          />
+          <div className="relative flex-1">
+            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-600">
+              <Filter className="h-4 w-4" />
+            </span>
+            <select
+              className="h-10 w-full rounded-2xl bg-white pl-9 pr-4 text-sm text-slate-900 ring-1 ring-slate-200/70 transition focus:ring-2 focus:ring-slate-300 appearance-none"
+              value={actionFilter}
+              onChange={(event) => setActionFilter(event.target.value)}
+            >
+              <option value="">Todas as ações</option>
+              {uniqueActions.map((action) => (
+                <option key={action} value={action}>
+                  {action}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="relative flex-1">
+            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-600">
+              <Filter className="h-4 w-4" />
+            </span>
+            <select
+              className="h-10 w-full rounded-2xl bg-white pl-9 pr-4 text-sm text-slate-900 ring-1 ring-slate-200/70 transition focus:ring-2 focus:ring-slate-300 appearance-none"
+              value={actorFilter}
+              onChange={(event) => setActorFilter(event.target.value)}
+            >
+              <option value="">Todos os atores</option>
+              {uniqueActors.map((actor) => (
+                <option key={actor} value={actor}>
+                  {actor}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
         <button
-          className="h-10 rounded-2xl bg-white/70 px-4 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-slate-200/70 transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+          className="flex h-10 items-center gap-2 rounded-2xl bg-white/70 px-4 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-slate-200/70 transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 whitespace-nowrap"
           onClick={loadAudit}
         >
-          <RefreshCw className="h-4 w-4" />
+          <RefreshCw className="h-4 w-4 shrink-0" />
           Atualizar
         </button>
       </div>

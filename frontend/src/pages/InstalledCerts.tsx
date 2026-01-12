@@ -1,6 +1,5 @@
-import { RefreshCw } from "lucide-react";
+import { Copy, RefreshCw, Search } from "lucide-react";
 import { Fragment, useEffect, useMemo, useState } from "react";
-import { Copy } from "lucide-react";
 
 import SectionTabs from "../components/SectionTabs";
 import Toast from "../components/Toast";
@@ -220,12 +219,17 @@ const InstalledCertsPage = () => {
               Somente via Agent
             </button>
           </div>
-          <input
-            className="h-10 rounded-2xl bg-white px-4 text-sm text-slate-900 placeholder:text-slate-400 ring-1 ring-slate-200/70 transition focus:ring-2 focus:ring-slate-300"
-            placeholder="Buscar por subject, issuer ou thumbprint"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-          />
+          <div className="relative flex-1 md:flex-none">
+            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+              <Search className="h-4 w-4" />
+            </span>
+            <input
+              className="h-10 w-full rounded-2xl bg-white pl-9 pr-4 text-sm text-slate-900 placeholder:text-slate-400 ring-1 ring-slate-200/70 transition focus:ring-2 focus:ring-slate-300"
+              placeholder="Buscar por subject, issuer ou thumbprint"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+          </div>
           <label className="flex items-center gap-2 rounded-full px-2 py-1 text-xs text-slate-600">
             <input
               type="checkbox"
@@ -250,10 +254,10 @@ const InstalledCertsPage = () => {
             ))}
           </select>
           <button
-            className="h-10 rounded-2xl bg-white/70 px-4 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-slate-200/70 transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+            className="flex h-10 items-center gap-2 rounded-2xl bg-white/70 px-4 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-slate-200/70 transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 whitespace-nowrap"
             onClick={loadInstalledCerts}
           >
-            <RefreshCw className="h-4 w-4" />
+            <RefreshCw className="h-4 w-4 shrink-0" />
             Atualizar
           </button>
         </div>

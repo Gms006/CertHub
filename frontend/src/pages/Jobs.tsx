@@ -1,4 +1,4 @@
-import { Download, RefreshCw } from "lucide-react";
+import { Calendar, Download, Monitor, RefreshCw, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import SectionTabs from "../components/SectionTabs";
@@ -282,34 +282,49 @@ const JobsPage = () => {
               Erro
             </button>
           </div>
-          <input
-            className="h-10 rounded-2xl bg-white px-4 text-sm text-slate-900 placeholder:text-slate-400 ring-1 ring-slate-200/70 transition focus:ring-2 focus:ring-slate-300"
-            placeholder="Buscar por certificado, job id, device..."
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-          />
-          <select
-            className="h-10 rounded-2xl bg-white/70 px-4 text-sm text-slate-700 ring-1 ring-slate-200/70 transition focus:ring-2 focus:ring-slate-300"
-            value={exportPeriod}
-            onChange={(event) => setExportPeriod(event.target.value)}
-          >
-            <option value="last_15_days">Últimos 15 dias</option>
-            <option value="this_month">Este mês</option>
-            <option value="last_6_months">Últimos 6 meses</option>
-          </select>
-          {isAdmin ? (
+          <div className="relative flex-1 md:flex-none">
+            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+              <Search className="h-4 w-4" />
+            </span>
+            <input
+              className="h-10 w-full rounded-2xl bg-white pl-9 pr-4 text-sm text-slate-900 placeholder:text-slate-400 ring-1 ring-slate-200/70 transition focus:ring-2 focus:ring-slate-300"
+              placeholder="Buscar por certificado, job id, device..."
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+          </div>
+          <div className="relative">
+            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-600">
+              <Calendar className="h-4 w-4" />
+            </span>
             <select
-              className="h-10 rounded-2xl bg-white/70 px-4 text-sm text-slate-700 ring-1 ring-slate-200/70 transition focus:ring-2 focus:ring-slate-300"
-              value={deviceFilter}
-              onChange={(event) => setDeviceFilter(event.target.value)}
+              className="h-10 rounded-2xl bg-white/70 pl-9 pr-4 text-sm text-slate-700 ring-1 ring-slate-200/70 transition focus:ring-2 focus:ring-slate-300"
+              value={exportPeriod}
+              onChange={(event) => setExportPeriod(event.target.value)}
             >
-              <option value="Todos">Todos os devices</option>
-              {devices.map((device) => (
-                <option key={device.id} value={device.id}>
-                  {device.hostname}
-                </option>
-              ))}
+              <option value="last_15_days">Últimos 15 dias</option>
+              <option value="this_month">Este mês</option>
+              <option value="last_6_months">Últimos 6 meses</option>
             </select>
+          </div>
+          {isAdmin ? (
+            <div className="relative">
+              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-600">
+                <Monitor className="h-4 w-4" />
+              </span>
+              <select
+                className="h-10 rounded-2xl bg-white/70 pl-9 pr-4 text-sm text-slate-700 ring-1 ring-slate-200/70 transition focus:ring-2 focus:ring-slate-300"
+                value={deviceFilter}
+                onChange={(event) => setDeviceFilter(event.target.value)}
+              >
+                <option value="Todos">Todos os devices</option>
+                {devices.map((device) => (
+                  <option key={device.id} value={device.id}>
+                    {device.hostname}
+                  </option>
+                ))}
+              </select>
+            </div>
           ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-3">
@@ -321,10 +336,10 @@ const JobsPage = () => {
             Exportar Excel
           </button>
           <button
-            className="h-10 rounded-2xl bg-white/70 px-4 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-slate-200/70 transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+            className="flex h-10 items-center gap-2 rounded-2xl bg-white/70 px-4 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-slate-200/70 transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 whitespace-nowrap"
             onClick={loadJobs}
           >
-            <RefreshCw className="h-4 w-4" />
+            <RefreshCw className="h-4 w-4 shrink-0" />
             Atualizar
           </button>
         </div>

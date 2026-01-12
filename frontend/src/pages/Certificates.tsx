@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   Activity,
   AlertTriangle,
+  ArrowDownWideNarrow,
   BadgeCheck,
   CalendarClock,
   Download,
@@ -696,27 +697,37 @@ const CertificatesPage = () => {
               onChange={(event) => setSearch(event.target.value)}
             />
           </div>
-          <select
-            className="h-11 rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-600"
-            value={statusFilter}
-            onChange={(event) => setStatusFilter(event.target.value)}
-          >
-            <option>Todos</option>
-            <option>Válido</option>
-            <option>Vence em 7d</option>
-            <option>Vence em 30d</option>
-            <option>Vencido</option>
-          </select>
-          <select
-            className="h-11 rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-600"
-            value={orderBy}
-            onChange={(event) =>
-              setOrderBy(event.target.value as "validade" | "empresa")
-            }
-          >
-            <option value="validade">Ordenar por validade</option>
-            <option value="empresa">Ordenar por empresa</option>
-          </select>
+          <div className="relative">
+            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+              <CalendarClock className="h-4 w-4" />
+            </span>
+            <select
+              className="h-11 w-full rounded-2xl border border-slate-200 bg-white pl-9 pr-4 text-sm text-slate-600 appearance-none"
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value)}
+            >
+              <option>Todos</option>
+              <option>Válido</option>
+              <option>Vence em 7d</option>
+              <option>Vence em 30d</option>
+              <option>Vencido</option>
+            </select>
+          </div>
+          <div className="relative">
+            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+              <ArrowDownWideNarrow className="h-4 w-4" />
+            </span>
+            <select
+              className="h-11 w-full rounded-2xl border border-slate-200 bg-white pl-9 pr-4 text-sm text-slate-600 appearance-none"
+              value={orderBy}
+              onChange={(event) =>
+                setOrderBy(event.target.value as "validade" | "empresa")
+              }
+            >
+              <option value="validade">Ordenar por validade</option>
+              <option value="empresa">Ordenar por empresa</option>
+            </select>
+          </div>
           <label className="inline-flex h-11 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-600">
             <input
               type="checkbox"
