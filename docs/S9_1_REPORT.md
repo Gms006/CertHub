@@ -1,5 +1,7 @@
 # Relatório S9.1 — Inventário Installed Certs
 
+**Status**: ✅ Concluído (validado)
+
 ## Lista DPAPI de thumbprints (Agent)
 - **Arquivo/classe**: `agent/windows/Certhub.Agent/Certhub.Agent/Services/InstalledThumbprintsStore.cs`.
 - **Formato**: lista JSON de `InstalledThumbprintEntry` protegida via DPAPI.
