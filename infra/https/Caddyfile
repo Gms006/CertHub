@@ -1,4 +1,4 @@
-portal.local {
+certhub.local {
     tls internal
 
     # Health (sem prefixo)
