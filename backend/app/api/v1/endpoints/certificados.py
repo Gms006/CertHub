@@ -85,7 +85,7 @@ def _mask_document(doc_type: str | None, digits: str | None) -> str | None:
     if not doc_type or not digits:
         return None
     if doc_type == "CNPJ" and len(digits) >= 14:
-        return f"CNPJ {digits[:2]}********{digits[10:14]}**"
+        return f"CNPJ {digits[:2]}{'*' * 8}{digits[10:14]}"
     if doc_type == "CPF" and len(digits) >= 11:
         return f"CPF ***.***.***-{digits[-2:]}"
     return None

@@ -63,7 +63,7 @@ def test_job_endpoints_do_not_expose_payload_fields(test_client_and_session, tmp
         assert item["cn"] == "Empresa 12345678000199"
         assert item["issuer_cn"] == "Autoridade Certificadora Teste"
         assert item["document_type"] == "CNPJ"
-        assert item["document_masked"] == "CNPJ 12********0199**"
+        assert item["document_masked"] == "CNPJ 12********0199"
 
     cert_response = client.get(f"/api/v1/certificados/{certificate.id}", headers=headers)
     assert cert_response.status_code == status.HTTP_200_OK
@@ -75,7 +75,7 @@ def test_job_endpoints_do_not_expose_payload_fields(test_client_and_session, tmp
     assert cert_payload["cn"] == "Empresa 12345678000199"
     assert cert_payload["issuer_cn"] == "Autoridade Certificadora Teste"
     assert cert_payload["document_type"] == "CNPJ"
-    assert cert_payload["document_masked"] == "CNPJ 12********0199**"
+    assert cert_payload["document_masked"] == "CNPJ 12********0199"
 
     technical_forbidden = client.get(
         f"/api/v1/certificados/{certificate.id}/technical",
