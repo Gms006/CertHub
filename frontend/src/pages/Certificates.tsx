@@ -135,6 +135,34 @@ const toISODate = (value?: string | null) => {
 
 const formatDocument = (value: string) => value || "-";
 
+const buildMaskedDocument = (cert: CertificateRead) => {
+  const maskedValue = cert.document_masked?.trim() ?? "";
+  const inferredType =
+    cert.document_type ||
+    (maskedValue.startsWith("CPF") ? "CPF" : maskedValue.startsWith("CNPJ") ? "CNPJ" : null);
+  const digits = extractDigits(maskedValue);
+
+  if (inferredType === "CPF" && digits.length >= 2) {
+    const tail = digits.slice(-2);
+    return `CPF ***.***.***-${tail}`;
+  }
+
+  if (inferredType === "CNPJ" && digits.length >= 6) {
+    const head = digits.slice(0, 2);
+    const tail = digits.slice(-4);
+    return `CNPJ ${head}${"*".repeat(8)}${tail}`;
+  }
+
+  if (maskedValue) {
+    if (inferredType && !maskedValue.startsWith(inferredType)) {
+      return `${inferredType} ${maskedValue}`;
+    }
+    return maskedValue;
+  }
+
+  return "-";
+};
+
 const statusUI = (status: CertStatus) => {
   if (status === "VENCIDO") {
     return {
@@ -285,8 +313,7 @@ const getCertificateDisplayName = (cert: CertificateRead) => {
   return trimmed.trim() || base || rawName;
 };
 
-const getCertificateDocument = (cert: CertificateRead) =>
-  cert.document_masked || "-";
+const getCertificateDocument = (cert: CertificateRead) => buildMaskedDocument(cert);
 
 const CertificatesPage = () => {
   const { apiFetch, user } = useAuth();
