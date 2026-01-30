@@ -10,9 +10,11 @@ import { formatDateTime, sanitizeSensitiveLabel } from "../lib/formatters";
 
 type InstallJobRead = {
   id: string;
-  cert_id: string;
+  cert_id?: string | null;
   device_id: string;
   requested_by_user_id: string;
+  job_type: "INSTALL" | "REMOVE_CERT";
+  target_thumbprint?: string | null;
   status: string;
   created_at: string;
   updated_at: string;
@@ -147,13 +149,17 @@ const JobsPage = () => {
     const term = search.trim().toLowerCase();
     if (!term) return result;
     return result.filter((job) => {
-      const certName = certMap.get(job.cert_id)?.toLowerCase() ?? "";
+      const certName = job.cert_id ? certMap.get(job.cert_id)?.toLowerCase() ?? "" : "";
       const deviceName = deviceMap.get(job.device_id)?.toLowerCase() ?? "";
+      const thumbprint = job.target_thumbprint?.toLowerCase() ?? "";
+      const jobTypeLabel = job.job_type === "REMOVE_CERT" ? "remoção" : "";
       return (
         certName.includes(term) ||
         job.id.toLowerCase().includes(term) ||
         job.device_id.toLowerCase().includes(term) ||
-        deviceName.includes(term)
+        deviceName.includes(term) ||
+        thumbprint.includes(term) ||
+        jobTypeLabel.includes(term)
       );
     });
   }, [deviceFilter, isAdmin, jobs, statusFilter, search, certMap, deviceMap]);
@@ -369,7 +375,15 @@ const JobsPage = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200/70">
-              {filteredJobs.map((job) => (
+              {filteredJobs.map((job) => {
+                const certLabel =
+                  job.job_type === "REMOVE_CERT"
+                    ? "Remoção manual"
+                    : certMap.get(job.cert_id ?? "") ?? formatId(job.cert_id ?? "-");
+                const thumbprintLabel = job.target_thumbprint
+                  ? job.target_thumbprint.slice(-6)
+                  : null;
+                return (
                 <tr
                   key={job.id}
                   className="odd:bg-white even:bg-slate-50/40 hover:bg-slate-100/60"
@@ -378,14 +392,19 @@ const JobsPage = () => {
                     <div className="max-w-[220px] space-y-1">
                       <p
                         className="truncate font-medium text-slate-900"
-                        title={certMap.get(job.cert_id) ?? job.cert_id}
+                        title={certLabel}
                       >
-                        {certMap.get(job.cert_id) ?? formatId(job.cert_id)}
+                        {certLabel}
                       </p>
                       <p className="truncate text-xs text-slate-500">
                         Job {formatId(job.id)} •{" "}
                         {formatId(job.requested_by_user_id)}
                       </p>
+                      {thumbprintLabel ? (
+                        <p className="truncate text-[11px] text-slate-400">
+                          Thumbprint • {thumbprintLabel}
+                        </p>
+                      ) : null}
                     </div>
                   </td>
                   <td className="px-4 py-3 text-slate-600">
@@ -445,7 +464,8 @@ const JobsPage = () => {
                     </details>
                   </td>
                 </tr>
-              ))}
+              );
+              })}
             </tbody>
           </table>
         </div>

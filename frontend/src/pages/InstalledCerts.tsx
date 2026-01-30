@@ -1,4 +1,4 @@
-import { Copy, RefreshCw, Search } from "lucide-react";
+import { Copy, RefreshCw, Search, Trash2 } from "lucide-react";
 import { Fragment, useEffect, useMemo, useState } from "react";
 
 import SectionTabs from "../components/SectionTabs";
@@ -30,6 +30,16 @@ type InstalledCert = {
   installed_at?: string | null;
   last_seen_at: string;
   removed_at?: string | null;
+};
+
+type RemoveJobResponse = {
+  job_id: string;
+};
+
+type RemoveJobStatus = {
+  id: string;
+  status: string;
+  error_message?: string | null;
 };
 
 const formatThumbprint = (value: string, hideLongIds: boolean) =>
@@ -64,6 +74,9 @@ const InstalledCertsPage = () => {
   const [loading, setLoading] = useState(false);
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
   const [copiedThumbprint, setCopiedThumbprint] = useState<string | null>(null);
+  const [removeCandidate, setRemoveCandidate] = useState<InstalledCert | null>(null);
+  const [removeJob, setRemoveJob] = useState<RemoveJobStatus | null>(null);
+  const [removeSubmitting, setRemoveSubmitting] = useState(false);
 
   const isAdmin = user?.role_global === "ADMIN" || user?.role_global === "DEV";
 
@@ -132,6 +145,15 @@ const InstalledCertsPage = () => {
     return () => window.clearInterval(interval);
   }, [selectedDeviceId, scope, includeRemoved]);
 
+  useEffect(() => {
+    if (!removeJob?.id) return;
+    if (removeJob.status === "DONE" || removeJob.status === "FAILED") return;
+    const interval = window.setInterval(() => {
+      fetchRemoveJobStatus(removeJob.id);
+    }, 5000);
+    return () => window.clearInterval(interval);
+  }, [removeJob?.id, removeJob?.status]);
+
   const filteredCerts = useMemo(() => {
     const term = search.trim().toLowerCase();
     if (!term) return installedCerts;
@@ -171,6 +193,51 @@ const InstalledCertsPage = () => {
       }, 1800);
     } catch {
       notify("Não foi possível copiar o thumbprint.", "error");
+    }
+  };
+
+  const fetchRemoveJobStatus = async (jobId: string) => {
+    try {
+      const response = await apiFetch(`/install-jobs/${jobId}`);
+      if (!response.ok) {
+        return;
+      }
+      const data = (await response.json()) as RemoveJobStatus;
+      setRemoveJob(data);
+      if (data.status === "DONE") {
+        notify("Certificado removido.", "success");
+        setRemoveCandidate(null);
+        setRemoveJob(null);
+        loadInstalledCerts();
+      }
+      if (data.status === "FAILED") {
+        notify(data.error_message ?? "Falha ao remover certificado.", "error");
+      }
+    } catch {
+      // silencioso
+    }
+  };
+
+  const handleRemoveRequest = async () => {
+    if (!removeCandidate || !selectedDeviceId) return;
+    setRemoveSubmitting(true);
+    try {
+      const response = await apiFetch(
+        `/devices/${selectedDeviceId}/installed-certs/${removeCandidate.thumbprint}/remove`,
+        { method: "POST" },
+      );
+      if (!response.ok) {
+        const data = (await response.json()) as { detail?: string };
+        notify(data?.detail ?? "Não foi possível solicitar a remoção.", "error");
+        return;
+      }
+      const data = (await response.json()) as RemoveJobResponse;
+      setRemoveJob({ id: data.job_id, status: "PENDING" });
+      notify("Remoção solicitada. Aguardando agente.", "success");
+    } catch {
+      notify("Erro ao solicitar a remoção.", "error");
+    } finally {
+      setRemoveSubmitting(false);
     }
   };
 
@@ -311,6 +378,7 @@ const InstalledCertsPage = () => {
                 <th className="px-4 py-3">Thumbprint</th>
                 <th className="px-4 py-3">Retenção</th>
                 <th className="px-4 py-3">Última atualização</th>
+                <th className="px-4 py-3">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200/70">
@@ -337,6 +405,7 @@ const InstalledCertsPage = () => {
                       : "bg-emerald-50 text-emerald-700"
                   : "bg-slate-100 text-slate-500";
                 const isExpanded = expandedRows[rowKey];
+                const canRemove = cert.installed_via_agent && !cert.removed_at;
                 return (
                   <Fragment key={rowKey}>
                     <tr className="odd:bg-white even:bg-slate-50/40 hover:bg-slate-100/60">
@@ -428,10 +497,27 @@ const InstalledCertsPage = () => {
                       <td className="px-4 py-4 text-slate-500">
                         {formatDateTime(cert.last_seen_at)}
                       </td>
+                      <td className="px-4 py-4">
+                        {canRemove ? (
+                          <button
+                            type="button"
+                            className="inline-flex items-center gap-2 rounded-full border border-rose-200/70 bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-700 transition hover:border-rose-300"
+                            onClick={() => {
+                              setRemoveJob(null);
+                              setRemoveCandidate(cert);
+                            }}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                            Remover
+                          </button>
+                        ) : (
+                          <span className="text-xs text-slate-400">-</span>
+                        )}
+                      </td>
                     </tr>
                     {isExpanded ? (
                       <tr className="bg-slate-50/60">
-                        <td colSpan={7} className="px-4 py-4 text-xs text-slate-600">
+                        <td colSpan={8} className="px-4 py-4 text-xs text-slate-600">
                           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                             <div>
                               <div className="text-[11px] uppercase text-slate-400">Serial</div>
@@ -486,6 +572,47 @@ const InstalledCertsPage = () => {
           </table>
         </div>
       )}
+
+      {removeCandidate ? (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/40 p-4">
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-xl">
+            <h2 className="text-lg font-semibold text-slate-900">Remover certificado</h2>
+            <p className="mt-2 text-sm text-slate-600">
+              Remover este certificado desta máquina? Isso remove do Windows (CurrentUser\My).
+            </p>
+            <div className="mt-4 space-y-1 text-xs text-slate-500">
+              <div>Thumbprint: {formatThumbprint(removeCandidate.thumbprint, false)}</div>
+              <div>Device: {devices.find((d) => d.id === selectedDeviceId)?.hostname}</div>
+            </div>
+            {removeJob ? (
+              <div className="mt-4 rounded-2xl bg-slate-50 px-4 py-3 text-xs text-slate-600">
+                Status do job: {removeJob.status}
+              </div>
+            ) : null}
+            <div className="mt-6 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                className="rounded-full px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-800"
+                onClick={() => {
+                  setRemoveCandidate(null);
+                  setRemoveJob(null);
+                }}
+                disabled={removeSubmitting}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:bg-rose-300"
+                onClick={handleRemoveRequest}
+                disabled={removeSubmitting}
+              >
+                Confirmar remoção
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {toast && <Toast message={toast.message} tone={toast.tone} />}
     </div>

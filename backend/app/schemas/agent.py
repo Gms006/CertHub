@@ -30,10 +30,12 @@ class AgentJobStatusUpdate(BaseModel):
 
 class AgentPayloadResponse(BaseModel):
     job_id: uuid.UUID
-    cert_id: uuid.UUID
-    pfx_base64: str
-    password: str
-    source_path: str
+    job_type: Literal["INSTALL", "REMOVE_CERT"] = "INSTALL"
+    cert_id: uuid.UUID | None = None
+    pfx_base64: str | None = None
+    password: str | None = None
+    source_path: str | None = None
+    target_thumbprint: str | None = None
     generated_at: datetime
     cleanup_mode: Literal["DEFAULT", "KEEP_UNTIL", "EXEMPT"] | None = None
     keep_until: datetime | None = None
@@ -49,6 +51,16 @@ class AgentCleanupEvent(BaseModel):
     skipped_thumbprints: list[str] | None = None
     mode: Literal["scheduled", "fallback", "manual"]
     ran_at_local: str | None = None
+
+
+class AgentDuplicateExpiredCleanupEvent(BaseModel):
+    job_id: uuid.UUID
+    new_thumbprint: str
+    removed_count: int
+    removed_thumbprints: list[str] | None = None
+    entity_key_hash: str | None = None
+    failed_count: int | None = None
+    failed_thumbprints: list[str] | None = None
 
 
 class AgentJobClaimResponse(InstallJobRead):

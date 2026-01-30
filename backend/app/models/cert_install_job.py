@@ -29,6 +29,9 @@ CLEANUP_MODE_DEFAULT = "DEFAULT"
 CLEANUP_MODE_KEEP_UNTIL = "KEEP_UNTIL"
 CLEANUP_MODE_EXEMPT = "EXEMPT"
 
+JOB_TYPE_INSTALL = "INSTALL"
+JOB_TYPE_REMOVE = "REMOVE_CERT"
+
 
 class CertInstallJob(Base):
     __tablename__ = "cert_install_jobs"
@@ -39,7 +42,9 @@ class CertInstallJob(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     org_id: Mapped[int] = mapped_column(Integer, nullable=False)
-    cert_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("certificates.id", ondelete="CASCADE"))
+    cert_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("certificates.id", ondelete="CASCADE"), nullable=True
+    )
     device_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("devices.id", ondelete="CASCADE"))
     requested_by_user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"))
     approved_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
@@ -55,6 +60,7 @@ class CertInstallJob(Base):
     error_code: Mapped[str | None] = mapped_column(String, nullable=True)
     error_message: Mapped[str | None] = mapped_column(String, nullable=True)
     thumbprint: Mapped[str | None] = mapped_column(String, nullable=True)
+    target_thumbprint: Mapped[str | None] = mapped_column(String, nullable=True)
     payload_token_hash: Mapped[str | None] = mapped_column(Text, nullable=True)
     payload_token_expires_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
@@ -75,6 +81,9 @@ class CertInstallJob(Base):
     )
     keep_set_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     status: Mapped[str] = mapped_column(String, nullable=False, default=JOB_STATUS_REQUESTED)
+    job_type: Mapped[str] = mapped_column(
+        String, nullable=False, server_default=text(f"'{JOB_TYPE_INSTALL}'")
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

@@ -37,6 +37,7 @@ from app.schemas.agent import (
   AgentAuthRequest,
   AgentAuthResponse,
   AgentCleanupEvent,
+  AgentDuplicateExpiredCleanupEvent,
   AgentJobClaimResponse,
   AgentHeartbeatRequest,
   AgentJobStatusUpdate,
@@ -58,6 +59,15 @@ RATE_LIMIT_INSTALLED_CERTS_PER_DEVICE = 12
 
 def _normalize_thumbprint(value: str) -> str:
     return value.replace(" ", "").upper()
+
+
+def _mask_thumbprint(value: str | None) -> str | None:
+    if not value:
+        return None
+    normalized = _normalize_thumbprint(value)
+    if len(normalized) <= 6:
+        return normalized
+    return normalized[-6:]
 
 
 def _extract_bearer_token(
@@ -203,6 +213,34 @@ def agent_cleanup_event(
                 "ran_at_local": payload.ran_at_local,
             },
         )
+    db.commit()
+    return {"status": "ok"}
+
+
+@router.post("/cert-duplicate-expired")
+def agent_duplicate_expired_cleanup(
+    payload: AgentDuplicateExpiredCleanupEvent,
+    db: Session = Depends(get_db),
+    device: Device = Depends(require_device),
+) -> dict[str, str]:
+    log_audit(
+        db=db,
+        org_id=device.org_id,
+        action="CERT_REMOVED_DUPLICATE_EXPIRED",
+        entity_type="cert_install_job",
+        entity_id=str(payload.job_id),
+        actor_device_id=device.id,
+        meta={
+            "device_id": str(device.id),
+            "job_id": str(payload.job_id),
+            "entity_key_hash": payload.entity_key_hash,
+            "removed_count": payload.removed_count,
+            "removed_thumbprints": payload.removed_thumbprints,
+            "new_thumbprint": payload.new_thumbprint,
+            "failed_count": payload.failed_count,
+            "failed_thumbprints": payload.failed_thumbprints,
+        },
+    )
     db.commit()
     return {"status": "ok"}
 
@@ -573,6 +611,35 @@ def job_payload(
     locked_job.payload_token_used_at = datetime.now(timezone.utc)
     db.commit()
 
+    if locked_job.job_type == "REMOVE_CERT":
+        if not locked_job.target_thumbprint:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="target thumbprint missing",
+            )
+        log_audit(
+            db=db,
+            org_id=device.org_id,
+            action="PAYLOAD_ISSUED",
+            entity_type="cert_install_job",
+            entity_id=locked_job.id,
+            actor_device_id=device.id,
+            meta={
+                "job_id": str(locked_job.id),
+                "device_id": str(device.id),
+                "job_type": locked_job.job_type,
+                "ip": request.client.host if request.client else None,
+            },
+        )
+        db.commit()
+        response.headers["Cache-Control"] = "no-store"
+        return AgentPayloadResponse(
+            job_id=locked_job.id,
+            job_type=locked_job.job_type,
+            target_thumbprint=locked_job.target_thumbprint,
+            generated_at=datetime.now(timezone.utc),
+        )
+
     certificate = db.get(Certificate, locked_job.cert_id)
     if certificate is None or certificate.org_id != device.org_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="certificate not found")
@@ -599,6 +666,7 @@ def job_payload(
         meta={
             "job_id": str(locked_job.id),
             "device_id": str(device.id),
+            "job_type": locked_job.job_type,
             "ip": request.client.host if request.client else None,
         },
     )
@@ -606,6 +674,7 @@ def job_payload(
     response.headers["Cache-Control"] = "no-store"
     return AgentPayloadResponse(
         job_id=locked_job.id,
+        job_type=locked_job.job_type,
         cert_id=certificate.id,
         pfx_base64=encoded,
         password=password,
@@ -634,7 +703,13 @@ def job_result(
     status_value = JOB_STATUS_DONE if payload.status == "DONE" else JOB_STATUS_FAILED
     error_code = payload.error_code if status_value == JOB_STATUS_FAILED else None
     error_message = payload.error_message if status_value == JOB_STATUS_FAILED else None
-    thumbprint = payload.thumbprint if status_value == JOB_STATUS_DONE else None
+    if status_value == JOB_STATUS_DONE:
+        if job.job_type == "REMOVE_CERT":
+            thumbprint = payload.thumbprint or job.target_thumbprint
+        else:
+            thumbprint = payload.thumbprint
+    else:
+        thumbprint = None
 
     result = db.execute(
         update(CertInstallJob)
@@ -672,19 +747,37 @@ def job_result(
         db.commit()
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="job not updatable")
 
-    log_audit(
-        db=db,
-        org_id=device.org_id,
-        action="INSTALL_DONE" if status_value == JOB_STATUS_DONE else "INSTALL_FAILED",
-        entity_type="cert_install_job",
-        entity_id=result.id,
-        actor_device_id=device.id,
-        meta={
-            "job_id": str(result.id),
-            "device_id": str(device.id),
-            "status": status_value,
-            "error_code": error_code,
-        },
-    )
+    if result.job_type == "REMOVE_CERT":
+        log_audit(
+            db=db,
+            org_id=device.org_id,
+            action="CERT_REMOVED_MANUAL" if status_value == JOB_STATUS_DONE else "CERT_REMOVE_FAILED",
+            entity_type="cert_install_job",
+            entity_id=result.id,
+            actor_device_id=device.id,
+            meta={
+                "job_id": str(result.id),
+                "device_id": str(device.id),
+                "status": status_value,
+                "error_code": error_code,
+                "thumbprint_last6": _mask_thumbprint(thumbprint or result.target_thumbprint),
+                "removed": status_value == JOB_STATUS_DONE,
+            },
+        )
+    else:
+        log_audit(
+            db=db,
+            org_id=device.org_id,
+            action="INSTALL_DONE" if status_value == JOB_STATUS_DONE else "INSTALL_FAILED",
+            entity_type="cert_install_job",
+            entity_id=result.id,
+            actor_device_id=device.id,
+            meta={
+                "job_id": str(result.id),
+                "device_id": str(device.id),
+                "status": status_value,
+                "error_code": error_code,
+            },
+        )
     db.commit()
     return result
