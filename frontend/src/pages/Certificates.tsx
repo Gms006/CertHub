@@ -135,29 +135,37 @@ const toISODate = (value?: string | null) => {
 
 const formatDocument = (value: string) => value || "-";
 
+const formatCpf = (digits: string) =>
+  `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9, 11)}`;
+
+const formatCnpj = (digits: string) =>
+  `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(
+    8,
+    12,
+  )}-${digits.slice(12, 14)}`;
+
 const buildMaskedDocument = (cert: CertificateRead) => {
   const maskedValue = cert.document_masked?.trim() ?? "";
+  const digits = extractDigits(maskedValue);
   const inferredType =
     cert.document_type ||
+    (digits.length === 11 ? "CPF" : digits.length === 14 ? "CNPJ" : null) ||
     (maskedValue.startsWith("CPF") ? "CPF" : maskedValue.startsWith("CNPJ") ? "CNPJ" : null);
-  const digits = extractDigits(maskedValue);
 
-  if (inferredType === "CPF" && digits.length >= 2) {
-    const tail = digits.slice(-2);
-    return `CPF ***.***.***-${tail}`;
+  if (digits.length === 11) {
+    return `CPF ${formatCpf(digits)}`;
   }
 
-  if (inferredType === "CNPJ" && digits.length >= 6) {
-    const head = digits.slice(0, 2);
-    const tail = digits.slice(-4);
-    return `CNPJ ${head}${"*".repeat(8)}${tail}`;
+  if (digits.length === 14) {
+    return `CNPJ ${formatCnpj(digits)}`;
   }
 
-  if (maskedValue) {
-    if (inferredType && !maskedValue.startsWith(inferredType)) {
-      return `${inferredType} ${maskedValue}`;
+  const cleanedValue = maskedValue.replace(/\*/g, "").trim();
+  if (cleanedValue) {
+    if (inferredType && !cleanedValue.startsWith(inferredType)) {
+      return `${inferredType} ${cleanedValue}`;
     }
-    return maskedValue;
+    return cleanedValue;
   }
 
   return "-";
