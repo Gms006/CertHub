@@ -74,8 +74,8 @@ const JobsPage = () => {
       const endpoint = isAdmin
         ? "/install-jobs"
         : isView
-          ? "/install-jobs/my-device"
-          : "/install-jobs/mine";
+          ? "/install-jobs?scope=my-device"
+          : "/install-jobs?scope=mine";
       const response = await apiFetch(endpoint);
       if (!response.ok) {
         notify("Não foi possível carregar jobs.", "error");

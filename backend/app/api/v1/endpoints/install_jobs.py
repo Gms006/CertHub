@@ -203,17 +203,40 @@ async def export_install_jobs(
 @router.get("", response_model=list[InstallJobRead])
 async def list_install_jobs(
     mine: bool = Query(default=False),
+    scope: ExportScope | None = Query(default=None),
     db: Session = Depends(get_db),
     current_user=Depends(require_view_or_higher),
 ) -> list[CertInstallJob]:
-    if not mine:
+    resolved_scope = scope or (ExportScope.MINE if mine else ExportScope.ALL)
+    if resolved_scope == ExportScope.ALL:
         if current_user.role_global not in {"ADMIN", "DEV"}:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
         statement = select(CertInstallJob).where(CertInstallJob.org_id == current_user.org_id)
-    else:
+    elif resolved_scope == ExportScope.MINE:
         statement = select(CertInstallJob).where(
             CertInstallJob.org_id == current_user.org_id,
             CertInstallJob.requested_by_user_id == current_user.id,
+        )
+    else:
+        statement = (
+            select(CertInstallJob)
+            .join(Device, Device.id == CertInstallJob.device_id)
+            .outerjoin(
+                UserDevice,
+                and_(
+                    UserDevice.device_id == CertInstallJob.device_id,
+                    UserDevice.user_id == current_user.id,
+                ),
+            )
+            .where(
+                CertInstallJob.org_id == current_user.org_id,
+                or_(
+                    CertInstallJob.requested_by_user_id == current_user.id,
+                    Device.assigned_user_id == current_user.id,
+                    UserDevice.is_allowed.is_(True),
+                ),
+            )
+            .distinct()
         )
     statement = statement.order_by(CertInstallJob.created_at.desc())
     return db.execute(statement).scalars().all()
