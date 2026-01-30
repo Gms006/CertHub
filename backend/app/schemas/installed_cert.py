@@ -45,3 +45,7 @@ class InstalledCertRead(BaseModel):
     removed_at: datetime | None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class InstalledCertRemoveResponse(BaseModel):
+    job_id: uuid.UUID

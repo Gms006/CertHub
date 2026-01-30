@@ -159,6 +159,16 @@ public sealed class AgentClient
             cancellationToken);
     }
 
+    public async Task<HttpResponseMessage> PostDuplicateExpiredCleanupAsync(
+        DuplicateExpiredCleanupEvent payload,
+        CancellationToken cancellationToken)
+    {
+        return await PostWithAuthRetryAsync(
+            "agent/cert-duplicate-expired",
+            new StringContent(JsonSerializer.Serialize(payload, JsonOptions), Encoding.UTF8, "application/json"),
+            cancellationToken);
+    }
+
     private async Task<HttpResponseMessage> PostWithAuthRetryAsync(string path, HttpContent content, CancellationToken cancellationToken)
     {
         return await SendWithAuthRetryAsync(() => new HttpRequestMessage(HttpMethod.Post, path) { Content = content }, cancellationToken);
@@ -209,17 +219,23 @@ public sealed class AgentClient
         [JsonPropertyName("job_id")]
         public Guid JobId { get; set; }
 
+        [JsonPropertyName("job_type")]
+        public string JobType { get; set; } = "INSTALL";
+
         [JsonPropertyName("cert_id")]
-        public Guid CertId { get; set; }
+        public Guid? CertId { get; set; }
 
         [JsonPropertyName("pfx_base64")]
-        public string PfxBase64 { get; set; } = string.Empty;
+        public string? PfxBase64 { get; set; }
 
         [JsonPropertyName("password")]
-        public string Password { get; set; } = string.Empty;
+        public string? Password { get; set; }
 
         [JsonPropertyName("source_path")]
-        public string SourcePath { get; set; } = string.Empty;
+        public string? SourcePath { get; set; }
+
+        [JsonPropertyName("target_thumbprint")]
+        public string? TargetThumbprint { get; set; }
 
         [JsonPropertyName("generated_at")]
         public DateTimeOffset GeneratedAt { get; set; }
@@ -232,6 +248,30 @@ public sealed class AgentClient
 
         [JsonPropertyName("keep_reason")]
         public string? KeepReason { get; set; }
+    }
+
+    public sealed class DuplicateExpiredCleanupEvent
+    {
+        [JsonPropertyName("job_id")]
+        public Guid JobId { get; set; }
+
+        [JsonPropertyName("new_thumbprint")]
+        public string NewThumbprint { get; set; } = string.Empty;
+
+        [JsonPropertyName("removed_count")]
+        public int RemovedCount { get; set; }
+
+        [JsonPropertyName("removed_thumbprints")]
+        public List<string> RemovedThumbprints { get; set; } = new();
+
+        [JsonPropertyName("entity_key_hash")]
+        public string? EntityKeyHash { get; set; }
+
+        [JsonPropertyName("failed_count")]
+        public int FailedCount { get; set; }
+
+        [JsonPropertyName("failed_thumbprints")]
+        public List<string> FailedThumbprints { get; set; } = new();
     }
 
     public sealed class ResultUpdate

@@ -111,7 +111,7 @@ public sealed class CertificateCleanupService
         return true;
     }
 
-    private static bool ShouldSkipRetention(InstalledThumbprintEntry entry, Logger logger)
+    internal static bool ShouldSkipRetention(InstalledThumbprintEntry entry, Logger logger)
     {
         var mode = entry.CleanupMode?.ToUpperInvariant() ?? "DEFAULT";
         if (mode == "EXEMPT")
@@ -136,7 +136,7 @@ public sealed class CertificateCleanupService
         return false;
     }
 
-    private static InstalledThumbprintEntry SelectBestEntry(IEnumerable<InstalledThumbprintEntry> entries)
+    internal static InstalledThumbprintEntry SelectBestEntry(IEnumerable<InstalledThumbprintEntry> entries)
     {
         var list = entries.ToList();
         var exempt = list

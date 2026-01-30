@@ -15,6 +15,7 @@ JobStatus = Literal[
 ]
 
 CleanupMode = Literal["DEFAULT", "KEEP_UNTIL", "EXEMPT"]
+JobType = Literal["INSTALL", "REMOVE_CERT"]
 
 
 class InstallJobCreate(BaseModel):
@@ -39,7 +40,7 @@ class InstallJobApproveRequest(BaseModel):
 class InstallJobRead(BaseModel):
     id: uuid.UUID
     org_id: int
-    cert_id: uuid.UUID
+    cert_id: uuid.UUID | None
     device_id: uuid.UUID
     requested_by_user_id: uuid.UUID
     approved_by_user_id: uuid.UUID | None
@@ -51,12 +52,14 @@ class InstallJobRead(BaseModel):
     error_code: str | None
     error_message: str | None
     thumbprint: str | None
+    target_thumbprint: str | None
     cleanup_mode: CleanupMode
     keep_until: datetime | None
     keep_reason: str | None
     keep_set_by_user_id: uuid.UUID | None
     keep_set_at: datetime | None
     status: JobStatus
+    job_type: JobType
     created_at: datetime
     updated_at: datetime
 

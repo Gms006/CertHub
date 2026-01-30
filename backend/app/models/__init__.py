@@ -13,6 +13,8 @@ from app.models.cert_install_job import (
     JOB_STATUS_IN_PROGRESS,
     JOB_STATUS_PENDING,
     JOB_STATUS_REQUESTED,
+    JOB_TYPE_INSTALL,
+    JOB_TYPE_REMOVE,
 )
 from app.models.device import Device
 from app.models.device_installed_cert import DeviceInstalledCert
@@ -36,6 +38,8 @@ __all__ = [
     "JOB_STATUS_FAILED",
     "JOB_STATUS_EXPIRED",
     "JOB_STATUS_CANCELED",
+    "JOB_TYPE_INSTALL",
+    "JOB_TYPE_REMOVE",
     "Device",
     "DeviceInstalledCert",
     "UserDevice",

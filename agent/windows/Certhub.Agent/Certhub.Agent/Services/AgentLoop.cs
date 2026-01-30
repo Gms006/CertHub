@@ -8,6 +8,7 @@ namespace Certhub.Agent.Services;
 public sealed class AgentLoop
 {
     private static readonly TimeSpan MaxRateLimitDelay = TimeSpan.FromSeconds(30);
+    private const string RemoveJobType = "REMOVE_CERT";
     private readonly AgentConfigStore _configStore;
     private readonly DpapiStore _dpapiStore;
     private readonly InstalledThumbprintsStore _thumbprintsStore;
@@ -391,11 +392,18 @@ public sealed class AgentLoop
 
         try
         {
-            var thumbprint = InstallCertificate(payload);
+            if (string.Equals(payload.JobType, RemoveJobType, StringComparison.OrdinalIgnoreCase))
+            {
+                await RemoveCertificateAsync(payload, cancellationToken);
+                return;
+            }
+
+            var installed = InstallCertificate(payload);
+            var duplicateCleanup = RemoveExpiredDuplicateCertificates(installed);
             await _client!.SendResultAsync(jobId, new AgentClient.ResultUpdate
             {
                 Status = "DONE",
-                Thumbprint = thumbprint
+                Thumbprint = installed.Thumbprint
             }, cancellationToken);
             UpdateStatus(lastJobStatus: "DONE", error: null);
             try
@@ -409,19 +417,28 @@ public sealed class AgentLoop
             var config = _configStore.Load();
             if (config is not null)
             {
+                await ReportDuplicateExpiredCleanupAsync(payload, installed, duplicateCleanup, cancellationToken);
                 await ReportInstalledCertsAsync(config, cancellationToken, force: true);
             }
         }
         catch (Exception ex)
         {
-            _logger.Error($"Install failed for job {jobId}", ex);
-            await ReportFailureAsync(jobId, "INSTALL_FAILED", ex.Message, cancellationToken);
+            _logger.Error($"Job failed for job {jobId}", ex);
+            var errorCode = string.Equals(payload.JobType, RemoveJobType, StringComparison.OrdinalIgnoreCase)
+                ? "REMOVE_FAILED"
+                : "INSTALL_FAILED";
+            await ReportFailureAsync(jobId, errorCode, ex.Message, cancellationToken);
             UpdateStatus(lastJobStatus: "FAILED", error: ex.Message);
         }
     }
 
-    private string InstallCertificate(AgentClient.PayloadResponse payload)
+    private InstalledCertificateResult InstallCertificate(AgentClient.PayloadResponse payload)
     {
+        if (string.IsNullOrWhiteSpace(payload.PfxBase64) || payload.Password is null)
+        {
+            throw new InvalidOperationException("Payload missing certificate data.");
+        }
+
         var rawBytes = Convert.FromBase64String(payload.PfxBase64);
         using var certificate = new X509Certificate2(rawBytes, payload.Password,
             X509KeyStorageFlags.PersistKeySet | X509KeyStorageFlags.UserKeySet);
@@ -435,7 +452,7 @@ public sealed class AgentLoop
             store.Add(certificate);
         }
 
-        var normalized = thumbprint.Replace(" ", string.Empty).ToUpperInvariant();
+        var normalized = NormalizeThumbprint(thumbprint);
         var stored = _thumbprintsStore.LoadEntries(_configStore.InstalledThumbprintsPath).ToList();
         var existingEntry = stored.FirstOrDefault(entry =>
             string.Equals(entry.Thumbprint, normalized, StringComparison.OrdinalIgnoreCase));
@@ -464,7 +481,204 @@ public sealed class AgentLoop
             _logger.Info($"Installed thumbprint persisted via DPAPI: {normalized}");
         }
 
-        return normalized;
+        return new InstalledCertificateResult(normalized, certificate.Subject ?? string.Empty);
+    }
+
+    private async Task RemoveCertificateAsync(
+        AgentClient.PayloadResponse payload,
+        CancellationToken cancellationToken)
+    {
+        var targetThumbprint = NormalizeThumbprint(payload.TargetThumbprint);
+        if (string.IsNullOrWhiteSpace(targetThumbprint))
+        {
+            await ReportFailureAsync(payload.JobId, "INVALID_PAYLOAD", "Missing target thumbprint.", cancellationToken);
+            UpdateStatus(lastJobStatus: "FAILED", error: "Missing target thumbprint");
+            return;
+        }
+
+        _logger.Info($"Manual remove requested: {MaskThumbprint(targetThumbprint)}");
+        var removedCount = 0;
+        using var store = new X509Store(StoreName.My, StoreLocation.CurrentUser);
+        store.Open(OpenFlags.ReadWrite);
+        var found = store.Certificates.Find(X509FindType.FindByThumbprint, targetThumbprint, false);
+        foreach (var cert in found)
+        {
+            store.Remove(cert);
+            removedCount++;
+        }
+
+        var dpapiRemoved = RemoveThumbprintFromStore(targetThumbprint);
+        _logger.Info($"Manual remove result. Found={found.Count}, Removed={removedCount}, DPAPIEntryRemoved={dpapiRemoved}.");
+
+        if (found.Count == 0 && !dpapiRemoved)
+        {
+            await ReportFailureAsync(payload.JobId, "NOT_FOUND", "Certificate not found.", cancellationToken);
+            UpdateStatus(lastJobStatus: "FAILED", error: "Certificate not found");
+        }
+        else
+        {
+            await _client!.SendResultAsync(payload.JobId, new AgentClient.ResultUpdate
+            {
+                Status = "DONE",
+                Thumbprint = targetThumbprint
+            }, cancellationToken);
+            UpdateStatus(lastJobStatus: "DONE", error: null);
+        }
+
+        var config = _configStore.Load();
+        if (config is not null)
+        {
+            await ReportInstalledCertsAsync(config, cancellationToken, force: true);
+        }
+    }
+
+    private bool RemoveThumbprintFromStore(string thumbprint)
+    {
+        var stored = _thumbprintsStore.LoadEntries(_configStore.InstalledThumbprintsPath).ToList();
+        var normalized = NormalizeThumbprint(thumbprint);
+        var before = stored.Count;
+        stored = stored
+            .Where(entry => !string.Equals(NormalizeThumbprint(entry.Thumbprint), normalized, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        if (stored.Count == before)
+        {
+            return false;
+        }
+
+        _thumbprintsStore.SaveEntries(_configStore.InstalledThumbprintsPath, stored);
+        _logger.Info($"DPAPI entry removed for thumbprint: {normalized}");
+        return true;
+    }
+
+    private DuplicateExpiredCleanupResult RemoveExpiredDuplicateCertificates(InstalledCertificateResult installed)
+    {
+        var entityKey = CertificateEntityKey.ExtractEntityKey(installed.Subject);
+        if (string.IsNullOrWhiteSpace(entityKey))
+        {
+            _logger.Warn(
+                $"entity_key_not_found subject={CertificateEntityKey.MaskSubjectForLog(installed.Subject)}");
+            return DuplicateExpiredCleanupResult.Empty;
+        }
+
+        var entityKeyHash = CertificateEntityKey.HashEntityKey(entityKey);
+        var nowUtc = DateTime.UtcNow;
+        var removed = new List<string>();
+        var failed = new List<string>();
+        var skippedRetention = 0;
+        var toRemove = new List<string>();
+
+        var entries = _thumbprintsStore.LoadEntries(_configStore.InstalledThumbprintsPath);
+        var entryMap = entries
+            .Where(entry => !string.IsNullOrWhiteSpace(entry.Thumbprint))
+            .GroupBy(entry => NormalizeThumbprint(entry.Thumbprint))
+            .ToDictionary(group => group.Key, group => CertificateCleanupService.SelectBestEntry(group));
+
+        using var store = new X509Store(StoreName.My, StoreLocation.CurrentUser);
+        store.Open(OpenFlags.ReadWrite);
+
+        foreach (var cert in store.Certificates)
+        {
+            var thumbprint = NormalizeThumbprint(cert.Thumbprint);
+            if (string.IsNullOrWhiteSpace(thumbprint))
+            {
+                continue;
+            }
+
+            if (string.Equals(thumbprint, installed.Thumbprint, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (cert.NotAfter.ToUniversalTime() >= nowUtc)
+            {
+                continue;
+            }
+
+            var candidateKey = CertificateEntityKey.ExtractEntityKey(cert.Subject);
+            if (string.IsNullOrWhiteSpace(candidateKey))
+            {
+                continue;
+            }
+
+            if (!string.Equals(candidateKey, entityKey, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (entryMap.TryGetValue(thumbprint, out var entry) &&
+                CertificateCleanupService.ShouldSkipRetention(entry, _logger))
+            {
+                skippedRetention++;
+                continue;
+            }
+
+            toRemove.Add(thumbprint);
+        }
+
+        foreach (var thumbprint in toRemove.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            try
+            {
+                var found = store.Certificates.Find(X509FindType.FindByThumbprint, thumbprint, false);
+                foreach (var cert in found)
+                {
+                    store.Remove(cert);
+                }
+                removed.Add(thumbprint);
+                _logger.Info($"Removed expired duplicate cert thumbprint: {thumbprint}");
+            }
+            catch (Exception ex)
+            {
+                failed.Add(thumbprint);
+                _logger.Error($"Failed to remove expired duplicate cert thumbprint: {thumbprint}", ex);
+            }
+        }
+
+        _logger.Info(
+            $"Expired duplicate cleanup done. EntityKeyHash={entityKeyHash}, Removed={removed.Count}, Failed={failed.Count}, SkippedRetention={skippedRetention}.");
+
+        return new DuplicateExpiredCleanupResult(entityKeyHash, removed, failed, skippedRetention);
+    }
+
+    private async Task ReportDuplicateExpiredCleanupAsync(
+        AgentClient.PayloadResponse payload,
+        InstalledCertificateResult installed,
+        DuplicateExpiredCleanupResult cleanupResult,
+        CancellationToken cancellationToken)
+    {
+        if (_client is null)
+        {
+            _logger.Warn("Expired duplicate cleanup audit skipped: client not initialized.");
+            return;
+        }
+
+        if (!cleanupResult.HasData)
+        {
+            return;
+        }
+
+        try
+        {
+            var response = await _client.PostDuplicateExpiredCleanupAsync(new AgentClient.DuplicateExpiredCleanupEvent
+            {
+                JobId = payload.JobId,
+                NewThumbprint = MaskThumbprint(installed.Thumbprint),
+                RemovedCount = cleanupResult.RemovedThumbprints.Count,
+                RemovedThumbprints = cleanupResult.RemovedThumbprints.Select(MaskThumbprint).ToList(),
+                EntityKeyHash = cleanupResult.EntityKeyHash,
+                FailedCount = cleanupResult.FailedThumbprints.Count,
+                FailedThumbprints = cleanupResult.FailedThumbprints.Select(MaskThumbprint).ToList()
+            }, cancellationToken);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.Warn($"Expired duplicate cleanup audit failed: {(int)response.StatusCode} {response.ReasonPhrase}");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.Error("Expired duplicate cleanup audit failed with exception.", ex);
+        }
     }
 
     private void EnsureKeepUntilCleanupTask(AgentClient.PayloadResponse payload)
@@ -480,6 +694,36 @@ public sealed class AgentLoop
         }
 
         _scheduledTaskService.EnsureKeepUntilCleanupTask(payload.KeepUntil.Value, _executablePath);
+    }
+
+    private static string NormalizeThumbprint(string? thumbprint)
+    {
+        return (thumbprint ?? string.Empty).Replace(" ", string.Empty).ToUpperInvariant();
+    }
+
+    private static string MaskThumbprint(string? thumbprint)
+    {
+        var normalized = NormalizeThumbprint(thumbprint);
+        if (normalized.Length <= 6)
+        {
+            return normalized;
+        }
+
+        return normalized[^6..];
+    }
+
+    private sealed record InstalledCertificateResult(string Thumbprint, string Subject);
+
+    private sealed record DuplicateExpiredCleanupResult(
+        string EntityKeyHash,
+        IReadOnlyList<string> RemovedThumbprints,
+        IReadOnlyList<string> FailedThumbprints,
+        int SkippedRetentionCount)
+    {
+        public static DuplicateExpiredCleanupResult Empty => new(string.Empty, Array.Empty<string>(), Array.Empty<string>(), 0);
+
+        public bool HasData =>
+            RemovedThumbprints.Count > 0 || FailedThumbprints.Count > 0;
     }
 
     private async Task ReportFailureAsync(Guid jobId, string errorCode, string errorMessage, CancellationToken cancellationToken)

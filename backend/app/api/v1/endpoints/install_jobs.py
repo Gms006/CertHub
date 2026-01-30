@@ -88,7 +88,7 @@ async def export_install_jobs(
     start_date, end_date = resolve_period_range(period)
     statement = (
         select(CertInstallJob, Certificate.name, Device.hostname, User.nome, User.ad_username)
-        .join(Certificate, Certificate.id == CertInstallJob.cert_id)
+        .outerjoin(Certificate, Certificate.id == CertInstallJob.cert_id)
         .join(Device, Device.id == CertInstallJob.device_id)
         .join(User, User.id == CertInstallJob.requested_by_user_id)
         .where(
@@ -158,10 +158,11 @@ async def export_install_jobs(
 
     for job, cert_name, device_name, requested_name, requested_username in results:
         requester = requested_name or requested_username
+        display_name = sanitize_certificate_name(cert_name) if cert_name else "Remoção manual"
         sheet.append(
             [
                 str(job.id),
-                sanitize_certificate_name(cert_name),
+                display_name,
                 device_name,
                 job.status,
                 requester,
@@ -216,6 +217,38 @@ async def list_install_jobs(
         )
     statement = statement.order_by(CertInstallJob.created_at.desc())
     return db.execute(statement).scalars().all()
+
+
+@router.get("/{job_id}", response_model=InstallJobRead)
+def get_install_job(
+    job_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_view_or_higher),
+) -> CertInstallJob:
+    job = db.get(CertInstallJob, job_id)
+    if job is None or job.org_id != current_user.org_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="job not found")
+
+    if current_user.role_global not in {"ADMIN", "DEV"}:
+        device = db.get(Device, job.device_id)
+        allowed = db.execute(
+            select(UserDevice)
+            .where(
+                UserDevice.device_id == job.device_id,
+                UserDevice.user_id == current_user.id,
+                UserDevice.is_allowed.is_(True),
+            )
+            .limit(1)
+        ).scalar_one_or_none()
+        if (
+            job.requested_by_user_id != current_user.id
+            and device is not None
+            and device.assigned_user_id != current_user.id
+            and allowed is None
+        ):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
+
+    return job
 
 
 @router.get("/mine", response_model=list[InstallJobRead])

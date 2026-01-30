@@ -25,6 +25,7 @@ from app.models import (
     Device,
     JOB_STATUS_PENDING,
     JOB_STATUS_REQUESTED,
+    JOB_TYPE_INSTALL,
     UserDevice,
 )
 from app.schemas.certificate import (
@@ -401,6 +402,7 @@ async def create_install_job(
         device_id=device.id,
         requested_by_user_id=current_user.id,
         status=initial_status,
+        job_type=JOB_TYPE_INSTALL,
         cleanup_mode=cleanup_mode,
         keep_until=keep_until,
         keep_reason=keep_reason,
