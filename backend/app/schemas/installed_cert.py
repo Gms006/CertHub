@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 
 CleanupMode = Literal["DEFAULT", "KEEP_UNTIL", "EXEMPT"]
 
@@ -20,6 +20,15 @@ class InstalledCertReportItem(BaseModel):
     keep_reason: str | None = None
     job_id: uuid.UUID | None = None
     installed_at: datetime | None = None
+
+    @field_validator("cleanup_mode", mode="before")
+    @classmethod
+    def validate_cleanup_mode(cls, v):
+        if v is None:
+            return None
+        if v in {"DEFAULT", "KEEP_UNTIL", "EXEMPT"}:
+            return v
+        return None
 
 
 class InstalledCertReportRequest(BaseModel):

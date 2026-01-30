@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import logging
 import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -9,6 +10,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, Security, status
 from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy import select, update, func
+from sqlalchemy.exc import DataError, IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.audit import log_audit
@@ -49,6 +51,8 @@ from app.schemas.install_job import InstallJobRead
 from app.services.certificate_ingest import guess_password_from_path
 
 router = APIRouter(prefix="/agent", tags=["agent"])
+
+logger = logging.getLogger(__name__)
 
 PAYLOAD_TOKEN_TTL_SECONDS = 120
 RATE_LIMIT_WINDOW_SECONDS = 60
@@ -250,7 +254,7 @@ def report_installed_certs(
     payload: InstalledCertReportRequest,
     db: Session = Depends(get_db),
     device: Device = Depends(require_device),
-) -> dict[str, int | str]:
+) -> dict[str, int | str | list[dict[str, str]]]:
     allowed, _ = check_rate_limit(
         f"rl:agent_installed_certs:{device.id}",
         RATE_LIMIT_INSTALLED_CERTS_PER_DEVICE,
@@ -263,11 +267,25 @@ def report_installed_certs(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="device mismatch")
 
     now = datetime.now(timezone.utc)
+    allowed_cleanup_modes = {"DEFAULT", "KEEP_UNTIL", "EXEMPT"}
     items_by_thumbprint = {
         _normalize_thumbprint(item.thumbprint): item
         for item in payload.items
         if item.thumbprint
     }
+    job_ids = {item.job_id for item in items_by_thumbprint.values() if item.job_id}
+    valid_job_ids: set[uuid.UUID] = set()
+    if job_ids:
+        valid_job_ids = set(
+            db.execute(
+                select(CertInstallJob.id).where(
+                    CertInstallJob.org_id == device.org_id,
+                    CertInstallJob.id.in_(job_ids),
+                )
+            )
+            .scalars()
+            .all()
+        )
     existing_entries = db.execute(
         select(DeviceInstalledCert).where(
             DeviceInstalledCert.org_id == device.org_id,
@@ -276,49 +294,83 @@ def report_installed_certs(
     ).scalars().all()
     existing_by_thumbprint = {entry.thumbprint: entry for entry in existing_entries}
 
+    persisted_count = 0
+    errors: list[dict[str, str]] = []
+
     for thumbprint, item in items_by_thumbprint.items():
         installed_via_agent = item.installed_via_agent
-        cleanup_mode = item.cleanup_mode if installed_via_agent else None
+        cleanup_mode = item.cleanup_mode
+        if cleanup_mode is not None and cleanup_mode not in allowed_cleanup_modes:
+            logger.warning(
+                "Invalid cleanup_mode reported; discarding",
+                extra={
+                    "device_id": str(device.id),
+                    "thumbprint": thumbprint,
+                    "cleanup_mode": cleanup_mode,
+                },
+            )
+            cleanup_mode = None
+        job_id = item.job_id
+        if job_id and job_id not in valid_job_ids:
+            logger.warning(
+                "Invalid job_id reported; discarding",
+                extra={"device_id": str(device.id), "thumbprint": thumbprint, "job_id": str(job_id)},
+            )
+            job_id = None
+        if not installed_via_agent:
+            cleanup_mode = None
+            job_id = None
         keep_until = item.keep_until if installed_via_agent else None
         keep_reason = item.keep_reason if installed_via_agent else None
-        job_id = item.job_id if installed_via_agent else None
         installed_at = item.installed_at if installed_via_agent else None
         existing_entry = existing_by_thumbprint.get(thumbprint)
-        if existing_entry:
-            existing_entry.subject = item.subject
-            existing_entry.issuer = item.issuer
-            existing_entry.serial = item.serial
-            existing_entry.not_before = item.not_before
-            existing_entry.not_after = item.not_after
-            existing_entry.installed_via_agent = installed_via_agent
-            existing_entry.cleanup_mode = cleanup_mode
-            existing_entry.keep_until = keep_until
-            existing_entry.keep_reason = keep_reason
-            existing_entry.job_id = job_id
-            existing_entry.installed_at = installed_at
-            existing_entry.last_seen_at = now
-            existing_entry.removed_at = None
-        else:
-            db.add(
-                DeviceInstalledCert(
-                    org_id=device.org_id,
-                    device_id=device.id,
-                    thumbprint=thumbprint,
-                    subject=item.subject,
-                    issuer=item.issuer,
-                    serial=item.serial,
-                    not_before=item.not_before,
-                    not_after=item.not_after,
-                    installed_via_agent=installed_via_agent,
-                    cleanup_mode=cleanup_mode,
-                    keep_until=keep_until,
-                    keep_reason=keep_reason,
-                    job_id=job_id,
-                    installed_at=installed_at,
-                    last_seen_at=now,
-                    removed_at=None,
-                )
+        try:
+            with db.begin_nested():
+                if existing_entry:
+                    existing_entry.subject = item.subject
+                    existing_entry.issuer = item.issuer
+                    existing_entry.serial = item.serial
+                    existing_entry.not_before = item.not_before
+                    existing_entry.not_after = item.not_after
+                    existing_entry.installed_via_agent = installed_via_agent
+                    existing_entry.cleanup_mode = cleanup_mode
+                    existing_entry.keep_until = keep_until
+                    existing_entry.keep_reason = keep_reason
+                    existing_entry.job_id = job_id
+                    existing_entry.installed_at = installed_at
+                    existing_entry.last_seen_at = now
+                    existing_entry.removed_at = None
+                else:
+                    db.add(
+                        DeviceInstalledCert(
+                            org_id=device.org_id,
+                            device_id=device.id,
+                            thumbprint=thumbprint,
+                            subject=item.subject,
+                            issuer=item.issuer,
+                            serial=item.serial,
+                            not_before=item.not_before,
+                            not_after=item.not_after,
+                            installed_via_agent=installed_via_agent,
+                            cleanup_mode=cleanup_mode,
+                            keep_until=keep_until,
+                            keep_reason=keep_reason,
+                            job_id=job_id,
+                            installed_at=installed_at,
+                            last_seen_at=now,
+                            removed_at=None,
+                        )
+                    )
+                db.flush()
+            persisted_count += 1
+        except (IntegrityError, DataError) as exc:
+            logger.exception(
+                "Failed to persist installed cert report item",
+                extra={"device_id": str(device.id), "thumbprint": thumbprint},
             )
+            reason = "integrity_error" if isinstance(exc, IntegrityError) else "invalid_data"
+            errors.append({"thumbprint": thumbprint, "reason": reason})
+            continue
 
     for entry in existing_entries:
         if entry.thumbprint not in items_by_thumbprint and entry.removed_at is None:
@@ -334,11 +386,18 @@ def report_installed_certs(
         meta={
             "device_id": str(device.id),
             "count": len(items_by_thumbprint),
+            "persisted": persisted_count,
+            "failed": len(errors),
             "scope": "CurrentUser\\My",
         },
     )
     db.commit()
-    return {"status": "ok", "count": len(items_by_thumbprint)}
+    return {
+        "status": "ok",
+        "count": persisted_count,
+        "failed": len(errors),
+        "errors": errors,
+    }
 
 
 @router.get("/jobs", response_model=list[InstallJobRead])
