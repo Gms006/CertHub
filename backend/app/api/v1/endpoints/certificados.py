@@ -72,8 +72,17 @@ def _detect_document(value: str | None) -> tuple[str | None, str | None]:
         match = pattern.search(value)
         if match:
             digits = re.sub(r"\D", "", match.group(0))
-            return doc_type, digits
+            # Validar o tipo baseado na quantidade de dígitos
+            if len(digits) == 14 and doc_type == "CNPJ":
+                return doc_type, digits
+            if len(digits) == 11 and doc_type == "CPF":
+                return doc_type, digits
+    # Fallback: extrair dígitos e determinar por comprimento
     digits = re.sub(r"\D", "", value)
+    if len(digits) == 14:
+        return "CNPJ", digits
+    if len(digits) == 11:
+        return "CPF", digits
     if len(digits) >= 14:
         return "CNPJ", digits[:14]
     if len(digits) >= 11:
@@ -100,6 +109,7 @@ def parse_subject_summary(subject: str | None, issuer: str | None) -> dict[str, 
         "issuer_cn": issuer_cn,
         "document_type": doc_type,
         "document_masked": _mask_document(doc_type, digits),
+        "document_unmasked": digits,
     }
 
 
@@ -378,11 +388,6 @@ async def create_install_job(
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="cleanup_mode EXEMPT not allowed for device",
-            )
-        if current_user.role_global == "VIEW":
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="cleanup_mode EXEMPT not allowed for VIEW role",
             )
         if not keep_reason:
             raise HTTPException(

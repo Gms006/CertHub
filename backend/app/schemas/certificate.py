@@ -47,6 +47,7 @@ class CertificatePortalRead(CertificateBase):
     issuer_cn: str | None = None
     document_type: Literal["CNPJ", "CPF"] | None = None
     document_masked: str | None = None
+    document_unmasked: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

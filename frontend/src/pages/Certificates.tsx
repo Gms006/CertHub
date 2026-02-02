@@ -35,6 +35,7 @@ type CertificateRead = {
   issuer_cn?: string | null;
   document_type?: "CNPJ" | "CPF" | null;
   document_masked?: string | null;
+  document_unmasked?: string | null;
   serial_number?: string | null;
   sha1_fingerprint?: string | null;
   parse_ok?: boolean;
@@ -145,12 +146,8 @@ const formatCnpj = (digits: string) =>
   )}-${digits.slice(12, 14)}`;
 
 const buildMaskedDocument = (cert: CertificateRead) => {
-  const maskedValue = cert.document_masked?.trim() ?? "";
-  const digits = extractDigits(maskedValue);
-  const inferredType =
-    cert.document_type ||
-    (digits.length === 11 ? "CPF" : digits.length === 14 ? "CNPJ" : null) ||
-    (maskedValue.startsWith("CPF") ? "CPF" : maskedValue.startsWith("CNPJ") ? "CNPJ" : null);
+  const unmasked = cert.document_unmasked?.trim() ?? "";
+  const digits = extractDigits((unmasked || cert.document_masked) ?? "");
 
   if (digits.length === 11) {
     return `CPF ${formatCpf(digits)}`;
@@ -160,8 +157,10 @@ const buildMaskedDocument = (cert: CertificateRead) => {
     return `CNPJ ${formatCnpj(digits)}`;
   }
 
+  const maskedValue = cert.document_masked?.trim() ?? "";
   const cleanedValue = maskedValue.replace(/\*/g, "").trim();
   if (cleanedValue) {
+    const inferredType = cert.document_type || (cleanedValue.startsWith("CPF") ? "CPF" : cleanedValue.startsWith("CNPJ") ? "CNPJ" : null);
     if (inferredType && !cleanedValue.startsWith(inferredType)) {
       return `${inferredType} ${cleanedValue}`;
     }
@@ -226,7 +225,7 @@ const CertCard = ({
                 {empresa}
               </div>
               <div className="mt-0.5 text-xs text-slate-500">
-                Documento: {formatDocument(cnpj)}
+                Documento: {cnpj}
               </div>
             </div>
           </div>
@@ -564,11 +563,8 @@ const CertificatesPage = () => {
   );
   const deviceAllowsKeepUntil = selectedDevice?.allow_keep_until ?? true;
   const deviceAllowsExempt = selectedDevice?.allow_exempt ?? true;
-  const roleAllowsExempt = true;
   const showKeepUntilOption = Boolean(selectedDevice && deviceAllowsKeepUntil);
-  const showExemptOption = Boolean(
-    selectedDevice && deviceAllowsExempt && roleAllowsExempt,
-  );
+  const showExemptOption = Boolean(selectedDevice && deviceAllowsExempt);
 
   useEffect(() => {
     if (!selectedDevice) {
