@@ -351,6 +351,7 @@ const CertificatesPage = () => {
   const role = user?.role_global ?? "VIEW";
   const isAdmin = role === "ADMIN" || role === "DEV";
   const isView = role === "VIEW";
+  const roleAllowsExempt = true;
   const keepUntilMaxHours = user?.retention_keep_until_max_hours ?? null;
 
   const loadCertificates = async () => {
@@ -564,7 +565,9 @@ const CertificatesPage = () => {
   const deviceAllowsKeepUntil = selectedDevice?.allow_keep_until ?? true;
   const deviceAllowsExempt = selectedDevice?.allow_exempt ?? true;
   const showKeepUntilOption = Boolean(selectedDevice && deviceAllowsKeepUntil);
-  const showExemptOption = Boolean(selectedDevice && deviceAllowsExempt);
+  const showExemptOption = Boolean(
+    selectedDevice && deviceAllowsExempt && roleAllowsExempt,
+  );
 
   useEffect(() => {
     if (!selectedDevice) {
