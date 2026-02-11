@@ -1,0 +1,1 @@
+            c=prev[x-bpp] if x else 0 

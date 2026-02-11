@@ -1,0 +1,1 @@
+        w,h,bd,ct,cm,fm,im=struct.unpack(', chunk) 

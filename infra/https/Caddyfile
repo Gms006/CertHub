@@ -1,6 +1,15 @@
 certhub.local {
     tls internal
 
+    # --- INÍCIO DA CORREÇÃO ---
+    # Define um "named matcher" para todos os caminhos que terminam em .svg
+    @svg {
+        path *.svg
+    }
+    # Aplica o cabeçalho Content-Type correto para qualquer requisição que corresponda a @svg
+    header @svg Content-Type image/svg+xml
+    # --- FIM DA CORREÇÃO ---
+
     # Health (sem prefixo)
     handle /health {
         reverse_proxy 127.0.0.1:8010
@@ -22,13 +31,15 @@ certhub.local {
         reverse_proxy 127.0.0.1:8010
     }
 
-    # SPA por último
+    # SPA por último (handle genérico)
+    # Este bloco agora servirá os SVGs corretamente por causa do header global definido acima.
     handle {
         root * ../../frontend/dist
         try_files {path} /index.html
         file_server
     }
 
+    # Cabeçalhos de segurança globais
     header {
         Strict-Transport-Security "max-age=3600"
         X-Content-Type-Options "nosniff"

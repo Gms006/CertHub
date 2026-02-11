@@ -63,8 +63,12 @@ const AppShell = () => {
       <header className="sticky top-0 z-40 border-b border-slate-200/70 bg-white/70 backdrop-blur">
         <div className="flex w-full flex-wrap items-center justify-between gap-4 px-4 py-3">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#0e2659] text-white">
-              <span className="text-sm font-semibold">C</span>
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-transparent">
+              <img
+                src="/favicon/shield/favicon.svg"
+                alt="CertHub"
+                className="h-10 w-10"
+              />
             </div>
             <div className="min-w-0">
               <p className="text-sm font-semibold text-slate-900">CertHub</p>
