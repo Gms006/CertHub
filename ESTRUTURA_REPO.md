@@ -54,7 +54,9 @@ certhub/
 │  │  │  └─ user_device.py
 │  │  ├─ services/
 │  │  │  ├─ __init__.py
-│  │  │  └─ certificate_ingest.py
+│  │  │  ├─ certificate_ingest.py
+│  │  │  ├─ certificate_projection.py
+│  │  │  └─ econtrole_webhook.py
 │  │  ├─ watchers/
 │  │  │  ├─ __init__.py
 │  │  │  └─ pfx_directory.py
@@ -83,7 +85,8 @@ certhub/
 │  │     ├─ 0011_merge_0010_heads.py
 │  │     ├─ 0012_s9_retention_fields.py
 │  │     ├─ 0013_device_retention_flags.py
-│  │     └─ 0014_device_installed_certs.py
+│  │     ├─ 0014_device_installed_certs.py
+│  │     └─ 0015_add_remove_job_type.py
 │  ├─ tests/
 │  │  ├─ __init__.py
 │  │  ├─ conftest.py
@@ -221,5 +224,6 @@ certhub/
 
 - `agent/windows/Certhub.Agent`: aplicativo WinForms tray com polling/claim/payload/result e DPAPI local.
 - `backend/app/watchers` + `backend/app/workers`: watcher/worker RQ com Redis e jobs de ingest/delete.
+- `backend/app/services/econtrole_webhook.py`: integração outbound com eControle (`upsert/delete/full`).
 - Evidências S4: fluxo no portal **request → PENDING → DONE** e validação em `certmgr.msc`
   (**Current User > Personal**).

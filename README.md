@@ -15,6 +15,7 @@ O CertHub substitui o compartilhamento direto de arquivos `.pfx` por um processo
 - **Auditoria** (`audit_log`) para INSTALL_REQUESTED/APPROVED/DENIED e eventos de retenção.
 - **Retenção configurável** (KEEP_UNTIL/EXEMPT) com regras por job/usuário.
 - **Agent Windows** com cleanup agendado e suporte a KEEP_UNTIL one‑shot.
+- **Integração webhook eControle** com modos `upsert`, `delete` e `full` (best effort, sem quebrar ingest/delete em falha de rede).
 
 ## Arquitetura
 - `frontend/`: React (Vite)
@@ -104,6 +105,27 @@ Campos principais:
 - `CORS_ALLOW_ORIGINS` (CSV com origens permitidas)
 - `ECONTROLE_WEBHOOK_ENABLED`, `ECONTROLE_WEBHOOK_URL`, `ECONTROLE_WEBHOOK_TOKEN`
 - `ECONTROLE_WEBHOOK_VERIFY_TLS` (`false` em dev com TLS self-signed)
+- `ECONTROLE_WEBHOOK_ORG_SLUG` (enviado em `X-Org-Slug` e no envelope `org_slug`)
+
+### Integração eControle (webhook)
+
+- Serviço: `backend/app/services/econtrole_webhook.py`
+- Funções públicas:
+  - `notify_upsert(org_slug, certificates)`
+  - `notify_delete(org_slug, deleted_cert_ids)`
+  - `notify_full_sync(org_slug, certificates)`
+- Envelope enviado ao eControle:
+  - `mode`: `upsert | delete | full`
+  - `org_slug`
+  - `certificates` (upsert/full)
+  - `deleted_cert_ids` (delete)
+- Disparos atuais:
+  - ingest/upsert e prune/dedupe (em `certificate_ingest.py`)
+  - delete por worker/watcher (em `jobs_certificates.py`)
+  - reconciliação manual: `POST /api/v1/admin/certificates/reconcile-econtrole`
+- Comportamento de falha:
+  - timeout de 10s, respeita `ECONTROLE_WEBHOOK_VERIFY_TLS`
+  - erro HTTP/rede é logado, sem interromper fluxo principal
 
 > Em DEV, se `SMTP_HOST`/`SMTP_FROM` não estiverem configurados, o backend registra o link de reset no log.
 

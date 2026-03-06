@@ -21,9 +21,26 @@ O backend já possui o catálogo e o núcleo de RBAC/Jobs:
 - Endpoint DEV para ingestão de filesystem: `POST /api/v1/admin/certificates/ingest-from-fs` (dry-run, limit, prune, dedupe).
 - Certificados/Jobs/Devices/Usuários já com CRUD mínimo e auditoria.
 - Autenticação email+senha com tokens 1x, lockout e refresh via cookie HttpOnly.
-- **Não há** worker Redis/RQ nem watcher em execução no repo atual.
+- Worker Redis/RQ e watcher de diretório implementados para ingest/delete.
+- Integração webhook eControle implementada (modos `upsert`, `delete`, `full`) com envio best-effort.
 
-**O que muda:** o catálogo já existe; falta o **módulo de distribuição controlada + agent** e o pipeline real do Agent.
+**O que muda:** o catálogo e o pipeline de ingest já existem; o foco é evolução contínua de distribuição controlada + hardening + produto.
+
+### Atualização recente (Webhook eControle)
+
+- Serviço dedicado em `backend/app/services/econtrole_webhook.py` com:
+  - `notify_upsert(org_slug, certificates)`
+  - `notify_delete(org_slug, deleted_cert_ids)`
+  - `notify_full_sync(org_slug, certificates)`
+- Envelope padronizado:
+  - `mode`, `org_slug`, `certificates`, `deleted_cert_ids`
+- Disparos conectados em:
+  - `certificate_ingest.py` (upsert e delete por prune/dedupe)
+  - `jobs_certificates.py` (delete por watcher/worker)
+  - `POST /api/v1/admin/certificates/reconcile-econtrole` (full sync manual)
+- Resiliência:
+  - timeout 10s, TLS configurável por env
+  - falha de webhook não interrompe ingest/delete
 
 ---
 

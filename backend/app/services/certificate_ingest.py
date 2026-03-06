@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.models import Certificate
 from app.services import econtrole_webhook
+from app.services.certificate_projection import certificate_to_portal_payload
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.serialization.pkcs12 import load_key_and_certificates
 
@@ -341,13 +342,17 @@ def ingest_certificates_from_fs(
             deduped, deduped_ids = _dedupe_certificates(db, org_id=org_id)
             deleted_ids.extend(deduped_ids)
         db.commit()
-        upsert_payloads = econtrole_webhook.certificates_payload_from_ids(
-            db, org_id=org_id, certificate_ids=changed_ids
-        )
+        upsert_payloads = _certificates_payload_from_ids(db, org_id=org_id, certificate_ids=changed_ids)
         if upsert_payloads:
-            econtrole_webhook.publish_upsert(org_id=org_id, certificates=upsert_payloads)
+            econtrole_webhook.notify_upsert(
+                org_slug=settings.econtrole_webhook_org_slug or "",
+                certificates=upsert_payloads,
+            )
         if deleted_ids:
-            econtrole_webhook.publish_deleted_ids(org_id=org_id, deleted_cert_ids=deleted_ids)
+            econtrole_webhook.notify_delete(
+                org_slug=settings.econtrole_webhook_org_slug or "",
+                deleted_cert_ids=deleted_ids,
+            )
 
     total = len(files)
     inserted = sum(1 for item in results if item["action"] == "inserted")
@@ -406,11 +411,13 @@ def ingest_certificate_from_path(
             _mark_parse_failure(existing, parsed)
 
     db.commit()
-    if cert_id is not None and action in {"inserted", "updated", "failed"}:
-        upsert_payloads = econtrole_webhook.certificates_payload_from_ids(
-            db, org_id=org_id, certificate_ids=[cert_id]
-        )
-        econtrole_webhook.publish_upsert(org_id=org_id, certificates=upsert_payloads)
+    if cert_id is not None and action in {"inserted", "updated"}:
+        upsert_payloads = _certificates_payload_from_ids(db, org_id=org_id, certificate_ids=[cert_id])
+        if upsert_payloads:
+            econtrole_webhook.notify_upsert(
+                org_slug=settings.econtrole_webhook_org_slug or "",
+                certificates=upsert_payloads,
+            )
     return {
         "action": action,
         "cert_id": cert_id,
@@ -441,6 +448,24 @@ def _find_existing_certificate(
     return db.execute(
         select(Certificate).where(Certificate.org_id == org_id, Certificate.name == name)
     ).scalar_one_or_none()
+
+
+def _certificates_payload_from_ids(
+    db: Session, *, org_id: int, certificate_ids: Iterable[uuid.UUID]
+) -> list[dict[str, str | None]]:
+    ids = [cert_id for cert_id in certificate_ids if cert_id is not None]
+    if not ids:
+        return []
+    certificates = (
+        db.execute(
+            select(Certificate)
+            .where(Certificate.org_id == org_id, Certificate.id.in_(ids))
+            .order_by(Certificate.created_at)
+        )
+        .scalars()
+        .all()
+    )
+    return [certificate_to_portal_payload(certificate) for certificate in certificates]
 
 
 def _update_certificate(target: Certificate, parsed: ParsedCertificate) -> None:

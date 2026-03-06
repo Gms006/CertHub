@@ -6,6 +6,7 @@ from pathlib import Path
 from rq import get_current_job
 from sqlalchemy import select
 
+from app.core.config import settings
 from app.db.session import SessionLocal
 from app.models import Certificate
 from app.services import certificate_ingest, econtrole_webhook
@@ -132,6 +133,9 @@ def delete_certificate_by_path(org_id: int, path: str) -> dict[str, str | None]:
             )
             strategy = "by_name"
     if deleted_ids:
-        econtrole_webhook.publish_deleted_ids(org_id=org_id, deleted_cert_ids=deleted_ids)
+        econtrole_webhook.notify_delete(
+            org_slug=settings.econtrole_webhook_org_slug or "",
+            deleted_cert_ids=deleted_ids,
+        )
     _log_job("job_delete_finished", org_id=org_id, path=normalized_path)
     return {"action": action, "path": normalized_path, "strategy": strategy}

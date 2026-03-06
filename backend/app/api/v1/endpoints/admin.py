@@ -15,6 +15,7 @@ from app.db.session import get_db
 from app.core.security import AUTH_TOKEN_PURPOSE_SET_PASSWORD, generate_token, hash_token
 from app.models import (
     AuthToken,
+    Certificate,
     CertInstallJob,
     Device,
     JOB_STATUS_FAILED,
@@ -33,7 +34,8 @@ from app.schemas.device import (
 from app.schemas.user import UserCreate, UserCreateResponse, UserRead, UserUpdate
 from app.schemas.user_device import UserDeviceCreate, UserDeviceRead, UserDeviceReadWithUser
 from app.services.certificate_ingest import ingest_certificates_from_fs
-from app.services.econtrole_webhook import publish_full_from_db
+from app.services.certificate_projection import certificate_to_portal_payload
+from app.services.econtrole_webhook import notify_full_sync
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -498,12 +500,22 @@ def reconcile_econtrole_webhook(
     db: Session = Depends(get_db),
     current_user=Depends(require_dev),
 ) -> dict[str, str | int | bool | None]:
-    result = publish_full_from_db(db, org_id=current_user.org_id)
+    certificates = (
+        db.execute(
+            select(Certificate)
+            .where(Certificate.org_id == current_user.org_id)
+            .order_by(Certificate.created_at)
+        )
+        .scalars()
+        .all()
+    )
+    payload = [certificate_to_portal_payload(certificate) for certificate in certificates]
+    notify_full_sync(settings.econtrole_webhook_org_slug or "", payload)
     return {
-        "attempted": result.attempted,
-        "success": result.success,
-        "mode": result.mode,
-        "sent": result.sent,
-        "status_code": result.status_code,
-        "error": result.error,
+        "attempted": bool(settings.econtrole_webhook_enabled),
+        "success": True,
+        "mode": "full",
+        "sent": len(payload),
+        "status_code": None,
+        "error": None,
     }
