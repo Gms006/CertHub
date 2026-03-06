@@ -23,7 +23,7 @@ O build do Vite gera o diretório `frontend/dist`, que é servido pelo Caddyfile
 Adicione no `hosts` do Windows:
 
 ```
-127.0.0.1 portal.local
+127.0.0.1 certhub.local
 ```
 
 ## 3) Confiar no certificado interno (Caddy)
@@ -45,7 +45,39 @@ caddy run --config infra/https/Caddyfile --adapter caddyfile
 Acesse:
 
 ```
-https://portal.local
+https://certhub.local
+```
+
+## 5) Validar o setup TLS (importante)
+
+Execute o script de validação oficial:
+
+```powershell
+.\scripts\windows\s10_validate_tls.ps1
+```
+
+Esperado:
+- `[OK] TLS handshake portal sem -k`
+- `[OK] GET /health retornou 200`
+- `[OK] Strict-Transport-Security`
+- `[OK] X-Content-Type-Options`
+- `[OK] X-Frame-Options`
+- `[OK] Content-Security-Policy`
+- `[OK] Sem mixed content inválido em HTML principal`
+- `[OK] Validação TLS concluída`
+- **exit code: 0**
+
+Ou testes manuais rápidos:
+
+```powershell
+# HEAD + status
+curl --ssl-no-revoke -I https://certhub.local
+
+# Health endpoint
+curl --ssl-no-revoke -fsSL https://certhub.local/health
+
+# Headers de segurança
+curl --ssl-no-revoke -I https://certhub.local | findstr /I "Strict-Transport-Security X-Content-Type-Options X-Frame-Options Content-Security-Policy"
 ```
 
 ## Variáveis de ambiente recomendadas
@@ -53,8 +85,8 @@ https://portal.local
 Backend (`.env`):
 
 ```
-FRONTEND_BASE_URL=https://portal.local
-CORS_ALLOW_ORIGINS=http://localhost:5173,http://localhost:8011,http://192.168.25.51:5173,https://portal.local
+FRONTEND_BASE_URL=https://certhub.local
+CORS_ALLOW_ORIGINS=http://localhost:5173,http://localhost:8011,http://192.168.25.51:5173,https://certhub.local
 ```
 
 Frontend (`frontend/.env`):
@@ -66,7 +98,7 @@ VITE_API_URL=/api/v1
 ## Rollback (piloto)
 
 - Parar o Caddy.
-- Remover `https://portal.local` de `CORS_ALLOW_ORIGINS`.
+- Remover `https://certhub.local` de `CORS_ALLOW_ORIGINS`.
 - Voltar `VITE_API_URL` para `http://localhost:8010/api/v1` no frontend.
 
 ## Nota de HSTS (prod)

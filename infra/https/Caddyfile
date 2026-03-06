@@ -1,49 +1,50 @@
+# Domínio padrão do piloto LAN (S10): certhub.local
 certhub.local {
-    tls internal
+	tls internal
 
-    # --- INÍCIO DA CORREÇÃO ---
-    # Define um "named matcher" para todos os caminhos que terminam em .svg
-    @svg {
-        path *.svg
-    }
-    # Aplica o cabeçalho Content-Type correto para qualquer requisição que corresponda a @svg
-    header @svg Content-Type image/svg+xml
-    # --- FIM DA CORREÇÃO ---
+	# --- INÍCIO DA CORREÇÃO ---
+	# Define um "named matcher" para todos os caminhos que terminam em .svg
+	@svg {
+		path *.svg
+	}
+	# Aplica o cabeçalho Content-Type correto para qualquer requisição que corresponda a @svg
+	header @svg Content-Type image/svg+xml
+	# --- FIM DA CORREÇÃO ---
 
-    # Health (sem prefixo)
-    handle /health {
-        reverse_proxy 127.0.0.1:8010
-    }
+	# Health (sem prefixo)
+	handle /health {
+		reverse_proxy 127.0.0.1:8010
+	}
 
-    # Swagger/OpenAPI (FastAPI fica na raiz)
-    handle /docs* {
-        reverse_proxy 127.0.0.1:8010
-    }
-    handle /openapi.json {
-        reverse_proxy 127.0.0.1:8010
-    }
-    handle /redoc* {
-        reverse_proxy 127.0.0.1:8010
-    }
+	# Swagger/OpenAPI (FastAPI fica na raiz)
+	handle /docs* {
+		reverse_proxy 127.0.0.1:8010
+	}
+	handle /openapi.json {
+		reverse_proxy 127.0.0.1:8010
+	}
+	handle /redoc* {
+		reverse_proxy 127.0.0.1:8010
+	}
 
-    # API v1 (preserva /api/v1 no upstream)
-    handle /api/v1/* {
-        reverse_proxy 127.0.0.1:8010
-    }
+	# API v1 (preserva /api/v1 no upstream)
+	handle /api/v1/* {
+		reverse_proxy 127.0.0.1:8010
+	}
 
-    # SPA por último (handle genérico)
-    # Este bloco agora servirá os SVGs corretamente por causa do header global definido acima.
-    handle {
-        root * ../../frontend/dist
-        try_files {path} /index.html
-        file_server
-    }
+	# SPA por último (handle genérico)
+	# Este bloco agora servirá os SVGs corretamente por causa do header global definido acima.
+	handle {
+		root * ../../frontend/dist
+		try_files {path} /index.html
+		file_server
+	}
 
-    # Cabeçalhos de segurança globais
-    header {
-        Strict-Transport-Security "max-age=3600"
-        X-Content-Type-Options "nosniff"
-        X-Frame-Options "DENY"
-        Content-Security-Policy "frame-ancestors 'none'"
-    }
+	# Cabeçalhos de segurança globais
+	header {
+		Strict-Transport-Security "max-age=3600"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Content-Security-Policy "frame-ancestors 'none'"
+	}
 }

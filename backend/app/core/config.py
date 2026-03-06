@@ -46,6 +46,17 @@ class Settings(BaseSettings):
     smtp_pass: str | None = Field(None, alias="SMTP_PASS")
     smtp_from: str | None = Field(None, alias="SMTP_FROM")
     frontend_base_url: str | None = Field(None, alias="FRONTEND_BASE_URL")
+    econtrole_webhook_enabled: bool = Field(False, alias="ECONTROLE_WEBHOOK_ENABLED")
+    econtrole_webhook_url: str | None = Field(None, alias="ECONTROLE_WEBHOOK_URL")
+    econtrole_webhook_token: str | None = Field(None, alias="ECONTROLE_WEBHOOK_TOKEN")
+    econtrole_webhook_verify_tls: bool = Field(True, alias="ECONTROLE_WEBHOOK_VERIFY_TLS")
+    econtrole_webhook_timeout_seconds: float = Field(
+        10.0, alias="ECONTROLE_WEBHOOK_TIMEOUT_SECONDS"
+    )
+    econtrole_webhook_org_slug: str | None = Field(None, alias="ECONTROLE_WEBHOOK_ORG_SLUG")
+    econtrole_webhook_org_slug_map: str | None = Field(
+        None, alias="ECONTROLE_WEBHOOK_ORG_SLUG_MAP"
+    )
 
     def model_post_init(self, __context) -> None:
         if "COOKIE_SECURE" not in os.environ and self.env.lower() != "prod":

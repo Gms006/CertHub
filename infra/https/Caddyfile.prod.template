@@ -1,0 +1,37 @@
+# Produção (S10.1): substitua os placeholders antes de usar.
+{$CERT_DOMAIN} {
+    tls {$LE_EMAIL}
+
+    handle /health {
+        reverse_proxy 127.0.0.1:8010
+    }
+    handle /api/v1/* {
+        reverse_proxy 127.0.0.1:8010
+    }
+    handle /docs* {
+        reverse_proxy 127.0.0.1:8010
+    }
+    handle /openapi.json {
+        reverse_proxy 127.0.0.1:8010
+    }
+    handle /redoc* {
+        reverse_proxy 127.0.0.1:8010
+    }
+    handle {
+        root * ../../frontend/dist
+        try_files {path} /index.html
+        file_server
+    }
+
+    # Security headers (produção)
+    # Ajuste conforme necessidade da aplicação.
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Content-Security-Policy "frame-ancestors 'none'"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Permissions-Policy "geolocation=(), camera=(), microphone=()"
+        X-Permitted-Cross-Domain-Policies "none"
+    }
+}

@@ -79,7 +79,7 @@ def list_device_installed_certs(
         is_owner = device.assigned_user_id == current_user.id
         if not is_owner:
             has_explicit_allow = db.execute(
-                select(UserDevice.id)
+                select(UserDevice.user_id)
                 .where(
                     UserDevice.device_id == device_id,
                     UserDevice.user_id == current_user.id,

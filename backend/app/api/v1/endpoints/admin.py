@@ -33,6 +33,7 @@ from app.schemas.device import (
 from app.schemas.user import UserCreate, UserCreateResponse, UserRead, UserUpdate
 from app.schemas.user_device import UserDeviceCreate, UserDeviceRead, UserDeviceReadWithUser
 from app.services.certificate_ingest import ingest_certificates_from_fs
+from app.services.econtrole_webhook import publish_full_from_db
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -490,3 +491,19 @@ def ingest_certificates_from_filesystem(
         db.commit()
 
     return CertIngestResponse(**result)
+
+
+@router.post("/certificates/reconcile-econtrole", status_code=status.HTTP_200_OK)
+def reconcile_econtrole_webhook(
+    db: Session = Depends(get_db),
+    current_user=Depends(require_dev),
+) -> dict[str, str | int | bool | None]:
+    result = publish_full_from_db(db, org_id=current_user.org_id)
+    return {
+        "attempted": result.attempted,
+        "success": result.success,
+        "mode": result.mode,
+        "sent": result.sent,
+        "status_code": result.status_code,
+        "error": result.error,
+    }

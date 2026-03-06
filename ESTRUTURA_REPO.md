@@ -104,6 +104,8 @@ certhub/
 ├─ docs/
 │  ├─ api/
 │  │  └─ openapi.json
+│  ├─ S10_DEPLOYMENT_GUIDE.md
+│  ├─ S10_IIS_ALTERNATIVE.md
 │  ├─ S8_PILOTO_ROLLOUT.md
 │  ├─ S9_QA_CHECKLIST.md
 │  ├─ S9_1_REPORT.md
@@ -183,6 +185,7 @@ certhub/
 │  ├─ docker-compose.yml
 │  └─ https/
 │     ├─ Caddyfile
+│     ├─ Caddyfile.prod.template
 │     └─ README.md
 │
 ├─ scripts/
@@ -199,7 +202,10 @@ certhub/
 │     ├─ publish_agent.ps1
 │     ├─ s8_smoke.ps1
 │     ├─ s9_retention_smoke.ps1
+│     ├─ s10_pilot_up.ps1
 │     ├─ s10_run_caddy.ps1
+│     ├─ s10_setup_hosts.ps1
+│     ├─ s10_trust_ca.ps1
 │     └─ s10_validate_tls.ps1
 │
 ├─ .env.example

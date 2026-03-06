@@ -1372,7 +1372,64 @@ limit 20;
 
 **Objetivo**: acabar com “site não seguro” e padronizar acesso interno/externo com TLS.
 
-**Status**: 🔄 **Em execução**
+**Status**: ✅ **Aceito/Concluído (piloto LAN)**
+
+> Evidência: `.\scripts\windows\s10_validate_tls.ps1` retorna `exit 0` com sucesso.
+
+**Evidências Executadas (18 de fevereiro de 2026)**
+
+Validação concluída no ambiente piloto LAN (`https://certhub.local`):
+
+**1. HEAD Portal (TLS Handshake)**
+```powershell
+$ curl.exe --ssl-no-revoke -I https://certhub.local
+HTTP/1.1 200 OK
+Strict-Transport-Security: max-age=3600
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+Content-Security-Policy: frame-ancestors 'none'
+Content-Type: text/html; charset=utf-8
+Server: Caddy
+[Exit Code: 0]
+```
+
+**2. GET /health Endpoint**
+```powershell
+$ curl.exe --ssl-no-revoke -fsSL https://certhub.local/health
+{"status":"ok"}
+[Exit Code: 0]
+```
+
+**3. Script Oficial `s10_validate_tls.ps1`**
+```
+==> HEAD portal: https://certhub.local
+[WARN] TLS revocation check indisponível, tentando com --ssl-no-revoke
+[OK] TLS handshake portal sem -k
+
+==> GET health: https://certhub.local/health
+[OK] GET /health retornou 200
+
+==> Checking security headers on portal response
+[OK] Strict-Transport-Security
+[OK] X-Content-Type-Options
+[OK] X-Frame-Options
+[OK] Content-Security-Policy
+
+==> Checking mixed content marker (http://) on portal HTML
+[OK] Sem mixed content inválido em HTML principal
+
+==> Checking mixed content marker (http://) em até 3 arquivos JS
+==> GET JS: https://certhub.local/assets/index-DHq2e4l3.js
+[OK] Sem mixed content inválido em JS
+
+[OK] Validação TLS concluída
+[Exit Code Final: 0]
+```
+
+**Observações do Piloto:**
+- Em Windows/curl (Schannel), ocorre `CRYPT_E_NO_REVOCATION_CHECK` esperado para ambiente LAN sem validação de revogação. O script detecta automaticamente e aplica fallback `--ssl-no-revoke`.
+- Todos os headers de segurança obrigatórios presentes: HSTS, X-Content-Type-Options, X-Frame-Options, CSP.
+- HTML principal e JS testados sem mixed content inválido (apenas namespaces W3C esperados como `http://www.w3.org/` são permitidos).
 
 **Entregáveis**
 
@@ -1381,33 +1438,85 @@ limit 20;
 - URLs únicas e estáveis para portal e API (ex.: `portal.<dom>` e `api.<dom>`).
 - Ajuste de base URLs (`FRONTEND_BASE_URL`, `API_BASE_URL`) e redirects.
 - Headers de segurança no proxy (HSTS, X-Content-Type-Options, X-Frame-Options/Frame-ancestors).
+- Função `Join-Url` para evitar dupla barra (`://certhub.local//`) em URLs construídas dinamicamente.
+- Tratamento automático de `CRYPT_E_NO_REVOCATION_CHECK` em redes LAN internas (Windows/curl Schannel).
 
 **Aceite**
 
 - Portal e API acessíveis **somente via HTTPS** em ambiente prod.
-- Sem **mixed content** no portal (recursos carregados apenas por HTTPS).
+- Sem **mixed content** no portal (recursos carregados apenas por HTTPS), exceto namespaces W3C permitidos usados pelo runtime.
+- URLs construídas sem dupla barra (validação em logs: não deve aparecer `://certhub.local//`).
 
 **Passos (piloto LAN)**
 
 - Configurar o proxy Caddy com `tls internal` servindo o `frontend/dist` e roteando `/api/v1` para `http://127.0.0.1:8010`.
+- Padronizar domínio LAN em `certhub.local` (hosts + Caddy + validações).
+- Automatizar setup com scripts:
+  - `scripts/windows/s10_setup_hosts.ps1`
+  - `scripts/windows/s10_trust_ca.ps1`
+  - `scripts/windows/s10_pilot_up.ps1`
+  - `scripts/windows/s10_validate_tls.ps1`
 - Ajustar `.env`:
-  - `FRONTEND_BASE_URL=https://portal.local`
-  - `CORS_ALLOW_ORIGINS=... ,https://portal.local`
+  - `FRONTEND_BASE_URL=https://certhub.local`
+  - `CORS_ALLOW_ORIGINS=... ,https://certhub.local`
 - Ajustar `frontend/.env`:
   - `VITE_API_URL=/api/v1`
 
 **Validação (S10)**
 
+Executar os seguintes comandos (em ambiente piloto LAN `https://certhub.local`):
+
 ```bash
-curl -I https://portal.local
-curl -I https://portal.local/api/v1/health
+# Teste 1: HEAD portal (TLS handshake)
+curl --ssl-no-revoke -I https://certhub.local
+
+# Teste 2: Health endpoint (validar resposta JSON)
+curl --ssl-no-revoke -fsSL https://certhub.local/health
+
+# Teste 3: Verificar headers de segurança
+curl --ssl-no-revoke -I https://certhub.local | findstr /I "Strict-Transport-Security X-Content-Type-Options X-Frame-Options Content-Security-Policy"
+
+# Teste 4: Verificar mixed content (http://)
+curl --ssl-no-revoke -s https://certhub.local | Select-String "http://"
+
+# Teste 5: Execução oficial (fonte de verdade)
+.\scripts\windows\s10_validate_tls.ps1
 ```
+
+**Esperado:**
+- Status HTTP 200 no HEAD do portal
+- `/health` retorna `{"status":"ok"}` com 200
+- Todos os 4 headers de segurança presentes
+- Nenhum `http://` fora da allowlist W3C no HTML/JS
+- Script `s10_validate_tls.ps1` finaliza com **exit code 0**
 
 **Rollback curto (S10)**
 
 - Voltar o proxy para HTTP interno e bloquear acesso externo.
 - Reverter configurações de TLS/headers no proxy.
-- Remover `https://portal.local` de `CORS_ALLOW_ORIGINS` e voltar `VITE_API_URL` para `http://localhost:8010/api/v1`.
+- Remover `https://certhub.local` de `CORS_ALLOW_ORIGINS` e voltar `VITE_API_URL` para `http://localhost:8010/api/v1`.
+- Reverter `hosts` usando `hosts.bak` gerado no setup.
+
+### S10.1 — Produção (Caddy + Let's Encrypt)
+
+**Objetivo**: transformar o piloto em trilha de produção documentada com Caddy e ACME.
+
+**Status**: 🟡 **Planejado**
+
+**Entregáveis**
+- `infra/https/Caddyfile.prod.template` com placeholders de domínio/e-mail.
+- Guia de implantação: `docs/S10_DEPLOYMENT_GUIDE.md`.
+- Checklist operacional de cert/renovação/backup.
+
+### S10.2 — Alternativa IIS
+
+**Objetivo**: oferecer rota de implantação para ambientes corporativos com IIS.
+
+**Status**: 🟡 **Planejado**
+
+**Entregáveis**
+- Guia curto high-level: `docs/S10_IIS_ALTERNATIVE.md`.
+- Passos de validação equivalentes ao fluxo com Caddy.
 
 ---
 

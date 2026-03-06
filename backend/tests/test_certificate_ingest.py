@@ -10,7 +10,7 @@ assert helpers_spec and helpers_spec.loader
 helpers_spec.loader.exec_module(helpers)
 
 from app import models
-from app.services import certificate_ingest
+from app.services import certificate_ingest, econtrole_webhook
 from app.services.certificate_ingest import ParsedCertificate
 
 create_certificate = helpers.create_certificate
@@ -142,3 +142,60 @@ def test_guess_password_variations():
     ]
     for filename, expected in cases:
         assert certificate_ingest._guess_password(Path(filename)) == expected
+
+
+def test_ingest_publishes_only_changed_certificates(monkeypatch, tmp_path, test_client_and_session):
+    client, SessionLocal = test_client_and_session
+    with SessionLocal() as db:
+        dev = create_user(db, role="DEV")
+
+    for filename in ["first.pfx", "second.pfx"]:
+        (tmp_path / filename).write_text("dummy")
+
+    def fake_extract_metadata(path, _):
+        return (
+            ParsedCertificate(
+                path=path,
+                name=path.stem,
+                subject=f"CN={path.stem}",
+                issuer="CN=Issuer",
+                serial_number=f"SER-{path.stem}",
+                not_before=datetime(2024, 1, 1, tzinfo=timezone.utc),
+                not_after=datetime(2026, 1, 1, tzinfo=timezone.utc),
+                sha1_fingerprint=f"SHA-{path.stem}",
+                password_used=None,
+                parse_error=None,
+            ),
+            True,
+        )
+
+    class FakeResponse:
+        status_code = 200
+        text = "ok"
+
+    calls: list[dict] = []
+
+    def fake_post(url, **kwargs):
+        calls.append({"url": url, **kwargs})
+        return FakeResponse()
+
+    monkeypatch.setattr(certificate_ingest.settings, "certs_root_path", tmp_path)
+    monkeypatch.setattr(certificate_ingest, "_extract_metadata", fake_extract_metadata)
+    monkeypatch.setattr(econtrole_webhook.settings, "econtrole_webhook_enabled", True)
+    monkeypatch.setattr(econtrole_webhook.settings, "econtrole_webhook_url", "http://localhost/webhook")
+    monkeypatch.setattr(econtrole_webhook.settings, "econtrole_webhook_token", "token")
+    monkeypatch.setattr(econtrole_webhook.httpx, "post", fake_post)
+
+    response = client.post(
+        "/api/v1/admin/certificates/ingest-from-fs",
+        json={"dry_run": False},
+        headers=headers(dev),
+    )
+    assert response.status_code == 200
+
+    assert len(calls) == 1
+    assert calls[0]["params"] == {"mode": "upsert"}
+    assert calls[0]["headers"]["Authorization"] == "Bearer token"
+    assert calls[0]["headers"]["X-Org-Slug"] == "1"
+    certificates = calls[0]["json"]["certificates"]
+    assert len(certificates) == 2

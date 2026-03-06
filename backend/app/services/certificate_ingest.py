@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.models import Certificate
+from app.services import econtrole_webhook
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.serialization.pkcs12 import load_key_and_certificates
 
@@ -279,6 +280,7 @@ def ingest_certificates_from_fs(
         files = files[:limit]
 
     results: list[dict[str, str | uuid.UUID | None]] = []
+    changed_ids: set[uuid.UUID] = set()
 
     for path in files:
         parsed, success = _extract_metadata(path, _candidate_passwords(path))
@@ -307,6 +309,7 @@ def ingest_certificates_from_fs(
             else:
                 certificate = _build_certificate(org_id, parsed)
                 db.add(certificate)
+                db.flush()
                 action = "inserted"
                 cert_id = certificate.id
         else:
@@ -323,16 +326,28 @@ def ingest_certificates_from_fs(
                 "error": parsed.parse_error if not success else None,
             }
         )
+        if cert_id is not None and action in {"inserted", "updated", "failed"}:
+            changed_ids.add(cert_id)
 
     pruned = 0
     deduped = 0
+    deleted_ids: list[str] = []
 
     if not dry_run:
         if prune_missing:
-            pruned = _prune_missing_certificates(db, org_id=org_id)
+            pruned, pruned_ids = _prune_missing_certificates(db, org_id=org_id)
+            deleted_ids.extend(pruned_ids)
         if dedupe:
-            deduped = _dedupe_certificates(db, org_id=org_id)
+            deduped, deduped_ids = _dedupe_certificates(db, org_id=org_id)
+            deleted_ids.extend(deduped_ids)
         db.commit()
+        upsert_payloads = econtrole_webhook.certificates_payload_from_ids(
+            db, org_id=org_id, certificate_ids=changed_ids
+        )
+        if upsert_payloads:
+            econtrole_webhook.publish_upsert(org_id=org_id, certificates=upsert_payloads)
+        if deleted_ids:
+            econtrole_webhook.publish_deleted_ids(org_id=org_id, deleted_cert_ids=deleted_ids)
 
     total = len(files)
     inserted = sum(1 for item in results if item["action"] == "inserted")
@@ -381,6 +396,7 @@ def ingest_certificate_from_path(
         else:
             certificate = _build_certificate(org_id, parsed)
             db.add(certificate)
+            db.flush()
             action = "inserted"
             cert_id = certificate.id
     else:
@@ -390,6 +406,11 @@ def ingest_certificate_from_path(
             _mark_parse_failure(existing, parsed)
 
     db.commit()
+    if cert_id is not None and action in {"inserted", "updated", "failed"}:
+        upsert_payloads = econtrole_webhook.certificates_payload_from_ids(
+            db, org_id=org_id, certificate_ids=[cert_id]
+        )
+        econtrole_webhook.publish_upsert(org_id=org_id, certificates=upsert_payloads)
     return {
         "action": action,
         "cert_id": cert_id,
@@ -464,21 +485,23 @@ def _mark_parse_failure(target: Certificate, parsed: ParsedCertificate) -> None:
         target.source_path = str(parsed.path)
 
 
-def _prune_missing_certificates(db: Session, *, org_id: int) -> int:
+def _prune_missing_certificates(db: Session, *, org_id: int) -> tuple[int, list[str]]:
     certificates = db.execute(
         select(Certificate).where(
             Certificate.org_id == org_id, Certificate.source_path.is_not(None)
         )
     ).scalars()
     removed = 0
+    removed_ids: list[str] = []
     for certificate in certificates:
         if certificate.source_path and not Path(certificate.source_path).exists():
+            removed_ids.append(str(certificate.id))
             db.delete(certificate)
             removed += 1
-    return removed
+    return removed, removed_ids
 
 
-def _dedupe_certificates(db: Session, *, org_id: int) -> int:
+def _dedupe_certificates(db: Session, *, org_id: int) -> tuple[int, list[str]]:
     certificates = db.execute(
         select(Certificate).where(Certificate.org_id == org_id)
     ).scalars()
@@ -491,6 +514,7 @@ def _dedupe_certificates(db: Session, *, org_id: int) -> int:
             by_serial.setdefault(certificate.serial_number, []).append(certificate)
 
     removed_ids: set[uuid.UUID] = set()
+    removed_cert_ids: list[str] = []
 
     def remove_duplicates(groups: dict[str, list[Certificate]]) -> None:
         for group in groups.values():
@@ -506,8 +530,9 @@ def _dedupe_certificates(db: Session, *, org_id: int) -> int:
                 if duplicate.id in removed_ids:
                     continue
                 removed_ids.add(duplicate.id)
+                removed_cert_ids.append(str(duplicate.id))
                 db.delete(duplicate)
 
     remove_duplicates(by_sha1)
     remove_duplicates(by_serial)
-    return len(removed_ids)
+    return len(removed_ids), removed_cert_ids

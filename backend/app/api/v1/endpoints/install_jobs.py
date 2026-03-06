@@ -242,38 +242,6 @@ async def list_install_jobs(
     return db.execute(statement).scalars().all()
 
 
-@router.get("/{job_id}", response_model=InstallJobRead)
-def get_install_job(
-    job_id: uuid.UUID,
-    db: Session = Depends(get_db),
-    current_user=Depends(require_view_or_higher),
-) -> CertInstallJob:
-    job = db.get(CertInstallJob, job_id)
-    if job is None or job.org_id != current_user.org_id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="job not found")
-
-    if current_user.role_global not in {"ADMIN", "DEV"}:
-        device = db.get(Device, job.device_id)
-        allowed = db.execute(
-            select(UserDevice)
-            .where(
-                UserDevice.device_id == job.device_id,
-                UserDevice.user_id == current_user.id,
-                UserDevice.is_allowed.is_(True),
-            )
-            .limit(1)
-        ).scalar_one_or_none()
-        if (
-            job.requested_by_user_id != current_user.id
-            and device is not None
-            and device.assigned_user_id != current_user.id
-            and allowed is None
-        ):
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
-
-    return job
-
-
 @router.get("/mine", response_model=list[InstallJobRead])
 async def list_my_jobs(
     db: Session = Depends(get_db), current_user=Depends(require_view_or_higher)
@@ -312,6 +280,38 @@ async def list_my_device_jobs(
         .distinct()
     )
     return db.execute(statement).scalars().all()
+
+
+@router.get("/{job_id}", response_model=InstallJobRead)
+def get_install_job(
+    job_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_view_or_higher),
+) -> CertInstallJob:
+    job = db.get(CertInstallJob, job_id)
+    if job is None or job.org_id != current_user.org_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="job not found")
+
+    if current_user.role_global not in {"ADMIN", "DEV"}:
+        device = db.get(Device, job.device_id)
+        allowed = db.execute(
+            select(UserDevice)
+            .where(
+                UserDevice.device_id == job.device_id,
+                UserDevice.user_id == current_user.id,
+                UserDevice.is_allowed.is_(True),
+            )
+            .limit(1)
+        ).scalar_one_or_none()
+        if (
+            job.requested_by_user_id != current_user.id
+            and device is not None
+            and device.assigned_user_id != current_user.id
+            and allowed is None
+        ):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
+
+    return job
 
 
 @router.post("/{job_id}/approve", response_model=InstallJobRead)

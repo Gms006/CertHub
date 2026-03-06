@@ -102,35 +102,70 @@ Campos principais:
 - `FRONTEND_BASE_URL` (ex.: `http://localhost:5173`)
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`
 - `CORS_ALLOW_ORIGINS` (CSV com origens permitidas)
+- `ECONTROLE_WEBHOOK_ENABLED`, `ECONTROLE_WEBHOOK_URL`, `ECONTROLE_WEBHOOK_TOKEN`
+- `ECONTROLE_WEBHOOK_VERIFY_TLS` (`false` em dev com TLS self-signed)
 
 > Em DEV, se `SMTP_HOST`/`SMTP_FROM` não estiverem configurados, o backend registra o link de reset no log.
 
-## S10 TLS/HTTPS (piloto LAN)
-O piloto usa Caddy para servir o frontend e fazer reverse proxy para `/api/v1` no backend.
+## S10 Piloto LAN (1 comando)
+Domínio padrão do piloto: `certhub.local`.
 
-### 1) Subir backend (porta 8010)
-```bash
-cd backend
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8010 --env-file .\.env
-```
+Pré-requisitos:
+- Backend em `http://127.0.0.1:8010` (health: `/health`).
+- Caddy instalado no Windows.
+- PowerShell em modo administrador para ajustes de hosts/CA.
 
-### 2) Build do frontend
-```bash
-cd frontend
-npm install
-npm run build
-```
-
-### 3) Rodar o proxy Caddy
+Comando único:
 ```powershell
-caddy run --config infra/https/Caddyfile --adapter caddyfile
+.\scripts\windows\s10_pilot_up.ps1
 ```
 
-### Variáveis de ambiente (piloto)
+O script executa:
+1. Build do frontend (se `frontend/dist` não existir).
+2. Verificação da API em `http://127.0.0.1:8010/health`.
+3. Setup idempotente do `hosts` (`127.0.0.1 certhub.local`).
+4. `caddy trust` para confiar na CA local.
+5. Inicialização do Caddy.
+6. Validação TLS sem `-k` e headers obrigatórios.
+
+Validação manual (aceite):
+```bash
+# Teste 1: HEAD (TLS handshake)
+curl --ssl-no-revoke -I https://certhub.local
+# Esperado: HTTP/1.1 200 OK
+
+# Teste 2: Health endpoint (JSON response)
+curl --ssl-no-revoke -fsSL https://certhub.local/health
+# Esperado: {"status":"ok"}
+
+# Teste 3: Headers de segurança
+curl --ssl-no-revoke -I https://certhub.local | findstr /I "Strict-Transport-Security X-Content-Type-Options X-Frame-Options Content-Security-Policy"
+# Esperado: 4 headers presentes
+
+# Teste 4: Validação oficial (fonte de verdade)
+.\scripts\windows\s10_validate_tls.ps1
+# Esperado: exit 0, todos os [OK] marcados
+```
+
+Observação da validação TLS (`scripts/windows/s10_validate_tls.ps1`):
+- O health é validado com `GET /health` (o endpoint não aceita `HEAD`).
+- A checagem de mixed content ignora apenas namespaces W3C esperados:
+  - `http://www.w3.org/1999/xlink`
+  - `http://www.w3.org/XML/1998/namespace`
+  - `http://www.w3.org/2000/xmlns/`
+  - `http://www.w3.org/` (genérico para outras definições W3C)
+- Headers de segurança obrigatórios (Caddyfile):
+  - `Strict-Transport-Security: max-age=3600` (HSTS)
+  - `X-Content-Type-Options: nosniff` (MIME sniffing prevention)
+  - `X-Frame-Options: DENY` (Clickjacking prevention)
+  - `Content-Security-Policy: frame-ancestors 'none'` (CSP)
+- **Windows/curl + Schannel**: em redes internas sem verificação de revogação OSCP/CRL, o curl pode retornar `CRYPT_E_NO_REVOCATION_CHECK`. O script detecta automaticamente e tenta novamente com `--ssl-no-revoke` (somente para validação do piloto LAN). Isso não afeta a segurança do piloto e é documentado no audit trail.
+
+Variáveis de ambiente (piloto):
 Backend (`.env`):
 ```
-FRONTEND_BASE_URL=https://portal.local
-CORS_ALLOW_ORIGINS=http://localhost:5173,http://localhost:8011,http://192.168.25.51:5173,https://portal.local
+FRONTEND_BASE_URL=https://certhub.local
+CORS_ALLOW_ORIGINS=http://localhost:5173,http://localhost:8011,http://192.168.25.51:5173,https://certhub.local
 ```
 
 Frontend (`frontend/.env`):
@@ -138,7 +173,17 @@ Frontend (`frontend/.env`):
 VITE_API_URL=/api/v1
 ```
 
-Runbook completo: `infra/https/README.md`.
+Runbook piloto: `infra/https/README.md`  
+Trilha produção (S10.1): `docs/S10_DEPLOYMENT_GUIDE.md`
+
+### Rollback (S10)
+- Parar Caddy (encerre a janela/processo do `caddy run`).
+- Voltar para dev local:
+  - API: `http://127.0.0.1:8010`
+  - Frontend Vite: `npm run dev` (em `frontend/`)
+- Reverter `hosts` com backup:
+  - Backup gerado em `C:\Windows\System32\drivers\etc\hosts.bak`
+  - Restaurar para `C:\Windows\System32\drivers\etc\hosts` (como admin).
 
 ### KEEP_UNTIL (one-shot auto-delete)
 Quando um job chega com `cleanup_mode=KEEP_UNTIL`, o Agent cria uma task **ONCE** via `schtasks` no horário local do `keep_until`.
