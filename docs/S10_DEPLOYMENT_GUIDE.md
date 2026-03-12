@@ -18,8 +18,8 @@ Passos:
 3. Garantir backend em `127.0.0.1:8010` e frontend em `frontend/dist`.
 4. Iniciar Caddy com o arquivo de produção.
 5. Validar:
-   - `curl -I https://<dominio>`
-   - `curl -I https://<dominio>/api/v1/health`
+   - `curl.exe -I https://<dominio>`
+   - `curl.exe -fsSL https://<dominio>/health`
 
 ## Opção 2: CA corporativa
 Quando usar:
@@ -30,7 +30,7 @@ Passos high-level:
 1. Emitir certificado server para o domínio final no PKI corporativo.
 2. Instalar cadeia completa (root/intermediate) no servidor e clientes.
 3. Configurar Caddy para usar cert/key emitidos pela CA corporativa.
-4. Validar cadeia e hostname com `curl -I https://<dominio>`.
+4. Validar cadeia e hostname com `curl.exe -I https://<dominio>`.
 
 ## Rodar como serviço no Windows (abordagem NSSM)
 Sem download automático neste repositório.
@@ -46,7 +46,7 @@ Passos:
 ## Renovação e monitoramento
 - Let's Encrypt: renovação automática pelo Caddy (validar logs periodicamente).
 - Verificação rápida:
-  - `curl -Iv https://<dominio>`
+  - `curl.exe -Iv https://<dominio>`
   - `caddy list-modules` (sanidade do binário)
 - Monitorar:
   - validade do certificado
@@ -66,12 +66,21 @@ Restore mínimo:
 4. Validar health e login do portal.
 
 ## Checklist de validação (curl/PowerShell)
-1. `curl -I https://certhub.local`
-2. `curl -I https://certhub.local/api/v1/health`
-3. `.\scripts\windows\s10_validate_tls.ps1 -PortalUrl https://certhub.local`
+1. `curl.exe -I https://<dominio>`
+2. `curl.exe -fsSL https://<dominio>/health`
+3. `.\scripts\windows\s10_validate_tls.ps1 -PortalUrl https://<dominio>`
 4. Confirmar headers:
    - `Strict-Transport-Security`
    - `X-Content-Type-Options`
    - `X-Frame-Options`
    - `Content-Security-Policy`
 5. Confirmar ausência de `http://` no HTML principal.
+
+## Checklist de Aceite S10.1
+- [ ] Certificado TLS válido emitido para o domínio final (sem `-k`).
+- [ ] `GET /health` retorna HTTP 200 via `https://<dominio>/health`.
+- [ ] Headers de segurança presentes: `Strict-Transport-Security`, `X-Content-Type-Options`, `X-Frame-Options`, `Content-Security-Policy`.
+- [ ] Sem mixed content inválido (`http://`) no HTML/JS principal.
+- [ ] Renovação automática do certificado confirmada nos logs do Caddy.
+- [ ] Backup mínimo executado (Postgres + Caddyfile(s) + `.env` de ambiente).
+- [ ] Restore mínimo testado com sucesso (health e login do portal validados).

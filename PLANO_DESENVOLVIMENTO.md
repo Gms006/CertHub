@@ -1518,7 +1518,7 @@ curl --ssl-no-revoke -s https://certhub.local | Select-String "http://"
 
 **Objetivo**: transformar o piloto em trilha de produção documentada com Caddy e ACME.
 
-**Status**: 🟡 **Planejado**
+**Status**: 🟡 **Em validação operacional (documentação pronta; aceite de produção pendente)**
 
 **Entregáveis**
 - `infra/https/Caddyfile.prod.template` com placeholders de domínio/e-mail.

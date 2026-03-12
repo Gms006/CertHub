@@ -198,6 +198,19 @@ VITE_API_URL=/api/v1
 Runbook piloto: `infra/https/README.md`  
 Trilha produção (S10.1): `docs/S10_DEPLOYMENT_GUIDE.md`
 
+## S10.1 Produção (Caddy + Let's Encrypt)
+Estado atual: documentação pronta, com aceite operacional de produção pendente.
+
+Referência: `docs/S10_DEPLOYMENT_GUIDE.md`
+
+Validação curta:
+```powershell
+curl.exe --ssl-no-revoke -I https://<dominio>
+curl.exe --ssl-no-revoke -fsSL https://<dominio>/health
+curl.exe --ssl-no-revoke -I https://<dominio> | findstr /I "Strict-Transport-Security X-Content-Type-Options X-Frame-Options Content-Security-Policy"
+.\scripts\windows\s10_validate_tls.ps1 -PortalUrl "https://<dominio>"
+```
+
 ### Rollback (S10)
 - Parar Caddy (encerre a janela/processo do `caddy run`).
 - Voltar para dev local:
