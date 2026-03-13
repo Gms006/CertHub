@@ -192,6 +192,8 @@ certhub/
 │     └─ README.md
 │
 ├─ scripts/
+│  ├─ dev/
+│  │  └─ start-certhub.ps1
 │  ├─ http/
 │  │  ├─ login.admin.json
 │  │  ├─ login.dev.json

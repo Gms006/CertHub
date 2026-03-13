@@ -203,8 +203,25 @@ Estado atual: documentação pronta, com aceite operacional de produção penden
 
 Referência: `docs/S10_DEPLOYMENT_GUIDE.md`
 
+Modo funcional (FQDN público temporário testado: `certhub.duckdns.org`):
+- Não usa edição de `hosts`.
+- Requer `frontend/dist` já buildado.
+- Usa `scripts/dev/start-certhub.ps1` com Caddy de produção.
+
+```powershell
+.\scripts\dev\start-certhub.ps1 -Mode PublicTls -CertDomain "certhub.duckdns.org" -LeEmail "<SEU_EMAIL>"
+```
+
 Validação curta:
 ```powershell
+Resolve-DnsName certhub.duckdns.org
+curl.exe -fsSL http://127.0.0.1:8010/health
+caddy validate --config .\infra\https\Caddyfile.prod --adapter caddyfile
+curl.exe --ssl-no-revoke -I https://certhub.duckdns.org
+curl.exe --ssl-no-revoke -fsSL https://certhub.duckdns.org/health
+.\scripts\windows\s10_validate_tls.ps1 -PortalUrl "https://certhub.duckdns.org"
+
+# Genérico
 curl.exe --ssl-no-revoke -I https://<dominio>
 curl.exe --ssl-no-revoke -fsSL https://<dominio>/health
 curl.exe --ssl-no-revoke -I https://<dominio> | findstr /I "Strict-Transport-Security X-Content-Type-Options X-Frame-Options Content-Security-Policy"

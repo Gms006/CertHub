@@ -21,6 +21,23 @@ Passos:
    - `curl.exe -I https://<dominio>`
    - `curl.exe -fsSL https://<dominio>/health`
 
+### Execução funcional com launcher (`scripts/dev/start-certhub.ps1`)
+FQDN temporário validado em ambiente de teste: `certhub.duckdns.org`.
+
+Sem editar `hosts`:
+1. Garantir que o DNS do domínio resolve para o IP público.
+2. Garantir backend saudável em `http://127.0.0.1:8010/health`.
+3. Garantir `frontend/dist` existente.
+4. Executar:
+   - `.\scripts\dev\start-certhub.ps1 -Mode PublicTls -CertDomain "certhub.duckdns.org" -LeEmail "<SEU_EMAIL>"`
+
+Comportamento do modo `PublicTls`:
+- Reutiliza subida de infra/backend/worker/watcher do launcher.
+- Não sobe Vite dev server; usa `frontend/dist`.
+- Gera `infra/https/Caddyfile.prod` a partir do template se não existir.
+- Roda `caddy validate` antes de `caddy run`.
+- Não altera `.env` e não depende de `hosts`.
+
 ## Opção 2: CA corporativa
 Quando usar:
 - Ambiente sem exposição pública.
@@ -75,6 +92,14 @@ Restore mínimo:
    - `X-Frame-Options`
    - `Content-Security-Policy`
 5. Confirmar ausência de `http://` no HTML principal.
+
+Validação sugerida para o FQDN temporário:
+1. `Resolve-DnsName certhub.duckdns.org`
+2. `curl.exe -fsSL http://127.0.0.1:8010/health`
+3. `caddy validate --config .\infra\https\Caddyfile.prod --adapter caddyfile`
+4. `curl.exe --ssl-no-revoke -I https://certhub.duckdns.org`
+5. `curl.exe --ssl-no-revoke -fsSL https://certhub.duckdns.org/health`
+6. `.\scripts\windows\s10_validate_tls.ps1 -PortalUrl "https://certhub.duckdns.org"`
 
 ## Checklist de Aceite S10.1
 - [ ] Certificado TLS válido emitido para o domínio final (sem `-k`).

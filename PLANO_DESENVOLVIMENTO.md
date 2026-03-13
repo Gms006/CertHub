@@ -1522,6 +1522,7 @@ curl --ssl-no-revoke -s https://certhub.local | Select-String "http://"
 
 **Entregáveis**
 - `infra/https/Caddyfile.prod.template` com placeholders de domínio/e-mail.
+- `scripts/dev/start-certhub.ps1` com modo `PublicTls` (sem hosts, com `caddy validate` pré-run).
 - Guia de implantação: `docs/S10_DEPLOYMENT_GUIDE.md`.
 - Checklist operacional de cert/renovação/backup.
 
