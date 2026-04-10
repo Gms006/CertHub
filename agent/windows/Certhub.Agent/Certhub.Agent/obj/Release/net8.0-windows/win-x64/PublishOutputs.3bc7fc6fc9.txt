@@ -1,0 +1,2 @@
+C:\Temp\CerthubAgent\publish\Certhub.Agent.pdb
+C:\Temp\CerthubAgent\publish\Certhub.Agent.exe

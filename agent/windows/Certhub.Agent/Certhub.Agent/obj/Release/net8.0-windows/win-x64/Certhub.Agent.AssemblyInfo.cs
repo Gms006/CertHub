@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Certhub.Agent")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+26c36a9b948524f88be42058039b03949b087805")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+d620a7f1386b2630777dd8e86cc7720d8a8431a5")]
 [assembly: System.Reflection.AssemblyProductAttribute("Certhub.Agent")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Certhub.Agent")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

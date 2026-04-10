@@ -15,6 +15,9 @@ type InstallJobRead = {
   requested_by_user_id: string;
   job_type: "INSTALL" | "REMOVE_CERT";
   target_thumbprint?: string | null;
+  cleanup_mode: "DEFAULT" | "KEEP_UNTIL" | "EXEMPT";
+  keep_until?: string | null;
+  keep_reason?: string | null;
   status: string;
   created_at: string;
   updated_at: string;
@@ -28,6 +31,11 @@ type CertificateRead = {
 type DeviceRead = {
   id: string;
   hostname: string;
+  assigned_user?: {
+    ad_username?: string | null;
+    nome?: string | null;
+    email?: string | null;
+  } | null;
 };
 
 const statusStyles: Record<string, string> = {
@@ -127,10 +135,33 @@ const JobsPage = () => {
       ),
     [certificates],
   );
+  const formatId = (value: string) =>
+    preferences.hideLongIds ? value.slice(0, 8) : value;
   const deviceMap = useMemo(
-    () => new Map(devices.map((device) => [device.id, device.hostname])),
+    () => new Map(devices.map((device) => [device.id, device])),
     [devices],
   );
+
+  const formatDeviceLabel = (deviceId: string) => {
+    const device = deviceMap.get(deviceId);
+    if (!device) return formatId(deviceId);
+    const userName =
+      device.assigned_user?.nome ||
+      device.assigned_user?.ad_username ||
+      device.assigned_user?.email;
+    return userName ? `${device.hostname} (${userName})` : device.hostname;
+  };
+
+  const formatRetentionPolicy = (job: InstallJobRead) => {
+    if (job.cleanup_mode === "KEEP_UNTIL") {
+      const until = formatDateTime(job.keep_until);
+      return until === "-" ? "Manter até data/hora" : `Manter até ${until}`;
+    }
+    if (job.cleanup_mode === "EXEMPT") {
+      return job.keep_reason ? `Isento (${job.keep_reason})` : "Isento de limpeza";
+    }
+    return "Remover às 18:00";
+  };
 
   const filteredJobs = useMemo(() => {
     let result = jobs;
@@ -150,7 +181,7 @@ const JobsPage = () => {
     if (!term) return result;
     return result.filter((job) => {
       const certName = job.cert_id ? certMap.get(job.cert_id)?.toLowerCase() ?? "" : "";
-      const deviceName = deviceMap.get(job.device_id)?.toLowerCase() ?? "";
+      const deviceName = formatDeviceLabel(job.device_id).toLowerCase();
       const thumbprint = job.target_thumbprint?.toLowerCase() ?? "";
       const jobTypeLabel = job.job_type === "REMOVE_CERT" ? "remoção" : "";
       return (
@@ -194,9 +225,6 @@ const JobsPage = () => {
       notify("Erro ao atualizar job.", "error");
     }
   };
-
-  const formatId = (value: string) =>
-    preferences.hideLongIds ? value.slice(0, 8) : value;
 
   const parseFileName = (contentDisposition: string | null) => {
     if (!contentDisposition) return null;
@@ -369,6 +397,7 @@ const JobsPage = () => {
               <tr>
                 <th className="px-4 py-3">Certificado</th>
                 <th className="px-4 py-3">Device</th>
+                <th className="px-4 py-3">Política de retenção</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Criado em</th>
                 <th className="px-4 py-3 text-right">Erros</th>
@@ -410,9 +439,14 @@ const JobsPage = () => {
                   <td className="px-4 py-3 text-slate-600">
                     <span
                       className="inline-block max-w-[160px] truncate"
-                      title={deviceMap.get(job.device_id) ?? job.device_id}
+                      title={formatDeviceLabel(job.device_id)}
                     >
-                      {deviceMap.get(job.device_id) ?? formatId(job.device_id)}
+                      {formatDeviceLabel(job.device_id)}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-slate-600">
+                    <span className="inline-block max-w-[220px] truncate" title={formatRetentionPolicy(job)}>
+                      {formatRetentionPolicy(job)}
                     </span>
                   </td>
                   <td className="px-4 py-3">

@@ -9,6 +9,8 @@ from app.schemas.certificate import CertificatePortalRead
 CN_PATTERN = re.compile(r"(?:^|,)\s*CN=([^,]+)", flags=re.IGNORECASE)
 CNPJ_PATTERN = re.compile(r"\b\d{2}\.?\d{3}\.?\d{3}/?\d{4}-?\d{2}\b")
 CPF_PATTERN = re.compile(r"\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b")
+ELEVEN_DIGITS_PATTERN = re.compile(r"(?<!\d)(\d{11})(?!\d)")
+FOURTEEN_DIGITS_PATTERN = re.compile(r"(?<!\d)(\d{14})(?!\d)")
 
 
 def sanitize_certificate_name(value: str) -> str:
@@ -39,23 +41,40 @@ def _detect_document(
 ) -> tuple[Literal["CNPJ", "CPF"] | None, str | None]:
     if not value:
         return None, None
-    for doc_type, pattern in (("CNPJ", CNPJ_PATTERN), ("CPF", CPF_PATTERN)):
-        match = pattern.search(value)
-        if match:
-            digits = re.sub(r"\D", "", match.group(0))
-            if len(digits) == 14 and doc_type == "CNPJ":
-                return doc_type, digits
-            if len(digits) == 11 and doc_type == "CPF":
-                return doc_type, digits
-    digits = re.sub(r"\D", "", value)
-    if len(digits) == 14:
-        return "CNPJ", digits
-    if len(digits) == 11:
-        return "CPF", digits
-    if len(digits) >= 14:
-        return "CNPJ", digits[:14]
-    if len(digits) >= 11:
-        return "CPF", digits[:11]
+
+    candidates: list[tuple[int, Literal["CNPJ", "CPF"], str]] = []
+
+    for match in CNPJ_PATTERN.finditer(value):
+        digits = re.sub(r"\D", "", match.group(0))
+        if len(digits) == 14:
+            candidates.append((match.start(), "CNPJ", digits))
+    for match in CPF_PATTERN.finditer(value):
+        digits = re.sub(r"\D", "", match.group(0))
+        if len(digits) == 11:
+            candidates.append((match.start(), "CPF", digits))
+
+    for label, expected_len in (("CPF", 11), ("CNPJ", 14)):
+        label_pattern = re.compile(rf"{label}\D{{0,10}}([\d./-]{{11,20}})", re.IGNORECASE)
+        for match in label_pattern.finditer(value):
+            digits = re.sub(r"\D", "", match.group(1))
+            if len(digits) >= expected_len:
+                doc_type: Literal["CNPJ", "CPF"] = "CPF" if label == "CPF" else "CNPJ"
+                candidates.append((match.start(), doc_type, digits[:expected_len]))
+
+    for match in FOURTEEN_DIGITS_PATTERN.finditer(value):
+        candidates.append((match.start(), "CNPJ", match.group(1)))
+    for match in ELEVEN_DIGITS_PATTERN.finditer(value):
+        candidates.append((match.start(), "CPF", match.group(1)))
+
+    if candidates:
+        _position, doc_type, digits = min(candidates, key=lambda item: item[0])
+        return doc_type, digits
+
+    compact_digits = re.sub(r"\D", "", value)
+    if len(compact_digits) == 14:
+        return "CNPJ", compact_digits
+    if len(compact_digits) == 11:
+        return "CPF", compact_digits
     return None, None
 
 
@@ -72,7 +91,7 @@ def _mask_document(doc_type: str | None, digits: str | None) -> str | None:
 def parse_subject_summary(subject: str | None, issuer: str | None) -> dict[str, str | None]:
     cn = _extract_cn(subject)
     issuer_cn = _extract_cn(issuer)
-    doc_type, digits = _detect_document(" ".join(filter(None, [subject, cn])))
+    doc_type, digits = _detect_document(" ".join(filter(None, [cn, subject])))
     return {
         "cn": cn,
         "issuer_cn": issuer_cn,

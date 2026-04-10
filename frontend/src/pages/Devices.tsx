@@ -31,7 +31,6 @@ type DeviceRead = {
     ad_username: string;
     email?: string | null;
     nome?: string | null;
-    auto_approve_install_jobs?: boolean;
   } | null;
 };
 
@@ -67,8 +66,6 @@ const DevicesPage = () => {
           assigned_user: device.assigned_user
             ? {
                 ...device.assigned_user,
-                auto_approve_install_jobs:
-                  device.assigned_user.auto_approve_install_jobs ?? false,
               }
             : null,
         })),
@@ -137,53 +134,9 @@ const DevicesPage = () => {
     }
   };
 
-  const handleAutoApproveToggle = async (userId: string, nextValue: boolean) => {
-    try {
-      const response = await apiFetch(`/admin/users/${userId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ auto_approve_install_jobs: nextValue }),
-      });
-      if (!response.ok) {
-        const data = (await response.json()) as { detail?: string };
-        notify(data?.detail ?? "Não foi possível atualizar auto approve.", "error");
-        return;
-      }
-      notify(nextValue ? "Auto approve ativado." : "Auto approve desativado.");
-      setDevices((prev) =>
-        prev.map((device) =>
-          device.assigned_user?.id === userId
-            ? {
-                ...device,
-                assigned_user: device.assigned_user
-                  ? {
-                      ...device.assigned_user,
-                      auto_approve_install_jobs: nextValue,
-                    }
-                  : null,
-              }
-            : device,
-        ),
-      );
-      setSelectedDevice((prev) =>
-        prev && prev.assigned_user?.id === userId
-          ? {
-              ...prev,
-              assigned_user: prev.assigned_user
-                ? { ...prev.assigned_user, auto_approve_install_jobs: nextValue }
-                : null,
-            }
-          : prev,
-      );
-      loadDevices();
-    } catch {
-      notify("Erro ao atualizar auto approve.", "error");
-    }
-  };
-
-  const handleRetentionToggle = async (
+  const handleDevicePolicyToggle = async (
     deviceId: string,
-    field: "allow_keep_until" | "allow_exempt",
+    field: "auto_approve" | "allow_keep_until" | "allow_exempt",
     nextValue: boolean,
   ) => {
     if (!isDev) {
@@ -199,17 +152,21 @@ const DevicesPage = () => {
       });
       if (!response.ok) {
         const data = (await response.json()) as { detail?: string };
-        notify(data?.detail ?? "Não foi possível atualizar retenção.", "error");
+        notify(data?.detail ?? "Não foi possível atualizar configuração.", "error");
         return;
       }
       notify(
-        field === "allow_keep_until"
+        field === "auto_approve"
           ? nextValue
-            ? "Keep Until permitido."
-            : "Keep Until bloqueado."
-          : nextValue
-            ? "Exempt permitido."
-            : "Exempt bloqueado.",
+            ? "Auto approve ativado."
+            : "Auto approve desativado."
+          : field === "allow_keep_until"
+            ? nextValue
+              ? "Keep Until permitido."
+              : "Keep Until bloqueado."
+            : nextValue
+              ? "Exempt permitido."
+              : "Exempt bloqueado.",
       );
       setDevices((prev) =>
         prev.map((device) =>
@@ -231,7 +188,7 @@ const DevicesPage = () => {
       );
       loadDevices();
     } catch {
-      notify("Erro ao atualizar retenção.", "error");
+      notify("Erro ao atualizar configuração.", "error");
     } finally {
       setRetentionUpdating((prev) => {
         const next = { ...prev };
@@ -239,6 +196,14 @@ const DevicesPage = () => {
         return next;
       });
     }
+  };
+
+  const handleRetentionToggle = async (
+    deviceId: string,
+    field: "allow_keep_until" | "allow_exempt",
+    nextValue: boolean,
+  ) => {
+    return handleDevicePolicyToggle(deviceId, field, nextValue);
   };
 
   if (!isAdmin) {
@@ -459,36 +424,26 @@ const DevicesPage = () => {
                         Auto approve
                       </p>
                       <p className="text-xs text-slate-500">
-                        Aprovar automaticamente instalações para o usuário vinculado.
+                        Aprovar automaticamente instalações para este dispositivo.
                       </p>
                     </div>
                     <label className="inline-flex cursor-pointer items-center gap-2 text-xs text-slate-600">
                       <input
                         type="checkbox"
                         className="h-4 w-4 rounded border-slate-300"
-                        checked={Boolean(
-                          selectedDevice.assigned_user?.auto_approve_install_jobs,
-                        )}
-                        disabled={!selectedDevice.assigned_user}
+                        checked={Boolean(selectedDevice.auto_approve)}
+                        disabled={retentionUpdating[`${selectedDevice.id}:auto_approve`]}
                         onChange={(event) =>
-                          selectedDevice.assigned_user
-                            ? handleAutoApproveToggle(
-                                selectedDevice.assigned_user.id,
-                                event.target.checked,
-                              )
-                            : undefined
+                          handleDevicePolicyToggle(
+                            selectedDevice.id,
+                            "auto_approve",
+                            event.target.checked,
+                          )
                         }
                       />
-                      {selectedDevice.assigned_user?.auto_approve_install_jobs
-                        ? "Ativo"
-                        : "Inativo"}
+                      {selectedDevice.auto_approve ? "Ativo" : "Inativo"}
                     </label>
                   </div>
-                  {!selectedDevice.assigned_user ? (
-                    <p className="mt-2 text-xs text-slate-400">
-                      Vincule um usuário para habilitar o auto approve.
-                    </p>
-                  ) : null}
                 </div>
                 <div className="rounded-2xl border border-slate-200 bg-white p-4">
                   <div className="flex items-center justify-between gap-3">

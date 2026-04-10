@@ -26,6 +26,9 @@ certhub.local {
 	handle /redoc* {
 		reverse_proxy 127.0.0.1:8010
 	}
+		handle /static/* {
+    	reverse_proxy 127.0.0.1:8010
+	}
 
 	# API v1 (preserva /api/v1 no upstream)
 	handle /api/v1/* {

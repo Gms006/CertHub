@@ -127,13 +127,6 @@ const mapStatusToCert = (status: StatusKey): CertStatus => {
   return "VALIDO";
 };
 
-const toISODate = (value?: string | null) => {
-  if (!value) return "-";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "-";
-  return date.toISOString().slice(0, 10);
-};
-
 const formatDocument = (value: string) => value || "-";
 
 const formatCpf = (digits: string) =>
@@ -146,25 +139,52 @@ const formatCnpj = (digits: string) =>
   )}-${digits.slice(12, 14)}`;
 
 const buildMaskedDocument = (cert: CertificateRead) => {
-  const unmasked = cert.document_unmasked?.trim() ?? "";
-  const digits = extractDigits((unmasked || cert.document_masked) ?? "");
+  const type = cert.document_type ?? null;
+  const unmaskedDigits = extractDigits(cert.document_unmasked);
+  const maskedDigits = extractDigits(cert.document_masked);
 
-  if (digits.length === 11) {
-    return `CPF ${formatCpf(digits)}`;
+  if (type === "CPF" && unmaskedDigits.length === 11) {
+    return `CPF ${formatCpf(unmaskedDigits)}`;
   }
 
-  if (digits.length === 14) {
-    return `CNPJ ${formatCnpj(digits)}`;
+  if (type === "CNPJ" && unmaskedDigits.length === 14) {
+    return `CNPJ ${formatCnpj(unmaskedDigits)}`;
+  }
+
+  if (unmaskedDigits.length === 11) {
+    return `CPF ${formatCpf(unmaskedDigits)}`;
+  }
+
+  if (unmaskedDigits.length === 14) {
+    return `CNPJ ${formatCnpj(unmaskedDigits)}`;
+  }
+
+  if (maskedDigits.length === 11) {
+    return `CPF ${formatCpf(maskedDigits)}`;
+  }
+
+  if (maskedDigits.length === 14) {
+    return `CNPJ ${formatCnpj(maskedDigits)}`;
   }
 
   const maskedValue = cert.document_masked?.trim() ?? "";
-  const cleanedValue = maskedValue.replace(/\*/g, "").trim();
+  const cleanedValue = maskedValue.replace(/\*/g, "").replace(/\s+/g, " ").trim();
   if (cleanedValue) {
-    const inferredType = cert.document_type || (cleanedValue.startsWith("CPF") ? "CPF" : cleanedValue.startsWith("CNPJ") ? "CNPJ" : null);
-    if (inferredType && !cleanedValue.startsWith(inferredType)) {
-      return `${inferredType} ${cleanedValue}`;
+    if (type === "CPF") {
+      const normalized = cleanedValue.replace(/^CNPJ\s+/i, "").trim();
+      return normalized.toUpperCase().startsWith("CPF")
+        ? normalized
+        : `CPF ${normalized}`;
     }
-    return cleanedValue;
+    if (type === "CNPJ") {
+      const normalized = cleanedValue.replace(/^CPF\s+/i, "").trim();
+      return normalized.toUpperCase().startsWith("CNPJ")
+        ? normalized
+        : `CNPJ ${normalized}`;
+    }
+    return cleanedValue.replace(/^(cpf|cnpj)\s+/i, (label) =>
+      label.toUpperCase(),
+    );
   }
 
   return "-";
@@ -727,7 +747,7 @@ const CertificatesPage = () => {
             </span>
             <input
               className="h-11 w-full rounded-2xl border border-slate-200 bg-white pl-9 text-sm text-slate-600"
-              placeholder="Buscar por empresa, CNPJ..."
+              placeholder="Buscar por empresa, CNPJ ou CPF..."
               value={search}
               onChange={(event) => setSearch(event.target.value)}
             />
@@ -818,7 +838,7 @@ const CertificatesPage = () => {
                 empresa={empresaName}
                 cnpj={documentValue}
                 status={certStatus}
-                validadeISO={toISODate(cert.not_after)}
+                validadeISO={formatDate(cert.not_after)}
                 diasLabel={statusInfo.meta}
                 titular={empresaName}
                 serial={cert.serial_number ?? undefined}
